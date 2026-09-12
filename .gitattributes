@@ -1,0 +1,17 @@
+# 统一换行符，避免 Windows 与其它平台来回改行尾
+* text=auto eol=lf
+
+# Godot 的文本型资源必须走文本 diff，否则每次改动都看不出差异
+*.gd   text
+*.tscn text
+*.tres text
+*.godot text
+
+# 二进制资源，交给 Git LFS 或原样存储
+*.png  binary
+*.jpg  binary
+*.ogg  binary
+*.wav  binary
+*.ttf  binary
+*.otf  binary
+*.pck  binary

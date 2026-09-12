@@ -1,0 +1,31 @@
+# Godot 4+ 专属
+.godot/
+/android/
+
+# Godot 导入缓存
+.import/
+
+# 导出配置（含本机路径，不入库）
+export.cfg
+export_presets.cfg
+
+# 自动生成的翻译资源
+*.translation
+
+# C# / Mono（本项目暂未使用，先留着）
+.mono/
+data_*/
+mono_crash.*.json
+
+# 导出的构建产物
+/build/
+
+# 编辑器与系统垃圾
+.vscode/
+.idea/
+*.tmp
+Thumbs.db
+desktop.ini
+
+# Godot 无头运行（--headless）时的 user:// 回退目录，正常用编辑器不会产生
+/Godot/

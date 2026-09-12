@@ -1,0 +1,71 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_player"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(640, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_platform"]
+size = Vector2(96, 12)
+
+[node name="TestRoom" type="Node2D"]
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(320, 332)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Ground"]
+offset_left = -320.0
+offset_top = -12.0
+offset_right = 320.0
+offset_bottom = 12.0
+mouse_filter = 2
+color = Color(0.29, 0.27, 0.24, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="PlatformA" type="StaticBody2D" parent="."]
+position = Vector2(140, 290)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="PlatformA"]
+offset_left = -48.0
+offset_top = -6.0
+offset_right = 48.0
+offset_bottom = 6.0
+mouse_filter = 2
+color = Color(0.37, 0.34, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatformA"]
+shape = SubResource("RectangleShape2D_platform")
+
+[node name="PlatformB" type="StaticBody2D" parent="."]
+position = Vector2(500, 265)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="PlatformB"]
+offset_left = -48.0
+offset_top = -6.0
+offset_right = 48.0
+offset_bottom = 6.0
+mouse_filter = 2
+color = Color(0.37, 0.34, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatformB"]
+shape = SubResource("RectangleShape2D_platform")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector2(200, 280)
+
+[node name="Hint" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 6.0
+offset_right = 480.0
+offset_bottom = 26.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "BAILIAN  /  M1 prototype  /  A-D or arrows to move, Space-W-Up to jump"
