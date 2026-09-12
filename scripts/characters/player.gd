@@ -1,5 +1,5 @@
 extends CharacterBody2D
-## 《百炼》玩家角色 —— M1 的第一步：只做「移动 + 跳跃」，不含战斗。
+## 《百炼》玩家角色 —— M1 的第一步：只做「移动 + 跳跃 + 朝向」，不含战斗。
 ##
 ## 设计原则（整个项目都遵守）：
 ##   1. 所有可调数值放在 @export 里，在检查器里直接改、立刻看效果，不要改代码重跑。
@@ -31,11 +31,17 @@ var _gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity", 
 var _coyote_timer: float = 0.0
 var _jump_buffer_timer: float = 0.0
 
+## 面朝方向：1 = 右，-1 = 左。它是一份"状态"，不是每帧算出来的临时值
+var _facing: int = 1
+
+@onready var _visuals: Node2D = $Visuals
+
 
 func _physics_process(delta: float) -> void:
 	_apply_gravity(delta)
 	_update_jump(delta)
 	_update_horizontal(delta)
+	_update_facing()
 	move_and_slide()
 
 
@@ -74,26 +80,36 @@ func _update_horizontal(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, decel * delta)
 
 
+func _update_facing() -> void:
+	# 只在真正有横向速度时更新朝向。
+	# 这样"停下来"的那一刻会保留上一次的朝向，而不是弹回默认的右侧。
+	if not is_zero_approx(velocity.x):
+		_facing = 1 if velocity.x > 0.0 else -1
+
+	# 翻转整个 Visuals 容器，而不是逐个去改 Body / Face 的位置。
+	# 目的：M3 把色块换成真正的美术资源时，这里一行都不用改。
+	_visuals.scale.x = float(_facing)
+
+
 # ═══════════════════════════════════════════════════════════════════
-# 你的第一个练习 —— 本轮唯一的任务
+# 你的任务：审查，不是重写
 #
-# 现状：角色身上有两块方块，Body（橙色身体）和 Face（白色小方块，代表"脸"）。
-#       现在不管往哪走，脸都固定在右边，很别扭。
+# 分工约定已调整为「AI 写代码，你审查并修正」。审查不等于扫一眼说"挺好"，
+# 要对下面三个问题给出答案。答不上来就说明这段代码还不属于你 —— 那就来问我。
 #
-# 目标：让"面朝方向"有视觉反馈。
-#   1) 往左走时，Face 应出现在身体左侧；往右走时回到右侧。
-#   2) 只用改 Face 这个子节点的位置（它的位置由 offset_left / offset_right 决定，
-#      你现在拿到的是 Control 类型的 ColorRect）。
-#   3) 判定依据是 velocity.x 的正负，注意还要处理"停下"的情况
-#      —— 停下时应该保持上一次的朝向，而不是弹回默认方向。
+# Q1（读代码）为什么这里要先存一个 _facing 成员变量，
+#    而不是每次直接写 _visuals.scale.x = signf(velocity.x)？
+#    提示：想想 velocity.x 正好等于 0 的那一刻，signf(0) 会返回什么，
+#    以及角色停下时会发生什么。
 #
-# 提示（Godot 4 的 API）：
-#   - 取子节点：$Face
-#   - Control 的水平位置：position.x，或直接改 offset_left / offset_right
-#   - 更省事的做法：给 Face 设一个基准位置，需要翻转时用 -abs() / abs()
+# Q2（动手调）把 max_speed、jump_velocity、fall_gravity_scale 各改一次，
+#    每改一次跑一遍 test_room，用一句话说清"手感变好还是变坏，为什么"。
+#    这三个数值没有标准答案，你需要形成自己的判断 —— 这是策划能力的起点。
 #
-# 做完之后：
-#   1) 在游戏里左右跑一遍，确认脸跟着转
-#   2) git add -A && git commit，message 写清楚你做了什么
-#   3) 把这个注释块删掉，换成你的实现
+# Q3（判断设计）为什么翻转的是 Visuals 这个空节点，
+#    而不是分别去改 Body 和 Face 的 offset？
+#    提示：想想 M3 要换成真正的美术资源（Sprite2D / AnimatedSprite2D）时，
+#    哪种写法不用动代码。
+#
+# 三个答案写进 commit message。想不清楚的直接问，别装懂。
 # ═══════════════════════════════════════════════════════════════════
