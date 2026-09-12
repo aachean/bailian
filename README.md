@@ -47,11 +47,13 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 godot --path . --write-movie build/reel/frames.png --fixed-fps 60 res://tests/demo_reel.tscn
 
 # 2. 合成 mp4（土狼/缓冲那两段 0.1 秒的窗口会被放慢 5×，否则肉眼看不出计时器在倒数）
-python tools/reel_assemble.py --reel build/reel
+python "%USERPROFILE%\.workbuddy\skills\godot-headless-testing\scripts\reel_assemble.py" --reel build/reel
 ```
 
-> `tools/reel_assemble.py` 在仓库外（`D:\workbuddy_projects\tools\`）——它属于开发工具，
-> 不是游戏本体。
+> 合成脚本属于开发工具，不在本仓库里；它随技能 `godot-headless-testing` 走。
+> 帧号对齐：录下的第 N 帧（从 0 起算）对应脚本里的 `tick = N + 1`
+> —— 已用画面上的 `tick=` 读数核对过。录制尾部会多出约 24 帧（收尾等待期），
+> 合成脚本按 `reel_meta.json` 里的总帧数裁掉。
 
 画面截图（窗口模式，输出到 `build/shots/`，该目录不入库）：
 
