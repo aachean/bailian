@@ -7,6 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 当前阶段 | **M1 · 战斗原型**（第 0–4 周） |
+| 远端 | https://github.com/aachean/bailian（私有） |
 | 完整计划 | [docs/game-development-plan.md](docs/game-development-plan.md) |
 
 ---
@@ -70,6 +71,8 @@ res://
 - 测试房间 `test_room.tscn`：地面 + 两块平台，用于验证跳跃手感
 - 设计文档落地：`docs/game-development-plan.md`
 - 协作模式调整为 **A · 审查式**（AI 写代码，神 审查并修正）
+- 纳入 **Apache-2.0 LICENSE**（沿用建仓时 GitHub 生成的文本，blob `261eeb9e`）
+- 建立远端仓库 `aachean/bailian`（私有）并完成首次推送，本地与远端 SHA 逐字节一致
 - **已知待办**：中文字体尚未接入，场景内文字暂用英文。Godot 默认主题字体不含 CJK 字形，
   接对话框系统（M3）之前必须先接入思源黑体等 OFL 授权字体，否则中文会显示成方框
 
