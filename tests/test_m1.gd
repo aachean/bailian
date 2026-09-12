@@ -14,6 +14,11 @@ extends Node
 ##    所以按下按键后必须等 2 个物理帧，玩家的 _physics_process 才会处理完这次输入。
 ## 2) CharacterBody2D.is_on_floor() 是上一次 move_and_slide() 的结果，
 ##    瞬移位置后要等 1 帧才会反映出来。所有"瞬移到空中"的操作后面都要先等 1 帧。
+##
+## ── 一条覆盖纪律（2026-09-13 补）─────────────────────────────
+## 凡是用「瞬移角色」做的断言，都只证明了碰撞盒和数值存在，证明不了玩家做得到。
+## 断言里至少要留一条走「完整操作链」的：真的助跑、真的按跳、真的落上去（见 #12）。
+## 配套的可视化回放在 tests/demo_reel.gd，它把同一批机制演一遍并把遥测打在画面上。
 
 const ROOM := preload("res://scenes/stages/test_room.tscn")
 const FPS := 60.0
@@ -54,6 +59,7 @@ func _ready() -> void:
 	await _t7_buffer()
 	await _t8_facing()
 	await _t10_platforms()
+	await _t12_run_jump_onto_platform()
 	_t11_not_implemented()
 
 	print("")
@@ -355,6 +361,38 @@ func _t10_platforms() -> void:
 	_check("10", "两块平台都站得住",
 		all_ok,
 		" ／ ".join(results))
+	await _settle()
+
+
+## #12 助跑起跳，把高台当台阶踩上去。
+##
+## 为什么单列这一条：#10 是把角色瞬移到平台正上方自由落体，只能证明「碰撞盒生效」，
+## 测不出「助跑起跳的抛物线能不能落在台面上」——而后者才是玩家实际会做的事。
+## 这个漏洞是 2026-09-13 录自动操作回放时才暴露的：当时剧本里角色落地后一直
+## 按着右键，径直走出台面掉回地面，测试却全绿。
+func _t12_run_jump_onto_platform() -> void:
+	await _settle()
+	var p: Node2D = _room.get_node("PlatformB")
+	var stand_y: float = _body_top(p) - 16.0
+	_press("move_right")
+	var n := 0
+	while n < 300 and _player.global_position.x < 390.0:
+		await get_tree().physics_frame
+		n += 1
+	await _tap("jump", 2)
+	var landed := false
+	n = 0
+	while n < 220:
+		await get_tree().physics_frame
+		n += 1
+		if n > 6 and _player.is_on_floor():
+			landed = absf(_player.global_position.y - stand_y) < 4.0
+			break
+	_release_all()
+	_check("12", "助跑起跳：能把高台当台阶踩上去（不只是「碰撞盒存在」）",
+		landed,
+		"落脚 (%.1f, %.1f)，台面站立高度 %.1f" % [
+			_player.global_position.x, _player.global_position.y, stand_y])
 	await _settle()
 
 

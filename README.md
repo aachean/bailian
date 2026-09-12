@@ -30,6 +30,29 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 
 它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。
 
+### 断言纪律（别破）
+
+凡是用「瞬移角色」做的断言，只证明了碰撞盒和数值存在，**证明不了玩家做得到**。
+所以断言里至少留一条走完整操作链的：真的助跑、真的按跳、真的落上去（见 `#12`）。
+这条纪律是踩过坑补的：`#10` 把角色瞬移到台上自由落体，全绿，但当时「助跑跳上高台」
+这个玩家真会做的动作其实没人验证过。
+
+### 可视化回放（demo reel）
+
+同一批机制的「可观看版」：脚本自己注入按键、自己打字幕、把 `on_floor` / `coyote` /
+`buffer` / `velocity` 实时打在画面上，再录成视频。不需要人在场，也不需要装插件。
+
+```
+# 1. 录制（窗口模式；会在屏幕上开一个窗口，录完自动退出）
+godot --path . --write-movie build/reel/frames.png --fixed-fps 60 res://tests/demo_reel.tscn
+
+# 2. 合成 mp4（土狼/缓冲那两段 0.1 秒的窗口会被放慢 5×，否则肉眼看不出计时器在倒数）
+python tools/reel_assemble.py --reel build/reel
+```
+
+> `tools/reel_assemble.py` 在仓库外（`D:\workbuddy_projects\tools\`）——它属于开发工具，
+> 不是游戏本体。
+
 画面截图（窗口模式，输出到 `build/shots/`，该目录不入库）：
 
 ```
@@ -55,5 +78,5 @@ res://
 │   ├── characters/  enemies/  equipment/  skills/  stages/
 ├── assets/          sprites / audio / fonts
 ├── addons/          第三方插件
-└── tests/           自动验收与截图（不参与游戏运行）
+└── tests/           自动验收 / 可视化回放 / 截图（不参与游戏运行）
 ```
