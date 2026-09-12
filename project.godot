@@ -1,11 +1,10 @@
 ; Engine configuration file.
-; 建议用编辑器 UI 修改，手改容易漏掉联动项。
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
 ;
-; 本文件的关键约定：
-;   - 视口 640x360，按 canvas_items 拉伸到 1280x720 窗口（整数倍，像素不糊）
-;   - 渲染后端选 GL Compatibility：2D 项目够用、启动快、兼容性好，日后好做网页版
-;   - 贴图过滤设为 Nearest：为将来的像素美术准备
-;   - 碰撞层命名见 [layer_names]，新增层时同步更新这里
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -24,7 +23,6 @@ window/size/viewport_height=360
 window/size/window_width_override=1280
 window/size/window_height_override=720
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
 [input]
 
@@ -72,7 +70,7 @@ dodge={
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/canvas_textures/default_texture_filter=0
 environment/defaults/default_clear_color=Color(0.102, 0.106, 0.129, 1)
