@@ -29,3 +29,6 @@ desktop.ini
 
 # Godot 无头运行（--headless）时的 user:// 回退目录，正常用编辑器不会产生
 /Godot/
+
+# 设计/计划/过程文档一律不进入本仓库（见 docs/adr/0001，文档在仓库外维护）
+/docs/
