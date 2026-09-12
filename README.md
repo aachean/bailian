@@ -79,6 +79,6 @@ res://
 ├── data/            数据资源（.tres）← 内容都长在这里，脚本里不写魔法数字
 │   ├── characters/  enemies/  equipment/  skills/  stages/
 ├── assets/          sprites / audio / fonts
-├── addons/          第三方插件
+├── addons/          第三方插件 + ai_bridge（AI 实时操控桥，见上）
 └── tests/           自动验收 / 可视化回放 / 截图（不参与游戏运行）
 ```

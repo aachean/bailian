@@ -16,6 +16,10 @@ run/main_scene="res://scenes/stages/test_room.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+AiBridge="*res://addons/ai_bridge/bridge.gd"
+
 [display]
 
 window/size/viewport_width=640
