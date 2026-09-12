@@ -1,13 +1,15 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/characters/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/components/hitbox.gd" id="2_hitbox"]
+[ext_resource type="Script" path="res://scripts/components/health.gd" id="3_health"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(24, 32)
 
 [node name="Player" type="CharacterBody2D" groups=["player"]]
 collision_layer = 1
-collision_mask = 4
+collision_mask = 6
 script = ExtResource("1_player")
 
 [node name="Visuals" type="Node2D" parent="."]
@@ -27,6 +29,22 @@ offset_right = 9.0
 offset_bottom = -5.0
 mouse_filter = 2
 color = Color(0.98, 0.98, 0.95, 1)
+
+[node name="Blade" type="ColorRect" parent="Visuals"]
+modulate = Color(1, 1, 1, 0)
+offset_left = 12.0
+offset_top = -5.0
+offset_right = 42.0
+offset_bottom = 5.0
+mouse_filter = 2
+color = Color(0.96, 0.92, 0.76, 1)
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("3_health")
+
+[node name="Hitbox" type="Node2D" parent="."]
+script = ExtResource("2_hitbox")
+target_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_body")

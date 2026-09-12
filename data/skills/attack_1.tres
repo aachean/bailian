@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"attack_1"
+display_name = "斩击·一"
+kind = 0
+startup_frames = 6
+active_frames = 4
+recovery_frames = 8
+damage = 9
+damage_variance = 0.12
+knockback = 120.0
+hitstop_frames = 5
+heavy = false
+chainable = true
+hitbox_size = Vector2(46, 32)
+hitbox_offset = Vector2(26, -2)
+lunge_speed = 60.0
+lunge_decay_frames = 8
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 0

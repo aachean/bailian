@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/target_dummy.tscn" id="2_dummy"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(640, 24)
@@ -58,14 +59,19 @@ color = Color(0.37, 0.34, 0.3, 1)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="PlatformB"]
 shape = SubResource("RectangleShape2D_platform")
 
+[node name="TargetDummy" parent="." instance=ExtResource("2_dummy")]
+position = Vector2(590, 288)
+
 [node name="Player" parent="." instance=ExtResource("1_player")]
 position = Vector2(200, 280)
 
 [node name="Hint" type="Label" parent="."]
 offset_left = 8.0
 offset_top = 6.0
-offset_right = 480.0
-offset_bottom = 26.0
+offset_right = 560.0
+offset_bottom = 54.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "BAILIAN  /  M1 prototype  /  A-D or arrows to move, Space-W-Up to jump"
+theme_override_font_sizes/font_size = 11
+text = "BAILIAN  /  M1 combat prototype
+A-D or arrows: move    W / Space / Up: jump
+J: attack  (tap it 3 times for the 3-hit combo)    K: dodge"

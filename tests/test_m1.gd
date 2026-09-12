@@ -19,14 +19,34 @@ extends Node
 ## 凡是用「瞬移角色」做的断言，都只证明了碰撞盒和数值存在，证明不了玩家做得到。
 ## 断言里至少要留一条走「完整操作链」的：真的助跑、真的按跳、真的落上去（见 #12）。
 ## 配套的可视化回放在 tests/demo_reel.gd，它把同一批机制演一遍并把遥测打在画面上。
+##
+## ── 战斗部分的两条额外纪律（2026-09-13 补）────────────────────
+## 3) 「按了键 → 状态变了」不算验证。必须断言【结果】：靶子掉了多少血、
+##    闪避位移是多少、无敌窗口到底挡住了哪一帧的伤害。
+## 4) 一次挥砍的判定帧有好几帧，但只许结算一次伤害。这条单独测（见 #15）——
+##    多段结算的 bug 在只测「有没有掉血」的断言下完全看不出来。
 
 const ROOM := preload("res://scenes/stages/test_room.tscn")
 const FPS := 60.0
 const SPAWN := Vector2(320.0, 280.0)
 
+## 本测试房间的参照物。运行时从场景里读真实位置（见 _ready），
+## 不在代码里写死 —— 挪靶子 / 挪地面的时候，测试不该跟着改一遍。
+## 靶子站在高台右侧的空地上：从出生点到高台的助跑路线必须保持畅通，
+## 靶子摆在中间会把助跑拦腰截断（车身碰撞会挡住玩家）。
+var DUMMY_X := 0.0
+var GROUND_STAND_Y := 0.0
+
+## player.gd 里的 State 枚举
+const ST_FREE := 0
+const ST_ATTACK := 1
+const ST_DODGE := 2
+
 var _room: Node2D
 var _player             # CharacterBody2D；不标类型，才能访问 player.gd 里的 @export
 var _visuals: Node2D
+var _dummy              # 训练靶子
+var _dummy_health: Health
 
 var _pass := 0
 var _fail := 0
@@ -37,6 +57,12 @@ func _ready() -> void:
 	add_child(_room)
 	_player = _room.get_node("Player")
 	_visuals = _player.get_node("Visuals")
+	_dummy = _room.get_node("TargetDummy")
+	_dummy_health = _dummy.get_node("Health")
+
+	# 参照物从场景里读，不写死
+	DUMMY_X = _dummy.global_position.x
+	GROUND_STAND_Y = _body_top(_room.get_node("Ground")) - 16.0
 
 	await _settle()
 
@@ -49,7 +75,7 @@ func _ready() -> void:
 		str(ProjectSettings.get_setting("application/config/name")),
 	])
 	print("")
-
+	print("── 移动 / 跳跃 ──")
 	await _t1_accel()
 	await _t2_stop()
 	await _t3_both_dirs()
@@ -60,7 +86,21 @@ func _ready() -> void:
 	await _t8_facing()
 	await _t10_platforms()
 	await _t12_run_jump_onto_platform()
-	_t11_not_implemented()
+	print("")
+	print("── 战斗 ──")
+	await _t11_combat_wired()
+	await _t13_attack_startup()
+	await _t14_attack_damage()
+	await _t15_single_hit_per_swing()
+	await _t16_combo_three_hits()
+	await _t17_finisher_locks()
+	await _t18_no_move_during_attack()
+	await _t19_dodge_distance()
+	await _t20_dodge_invincible()
+	await _t21_dodge_cooldown()
+	await _t22_dodge_cancels_attack()
+	await _t23_dummy_revives()
+	await _t24_full_chain()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -131,6 +171,40 @@ func _settle() -> void:
 	await _step(3)
 
 
+## 把玩家摆到指定 x、朝右、真正站到地面上。
+##
+## 瞬移之后 is_on_floor() 还保留着上一帧的结果（通常是 true），所以必须先等一帧
+## 让物理把真实状态反映出来，再判断有没有落地。这个坑咬过一次：条件写在 await 之前，
+## 循环立刻退出，玩家悬在离地 16px 的空中 —— 而「攻击要求站在地上」把后面
+## 所有战斗断言全废了，症状却是「按 J 没反应」。
+func _place_player(x: float) -> void:
+	_release_all()
+	await _step(2)
+	_player.global_position = Vector2(x, GROUND_STAND_Y - 16.0)
+	_player.velocity = Vector2.ZERO
+	_player._facing = 1
+	_visuals.scale.x = 1.0
+	await get_tree().physics_frame
+	var n := 0
+	while n < 90 and not _player.is_on_floor():
+		await get_tree().physics_frame
+		n += 1
+	await _step(2)
+
+
+## 把玩家摆到靶子左边 gap 像素处，并把靶子恢复到满血干净状态。
+## 战斗断言的前提是「玩家和靶子的相对位置固定」，所以每条战斗测试都从这里起步。
+func _face_dummy(gap: float = 40.0) -> void:
+	await _place_player(DUMMY_X - gap)
+	_dummy.health.heal_full()
+	_dummy.hits_taken = 0
+	_dummy.total_damage_taken = 0
+	_dummy.modulate.a = 1.0
+	_dummy.set_collision_layer_value(2, true)
+	_dummy.get_node("HealthBar").visible = true
+	await _step(2)
+
+
 ## 取一个 StaticBody2D 碰撞盒的顶面 y。
 func _body_top(body: Node2D) -> float:
 	var cs: CollisionShape2D = body.get_node("CollisionShape2D")
@@ -139,7 +213,7 @@ func _body_top(body: Node2D) -> float:
 
 
 # ─────────────────────────────────────────────────────────────
-# 逐条验收
+# 移动 / 跳跃
 # ─────────────────────────────────────────────────────────────
 
 ## #1 按住方向键：很快到匀速，不是慢慢加速
@@ -396,15 +470,354 @@ func _t12_run_jump_onto_platform() -> void:
 	await _settle()
 
 
-## #11 攻击/闪避：输入映射已就绪，但尚未接入逻辑 —— 按了没反应是预期
-func _t11_not_implemented() -> void:
-	var mapped := true
-	for a in ["attack", "dodge"]:
-		if not InputMap.has_action(a):
-			mapped = false
-	var f := FileAccess.open("res://scripts/characters/player.gd", FileAccess.READ)
-	var src: String = f.get_as_text() if f != null else ""
-	var wired: bool = src.contains("\"attack\"") or src.contains("\"dodge\"")
-	_check("11", "按 J / K：没反应（攻击、闪避尚未实现，预期）",
-		mapped and not wired,
-		"输入映射已就绪=%s，脚本中已接入=%s" % [mapped, wired])
+# ─────────────────────────────────────────────────────────────
+# 战斗
+# ─────────────────────────────────────────────────────────────
+
+## #11 按 J / K 都有反应（这一条在战斗实现之前是「没反应」，现在反过来）
+func _t11_combat_wired() -> void:
+	await _face_dummy()
+	var a0: int = _player.attacks_started
+	await _tap("attack", 2)
+	await _step(24)
+	var attacked: bool = _player.attacks_started > a0
+
+	await _settle()
+	await _step(45)                          # 等闪避冷却清空
+	var d0: int = _player.dodges_started
+	await _tap("dodge", 2)
+	await _step(4)
+	var dodged: bool = _player.dodges_started > d0
+
+	_check("11", "按 J / K：都有反应（M1 战斗已接入）",
+		attacked and dodged,
+		"J 出招=%s，K 闪避=%s" % [attacked, dodged])
+	await _settle()
+
+
+## #13 出招有前摇：不是按下就生效，得先「抡」几帧
+func _t13_attack_startup() -> void:
+	await _face_dummy()
+	var before: int = _dummy.hits_taken
+	_press("attack")
+	var hit_at := -1
+	var n := 0
+	while n < 30:
+		await get_tree().physics_frame
+		n += 1
+		if n == 2:
+			_release("attack")
+		if hit_at < 0 and _dummy.hits_taken > before:
+			hit_at = n
+	_release_all()
+	var cfg: int = _player.attack_combo[0].startup_frames
+	# 理论命中帧 = 输入排队 1 帧 + 前摇 6 帧 + 判定第一帧 ≈ 8。留出调度余量。
+	_check("13", "按 J：先出手，过一小会儿才打到（有前摇，不是按下就生效）",
+		hit_at >= cfg and hit_at <= cfg + 7,
+		"按下后第 %d 帧命中（配置前摇 %d 帧）" % [hit_at, cfg])
+	await _settle()
+
+
+## #14 打到靶子：掉血，且掉的量在设定范围内
+func _t14_attack_damage() -> void:
+	await _face_dummy()
+	var hp0: int = _dummy_health.hp
+	await _tap("attack", 2)
+	await _step(24)
+	var dealt: int = hp0 - _dummy_health.hp
+	var sk: SkillData = _player.attack_combo[0]
+	var lo := int(floor(float(sk.damage) * (1.0 - sk.damage_variance)))
+	var hi := int(ceil(float(sk.damage) * (1.0 + sk.damage_variance)))
+	_check("14", "站到靶子面前按 J：靶子掉血，掉的量在设定范围内",
+		dealt >= lo and dealt <= hi,
+		"这一下打掉 %d 点（配置 %d ±%d%%，区间 %d~%d）" % [
+			dealt, sk.damage, int(sk.damage_variance * 100.0), lo, hi])
+	await _settle()
+
+
+## #15 一次挥砍只结算一次伤害
+##
+## 判定框在 4 帧里都开着，如果不去重，一下会掉 4 次血。
+## 只测「有没有掉血」的断言完全看不出这个问题，所以单独列一条。
+func _t15_single_hit_per_swing() -> void:
+	await _face_dummy()
+	await _tap("attack", 2)
+	await _step(26)
+	var sk: SkillData = _player.attack_combo[0]
+	_check("15", "一次挥砍：判定持续好几帧，但只扣一次血",
+		_dummy.hits_taken == 1,
+		"命中 %d 次（判定持续 %d 帧）" % [_dummy.hits_taken, sk.active_frames])
+	await _settle()
+
+
+## #16 连按三次 J：三段连招全部打出来，且是「一段比一段重」
+func _t16_combo_three_hits() -> void:
+	await _face_dummy()
+	var before: int = _player.attacks_started
+	var hp0: int = _dummy_health.hp
+	var max_idx := -1
+
+	for i in 3:
+		_press("attack")
+		await _step(3)
+		_release("attack")
+		await _step(7)
+
+	var n := 0
+	while n < 90:
+		await get_tree().physics_frame
+		n += 1
+		max_idx = maxi(max_idx, _player.attack_index)
+	_release_all()
+
+	var segs: int = _player.attacks_started - before
+	var dealt: int = hp0 - _dummy_health.hp
+	var heavies := 0
+	for s in _player.attack_combo:
+		if (s as SkillData).heavy:
+			heavies += 1
+	_check("16", "连按三次 J：打出完整三段，不是三次第一段",
+		segs == 3 and max_idx == 2 and _dummy.hits_taken == 3 and dealt > 0,
+		"出招 %d 段，最深到第 %d 段，靶子挨 %d 下共 %d 点（其中重击段 %d 个）" % [
+			segs, max_idx + 1, _dummy.hits_taken, dealt, heavies])
+	await _settle()
+
+
+## #17 第 3 段是收招硬直：一直按 J 也不能把它取消掉
+##
+## 做法是和第 1 段做对照 —— 同样是「进入这一段之后猛按 J」：
+##   第 1 段 用 10 帧就被下一段接走（可以取消）
+##   第 3 段 必须走满全部帧数（不能取消）
+## 只断言「第 3 段时间长」没有意义，长度可能是随便配的；对照组才说明它「不接受取消」。
+func _t17_finisher_locks() -> void:
+	var gap_early := await _chain_gap(0)
+	var gap_finish := await _chain_gap(2)
+	var first: SkillData = _player.attack_combo[0]
+	var third: SkillData = _player.attack_combo[2]
+	_check("17", "第 3 段打完有收招硬直：一直按 J 也接不上下一段（前两段则一按就接）",
+		third.chainable == false and gap_finish < 0
+			and gap_early > 0 and gap_early <= first.active_to() + 5,
+		"第 1 段 %d 帧就被接走（可取消）／第 3 段猛按 J %s（配置 chainable=%s，全程 %d 帧）" % [
+			gap_early, "也没能接上" if gap_finish < 0 else "接上了", str(third.chainable),
+			third.total_frames()])
+	await _settle()
+
+
+## 进入第 index 段后每一帧交替按下/松开 J，测到「出招计数再次增加」用了多少帧。
+## 返回 -1 表示这一段结束前都没能接上（= 不可取消）。
+##
+## 故意站到靶子够不着的地方：打中会触发顿帧，顿帧会把动作时序整体推后，
+## 混进来就看不出「能不能取消」这条规则本身了。
+func _chain_gap(index: int) -> int:
+	await _place_player(180.0)
+	_player.attacks_started = 0
+	_player.call("_start_attack", index)
+	var n := 0
+	while n < 200:
+		await get_tree().physics_frame
+		n += 1
+		if n % 2 == 1:
+			_press("attack")
+		else:
+			_release("attack")
+		if _player.attacks_started >= 2:
+			_release_all()
+			return n
+		if _player.state != ST_ATTACK:
+			_release_all()
+			return -1
+	_release_all()
+	return -1
+
+
+## #18 出招期间按方向键不会移动：位移只由招式本身的前冲决定
+func _t18_no_move_during_attack() -> void:
+	await _face_dummy()
+	var x0: float = _player.global_position.x
+	_press("attack")
+	await _step(2)
+	_release("attack")
+	_press("move_right")
+	await _step(12)
+	_release_all()
+	var moved: float = absf(_player.global_position.x - x0)
+
+	# 对照：同样 12 帧，不攻击、只按住方向键能走多远。
+	# 往【左】走 —— 往右会撞上靶子的车身（靶子就站在这个站位右边 40 px），
+	# 撞上之后走出来的距离是「被挡住的距离」，不是「走路能走多远」，对照就失效了。
+	await _face_dummy()
+	var walk0: float = _player.global_position.x
+	_press("move_left")
+	await _step(12)
+	_release_all()
+	var walked: float = absf(_player.global_position.x - walk0)
+
+	_check("18", "出招当中按方向键：不跟着走，位移只由招式本身的前冲决定",
+		moved < 12.0 and walked > moved * 2.0,
+		"出招中 12 帧只挪 %.1f px；同样 12 帧纯走路 %.1f px" % [moved, walked])
+	await _settle()
+
+
+## #19 按 K：朝当前方向闪出去一段，明显快过走路
+func _t19_dodge_distance() -> void:
+	_release_all()
+	await _step(2)
+	_player.global_position = Vector2(240.0, GROUND_STAND_Y - 16.0)
+	_player.velocity = Vector2.ZERO
+	_player._facing = 1
+	_visuals.scale.x = 1.0
+	await _step(12)
+
+	var x0: float = _player.global_position.x
+	await _tap("dodge", 2)
+	var n := 0
+	while n < 90 and _player.state == ST_DODGE:
+		await get_tree().physics_frame
+		n += 1
+	await _step(4)
+	var dodged: float = absf(_player.global_position.x - x0)
+	var walk_ref: float = _player.max_speed * float(n) / FPS
+	var sk: SkillData = _player.dodge_skill
+	_check("19", "按 K：朝前闪出一段，明显快过走路",
+		dodged > walk_ref * 1.2,
+		"闪了 %.1f px（%d 帧）；同样帧数全程走满速也只有 %.1f px" % [dodged, n, walk_ref])
+	await _settle()
+
+
+## #20 闪避的无敌窗口：窗口内打不中，窗口外打得中
+##
+## 现在场上没有会打人的敌人（靶子不还手），所以只能直接往角色身上注入伤害来验证。
+## 这不理想 —— 但比「不验证」强，而且它测的正是玩家最在意的那件事：
+## 「闪的那一下是不是真的免伤」。
+func _t20_dodge_invincible() -> void:
+	var hp: Health = _player.get_node("Health")
+	await _settle()
+	await _step(45)                          # 等冷却
+
+	hp.heal_full()
+	_player.call("_start_dodge")
+	await _step(6)                           # 落在无敌窗口里（配置 2..18 帧）
+	var blocked := hp.take_damage(10)
+
+	# 等闪避走完 + 受击无敌过期，再打一次，这次必须打得中
+	await _step(50)
+	var hp_before := hp.hp
+	var through := hp.take_damage(10)
+	hp.heal_full()
+
+	var sk: SkillData = _player.dodge_skill
+	_check("20", "闪避当中有无敌帧：那几帧打不中，闪完就打得到",
+		blocked == 0 and through > 0 and hp_before > 0,
+		"窗口内注入 10 点 → 实际受伤 %d；闪完后注入 10 点 → 实际受伤 %d（无敌帧 %d~%d）" % [
+			blocked, through, sk.invincible_from, sk.invincible_to])
+	await _settle()
+
+
+## #21 闪避有冷却：刚闪完再按没反应，冷却过了才又能闪
+func _t21_dodge_cooldown() -> void:
+	await _settle()
+	await _step(60)                          # 保证从冷却完毕的状态起步
+	_player.call("_start_dodge")
+	await _step(6)
+	var before: int = _player.dodges_started
+	await _tap("dodge", 2)
+	await _step(6)
+	var denied: bool = _player.dodges_started == before
+	var cd_left: int = _player.dodge_cooldown
+
+	await _step(50)                          # 跨过剩余冷却
+	await _tap("dodge", 2)
+	await _step(4)
+	var allowed: bool = _player.dodges_started > before
+
+	_check("21", "闪避有冷却：刚闪完再按没反应，冷却过了才能再闪",
+		denied and allowed,
+		"冷却中再按 %s（当时还剩 %d 帧），等冷却结束再按 %s" % [
+			"没反应" if denied else "居然闪了", cd_left,
+			"闪出去了" if allowed else "还是没反应"])
+	await _settle()
+
+
+## #22 闪避能打断自己的攻击
+func _t22_dodge_cancels_attack() -> void:
+	await _face_dummy()
+	await _step(45)                          # 清掉可能残留的闪避冷却
+	_player.call("_start_attack", 0)
+	await _step(3)
+	var attacking: bool = _player.state == ST_ATTACK
+	await _tap("dodge", 2)
+	await _step(3)
+	var now_dodging: bool = _player.state == ST_DODGE
+	_check("22", "出招当中按 K：能打断自己的攻击闪出去",
+		attacking and now_dodging and _player.dodge_cancels_attack,
+		"按 K 前在攻击中=%s，按之后闪避中=%s（允许取消=%s）" % [
+			str(attacking), str(now_dodging), str(_player.dodge_cancels_attack)])
+	await _settle()
+
+
+## #23 靶子打死了会满血重生
+func _t23_dummy_revives() -> void:
+	await _face_dummy()
+	var full: int = _dummy_health.max_hp
+	_dummy_health.take_damage(full + 50)
+	await _step(4)
+	var died: bool = _dummy_health.is_dead
+
+	var wait_frames := int(ceil(_dummy.revive_delay * FPS)) + 20
+	await _step(wait_frames)
+	var back: bool = _dummy_health.hp == full and not _dummy_health.is_dead
+	_check("23", "把靶子打死：它会满血重生，可以继续打",
+		died and back,
+		"打死=%s；等 %.1f 秒后 → 血量 %d/%d，可打=%s" % [
+			str(died), _dummy.revive_delay, _dummy_health.hp, full, str(not _dummy_health.is_dead)])
+	await _settle()
+
+
+## #24 完整操作链：走过去 → 连按三次 J → 靶子掉血
+##
+## 这是战斗部分唯一一条「真的走过去、真的按键、真的打到」的断言。
+## 前面几条为了稳定都先把玩家摆到靶子面前，那种摆位证明不了「玩家自己走得到」。
+func _t24_full_chain() -> void:
+	_release_all()
+	await _step(2)
+	_dummy.health.heal_full()
+	_dummy.hits_taken = 0
+	_dummy.modulate.a = 1.0
+	_dummy.set_collision_layer_value(2, true)
+
+	_player.global_position = Vector2(200.0, GROUND_STAND_Y - 16.0)
+	_player.velocity = Vector2.ZERO
+	_player._facing = 1
+	_visuals.scale.x = 1.0
+	await _step(14)
+
+	var hp0: int = _dummy_health.hp
+	var before: int = _player.attacks_started
+
+	# ① 真的走过去
+	_press("move_right")
+	var n := 0
+	while n < 240 and _player.global_position.x < DUMMY_X - 42.0:
+		await get_tree().physics_frame
+		n += 1
+	_release("move_right")
+	await _step(8)
+	var stood: float = _player.global_position.x
+
+	# ② 连按三次
+	for i in 3:
+		_press("attack")
+		await _step(3)
+		_release("attack")
+		await _step(7)
+	await _step(50)
+	_release_all()
+
+	var dealt: int = hp0 - _dummy_health.hp
+	var segs: int = _player.attacks_started - before
+	var walk_frames := n
+	_check("24", "完整操作链：走过去 → 连按三次 J → 靶子掉血",
+		segs == 3 and dealt > 0 and _dummy.hits_taken == 3 and stood < DUMMY_X,
+		"走了 %d 帧到 x=%.1f，出招 %d 段，靶子挨 %d 下共 %d 点" % [
+			walk_frames, stood, segs, _dummy.hits_taken, dealt])
+	await _settle()

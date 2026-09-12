@@ -21,6 +21,10 @@ extends Node2D
 const LEAD_FRAMES := 2
 const TRAIL_MAX := 90
 
+## 参与回放的动作。_apply_hold 每一步都会把这批动作整体同步成步骤声明值，
+## 所以每个步骤的 hold 字典就是「这一步期间按住哪些键」的完整声明，不会漏松键。
+const ACTIONS := ["move_left", "move_right", "jump", "attack", "dodge"]
+
 const COL_BG   := Color(0.13, 0.12, 0.11, 0.92)
 const COL_FG   := Color(0.94, 0.92, 0.88)
 const COL_DIM  := Color(0.63, 0.60, 0.56)
@@ -28,6 +32,8 @@ const COL_HI   := Color(0.95, 0.87, 0.46)
 const COL_TRAIL := Color(0.98, 0.85, 0.35)
 
 var _player: CharacterBody2D
+var _dummy: Node2D
+var _dummy_health: Health
 var _cap_label: Label
 var _tele_label: Label
 var _title_label: Label
@@ -59,6 +65,21 @@ var _flight_min := 0.0
 var _flight_cause := "fall"
 var _prev_y := 0.0
 
+# ── 战斗观测 ──
+var _hp_events: Array = []       # 靶子血量每一次变化
+var _last_hp := -1
+var _last_hits := 0
+var _dodge_log: Array = []       # 每一次闪避的起止 x
+var _dodge_from := 0.0
+var _dodge_running := false
+var _last_dodges := 0
+var _prev_px := 0.0              # 上一帧的 x（闪避起点要减掉观察延迟）
+var _drift: Dictionary = {}      # 每个动作连续「掉了」多少帧
+var _input_drifts := 0           # 补针次数
+var _kills: Array = []           # 靶子被打死的帧号
+var _was_dead := false
+var _atk_press_frames: Array = []
+
 
 func _ready() -> void:
 	_player = get_node_or_null("TestRoom/Player") as CharacterBody2D
@@ -66,6 +87,19 @@ func _ready() -> void:
 		printerr("[reel] 找不到 TestRoom/Player")
 		get_tree().quit()
 		return
+
+	_dummy = get_node_or_null("TestRoom/TargetDummy") as Node2D
+	if _dummy == null:
+		printerr("[reel] 找不到 TestRoom/TargetDummy")
+		get_tree().quit()
+		return
+	_dummy_health = _dummy.get_node("Health")
+
+	# 把攻击判定框画出来。平时是关的（调手感时才开），回放里必须开 ——
+	# 「前摇 / 判定 / 后摇」这三段时间光看角色是看不出来的，红框亮起才是判定的开始。
+	var hb := _player.get_node_or_null("Hitbox")
+	if hb != null:
+		hb.set("debug_draw", true)
 
 	var hint := get_node_or_null("TestRoom/Hint")
 	if hint != null:
@@ -108,11 +142,13 @@ func _build_steps() -> void:
 	_add({}, 26, "⑨ 站定在台面上（松手即停）")
 
 	# ── 土狼时间：走出台边之后仍然能跳 ──
-	_add_wait({"move_right": true}, _pred_left_ground, 120,
-		"⑩ 往右走，一直走到走出台边（注意 coyote 从 0.100 开始倒数）")
-	_add({"move_right": true}, 2,
+	# 往左走出台缘：右侧那块空地站着靶子，往右走会直接落到它头顶上，
+	# 那是另一种玩法（站桩上），不该混进土狼时间的演示里。
+	_add_wait({"move_left": true}, _pred_left_ground, 120,
+		"⑩ 往左走，一直走到走出台边（注意 coyote 从 0.100 开始倒数）")
+	_add({"move_left": true}, 2,
 		"⑩ 已经踏空了 —— 脚下没有台面，正在往下掉，coyote 在倒数")
-	_add({"move_right": true, "jump": true}, 6,
+	_add({"move_left": true, "jump": true}, 6,
 		"⑩ 踏空之后才按的跳 —— 土狼时间内依然起跳成功")
 	_add({}, 70, "⑩ 落地。这一跳是「凭空」发生的，因为脚下已经没有台面了")
 
@@ -124,7 +160,65 @@ func _build_steps() -> void:
 	_add({"jump": true}, 4, "⑪ 落地前按下跳 —— 落地瞬间自动接上跳跃（跳跃缓冲）")
 	_add({}, 70, "⑪ 缓冲跳跃成功：这一次起跳发生在落地的那一帧，而不是按键的那一帧")
 
-	_add({}, 60, "■ 回放结束 — 攻击 / 闪避（J / K）尚未实现，是 M1 剩下的部分")
+	# ═══════════════════════════════════════════════════════════════
+	# 战斗：J 攻击 / K 闪避。右边那个深红色块是训练靶子，头顶有血条
+	# ═══════════════════════════════════════════════════════════════
+	_add({}, 24, "■ 移动 / 跳跃演示到此结束。下面是战斗 —— J 攻击，K 闪避")
+
+	# 走向靶子。注意这一步必须【向右】走：角色只有在真的移动时才会翻面，
+	# 从左边一路向左走过来会面朝左，之后所有攻击全部打空（踩过一次）。
+	_add_wait({"move_right": true}, _pred_touch_dummy, 240,
+		"⑫ 向右走向靶子 —— 靶子有车身碰撞，会把你挡在它身前")
+	_add({}, 30, "⑫ 站定。角色面朝右，靶子头顶的血条是满的（120 / 120）")
+
+	# ⑬ 单次攻击：前摇 → 判定 → 后摇
+	_add({"attack": true}, 4,
+		"⑬ 按一下 J：出第 1 段。身前那个红框是攻击判定框 —— 现在还没亮（前摇 6 帧）")
+	_add({}, 12, "⑬ 判定框亮起 → 命中：靶子闪白、掉血、飘出伤害数字，同时双方一起顿帧")
+	_add({}, 34, "⑬ 一次挥砍的判定持续 4 帧，但只结算一次伤害 —— 不是打 4 下")
+
+	# ⑭ 三段连招
+	_add({"attack": true}, 4, "⑭ 连按 J —— 第 1 段")
+	_add({}, 8, "⑭ 这一下按在收招里：按键被「记住」了，不是丢掉（连招缓冲）")
+	_add({"attack": true}, 4, "⑭ 衔接窗口一开，自动接上第 2 段")
+	_add({}, 8, "⑭ …")
+	_add({"attack": true}, 4, "⑭ 第 3 段 —— 重击：伤害 22、顿帧更长、靶子后仰更狠")
+	_add({}, 6, "⑭ 第 3 段带收招硬直。现在就猛按 J，看它接不接第 4 段")
+	_add({"attack": true}, 4, "⑭ 再按 J ……")
+	_add({}, 4, "⑭ …… 没反应。这一段配的就是 chainable = false")
+	_add({}, 44, "⑭ 三段就是三段。出招次数和靶子挨打次数打在下面的遥测里")
+
+	# ⑮ 闪避：位移 + 无敌帧
+	_add({"move_left": true, "dodge": true}, 4, "⑮ 按住 ← 再按 K：朝左闪避，方向可控")
+	_add({}, 26, "⑮ 闪出去了 —— 22 帧挪了约 119 px；同样帧数全程跑满也只有 66 px")
+	_add({}, 30, "⑮ 闪避第 2~18 帧是无敌的（遥测里的 invul 会亮）。M1 靶子不还手，只能看遥测")
+
+	# ⑯ 闪避打断攻击（紧接着按，赶在判定生效之前打断）
+	_add_wait({"move_right": true}, _pred_touch_dummy, 240, "⑯ 走回靶子面前")
+	_add({}, 20, "⑯ 站定")
+	_add({"attack": true}, 4, "⑯ 按 J 出招 ……")
+	_add({"move_left": true, "dodge": true}, 4,
+		"⑯ 挥砍还没打到人，就按 K —— 出招硬直可以被打断（被贴身时的退路）")
+	_add({}, 34, "⑯ 已经闪到左边：出招让位给闪避，不是把按键吃掉")
+
+	# ⑰ 打死 → 满血重生
+	_add_wait({"move_right": true}, _pred_touch_dummy, 240, "⑰ 再走回靶子面前，这回把它打死")
+	_add({}, 20, "⑰ 站定")
+	for k in 9:
+		_add({"attack": true}, 4, "⑰ 连打 J ……" if k == 0 else "")
+		_add({}, 8, "")
+	_add({}, 40, "⑰ 血条清空 —— 靶子淡出、关掉受击，打不着了")
+	_add({}, 120, "⑰ 1.3 秒后满血重生，可以接着打 —— 这就是「反复打这个靶子」的循环")
+
+	_add({}, 60, "■ 回放结束 — 移动 / 跳跃 / 三段连招 / 闪避 / 靶子重生，全程脚本自动操作")
+
+
+## 已经被靶子的车身挡住（贴在它身前）。用它当「走到位了」的判据，
+## 比写死一个 x 更稳：靶子挪位置，剧本不用跟着改。
+func _pred_touch_dummy() -> bool:
+	if _player == null or _dummy == null:
+		return false
+	return _player.global_position.x >= _dummy.global_position.x - 30.0
 
 
 ## 走出台边：脚下没有支撑
@@ -184,6 +278,9 @@ func _physics_process(_delta: float) -> void:
 
 	var s: Dictionary = _steps[_i]
 
+	# 每帧复查一次「该按住的键是不是还按着」——见 _resync_holds 的说明
+	_resync_holds()
+
 	if _phase == 0:
 		_t += 1
 		if _t >= LEAD_FRAMES:
@@ -201,6 +298,11 @@ func _physics_process(_delta: float) -> void:
 	else:
 		go = _t >= int(s.get("frames", 1))
 	if _t >= int(s.get("max", 100000)):
+		# 等待步骤超时说明「条件一直没满足」——多半是输入掉了或者剧本写错了。
+		# 不能静默跳过：从这里开始后面每一帧的画面都和字幕对不上。
+		if s.has("wait"):
+			print("[reel][WARN] f=%d 等待步骤超时（跑了 %d 帧条件仍未满足）: %s" % [
+				_tick, _t, str(s.get("cap", ""))])
 		go = true
 
 	if go:
@@ -232,7 +334,7 @@ func _enter(idx: int) -> void:
 
 
 func _apply_hold(h: Dictionary) -> void:
-	for a in ["move_left", "move_right", "jump"]:
+	for a in ACTIONS:
 		var want := bool(h.get(a, false))
 		if want == bool(_held.get(a, false)):
 			continue
@@ -241,7 +343,33 @@ func _apply_hold(h: Dictionary) -> void:
 			_press_frame = _tick
 			_press_airborne = not _player.is_on_floor()
 			_floor_since_press = false
+		if a == "attack" and want:
+			_atk_press_frames.append(_tick)
 		_inject(a, want)
+
+
+## 复查注入的按键有没有「掉」。录制窗口一旦失去焦点，引擎会把所有按住的键全部释放
+## —— 这是正确行为（玩家切出去时键确实该松开），但注入的键走的是同一套状态，
+## 于是「按住方向键一直走」会在失焦那一刻变成「停在原地」，
+## 后面的等待步骤永远等不到条件，整段回放从那里开始全偏。
+## 实测咬过一次：窗口模式录出来的帧号比无头跑出来的多 200 帧，画面从那一刻起和字幕错位。
+##
+## 处理方式：每帧复查，连续 2 帧发现状态不对才补一针（刚注入那一帧状态还没刷新，不能算）。
+## 补针会打日志，不静默自愈 —— 回放要不要重录，得能看到这件事发生过。
+func _resync_holds() -> void:
+	for a in ACTIONS:
+		if not bool(_held.get(a, false)):
+			_drift[a] = 0
+			continue
+		if Input.is_action_pressed(a):
+			_drift[a] = 0
+			continue
+		_drift[a] = int(_drift.get(a, 0)) + 1
+		if _drift[a] >= 2:
+			_drift[a] = 0
+			_input_drifts += 1
+			print("[reel][WARN] f=%d 注入的「按住 %s」掉了（窗口失焦？），已补回" % [_tick, a])
+			_inject(a, true)
 
 
 func _inject(action: String, pressed: bool) -> void:
@@ -317,8 +445,48 @@ func _observe() -> void:
 	if grounded and _press_frame >= 0 and _tick > _press_frame:
 		_floor_since_press = true
 
+	_observe_combat()
+
 	_prev_vy = vy
 	_prev_y = y_now
+	_prev_px = _player.global_position.x
+
+
+## 战斗观测：靶子每一次掉血、每一次闪避的起止位置、靶子每一次死亡。
+## 这些数字事后要拿去核对字幕，不能靠「看起来像打中了」。
+func _observe_combat() -> void:
+	if _dummy == null or _dummy_health == null:
+		return
+	var hp := int(_dummy_health.hp)
+	var hits := int(_dummy.get("hits_taken"))
+	if hp != _last_hp or hits != _last_hits:
+		_hp_events.append({
+			"tick": _tick, "hp": hp, "hits": hits,
+			"dmg": int(_dummy.get("total_damage_taken")),
+		})
+		_last_hp = hp
+		_last_hits = hits
+
+	var dead: bool = bool(_dummy_health.is_dead)
+	if dead and not _was_dead:
+		_kills.append(_tick)
+	_was_dead = dead
+
+	var dodges := int(_player.get("dodges_started"))
+	if dodges != _last_dodges:
+		_last_dodges = dodges
+		# 本节点是玩家的父级，_physics_process 先于玩家执行，所以计数器变化要晚一帧才看到，
+		# 而这一帧玩家已经闪出去 10 px 了。用上一帧的 x 当起点才准。
+		_dodge_from = _prev_px
+		_dodge_running = true
+	elif _dodge_running and int(_player.get("state")) != 2:
+		_dodge_running = false
+		_dodge_log.append({
+			"tick": _tick,
+			"from": _dodge_from,
+			"to": _player.global_position.x,
+			"dist": absf(_player.global_position.x - _dodge_from),
+		})
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -357,7 +525,7 @@ func _make_overlays() -> void:
 
 	var panel := PanelContainer.new()
 	panel.position = Vector2(6, 6)
-	panel.custom_minimum_size = Vector2(432, 0)
+	panel.custom_minimum_size = Vector2(470, 0)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COL_BG
 	sb.set_corner_radius_all(3)
@@ -394,19 +562,46 @@ func _update_tele() -> void:
 	if _player == null or _tele_label == null:
 		return
 	var p := _player
+	var dummy_txt := "—"
+	if _dummy != null and _dummy_health != null:
+		dummy_txt = "%d/%d  hits=%d  dmg=%d%s" % [
+			_dummy_health.hp, _dummy_health.max_hp,
+			int(_dummy.get("hits_taken")), int(_dummy.get("total_damage_taken")),
+			"  DEAD" if _dummy_health.is_dead else "",
+		]
 	_tele_label.text = (
-		"on_floor=%-3s  coyote=%.3f  buffer=%.3f  facing=%s  air=%d\n"
-		+ "v=(%7.1f, %7.1f)   pos=(%6.1f, %6.1f)   tick=%d"
+		"player %-7s hp=%d/%d  dodge_cd=%-3d  invul=%-3s  facing=%s  air=%d\n"
+		+ "v=(%7.1f, %7.1f)   pos=(%6.1f, %6.1f)   on_floor=%-3s  coyote=%.3f  buffer=%.3f\n"
+		+ "dummy  %s   tick=%d"
 	) % [
-		("yes" if p.is_on_floor() else "no"),
-		float(p.get("_coyote_timer")),
-		float(p.get("_jump_buffer_timer")),
+		p.state_name(), _player_health(), _player_max_health(),
+		int(p.get("dodge_cooldown")),
+		("yes" if _player_invul() else "no"),
 		str(p.get("_facing")),
 		_air_frames,
 		p.velocity.x, p.velocity.y,
 		p.global_position.x, p.global_position.y,
+		("yes" if p.is_on_floor() else "no"),
+		float(p.get("_coyote_timer")),
+		float(p.get("_jump_buffer_timer")),
+		dummy_txt,
 		_tick,
 	]
+
+
+func _player_health() -> int:
+	var h := _player.get_node_or_null("Health")
+	return int(h.hp) if h != null else 0
+
+
+func _player_max_health() -> int:
+	var h := _player.get_node_or_null("Health")
+	return int(h.max_hp) if h != null else 0
+
+
+func _player_invul() -> bool:
+	var h := _player.get_node_or_null("Health")
+	return bool(h.invincible) if h != null else false
 
 
 func _push_trail() -> void:
@@ -460,6 +655,24 @@ func _finish() -> void:
 			cause, f["from_y"], f["min_y"], f["h"],
 		])
 
+	print("[reel] 靶子掉血时间线（dmg = 累计伤害）")
+	for e in _hp_events:
+		print("   f=%-5d hp=%3d  挨打 %d 次  累计 %d 点" % [
+			e["tick"], e["hp"], e["hits"], e["dmg"],
+		])
+	print("[reel] 打了 %d 次 J（注入次数，含被取消的那次）／ 靶子被打死 %d 次" % [
+		_atk_press_frames.size(), _kills.size()])
+	if _input_drifts > 0:
+		print("[reel][WARN] 输入掉了 %d 次（见上面的补针日志）—— 这段回放的时间轴可能已经偏了" % [
+			_input_drifts])
+	for k in _kills:
+		print("   死亡帧 f=%d" % k)
+	print("[reel] 每次闪避的位移")
+	for d in _dodge_log:
+		print("   f=%-5d 从 x=%6.1f → x=%6.1f  位移 %5.1f px" % [
+			d["tick"], d["from"], d["to"], d["dist"],
+		])
+
 	_write_meta()
 	await get_tree().create_timer(0.4).timeout
 	get_tree().quit()
@@ -486,6 +699,13 @@ func _write_meta() -> void:
 		"flights": _flights,
 		"marks": _marks,
 		"slow_ranges": slow,
+		"combat": {
+			"hp_events": _hp_events,
+			"dodge_log": _dodge_log,
+			"kill_frames": _kills,
+			"attack_presses": _atk_press_frames.size(),
+			"dummy_x": _dummy.global_position.x if _dummy != null else 0.0,
+		},
 	}
 	var path := ProjectSettings.globalize_path("res://build/reel/reel_meta.json")
 	var f := FileAccess.open(path, FileAccess.WRITE)

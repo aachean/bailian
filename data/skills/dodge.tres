@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"dodge"
+display_name = "闪避"
+kind = 1
+startup_frames = 0
+active_frames = 0
+recovery_frames = 22
+damage = 0
+damage_variance = 0.0
+knockback = 0.0
+hitstop_frames = 0
+heavy = false
+chainable = false
+hitbox_size = Vector2(1, 1)
+hitbox_offset = Vector2(0, 0)
+lunge_speed = 620.0
+lunge_decay_frames = 20
+invincible_from = 2
+invincible_to = 18
+cooldown_frames = 14
