@@ -19,6 +19,25 @@
 
 ---
 
+## 自动验收
+
+改完任何东西（尤其是手感数值）先跑这一条。它不开窗口，逐帧注入输入、测量物理量，
+对 M1 验收清单逐条断言。**退出码 0 = 全通过。**
+
+```
+godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
+```
+
+它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。
+
+画面截图（窗口模式，输出到 `build/shots/`，该目录不入库）：
+
+```
+godot --path . res://tests/screenshot.tscn
+```
+
+---
+
 ## 目录结构
 
 ```
@@ -35,5 +54,6 @@ res://
 ├── data/            数据资源（.tres）← 内容都长在这里，脚本里不写魔法数字
 │   ├── characters/  enemies/  equipment/  skills/  stages/
 ├── assets/          sprites / audio / fonts
-└── addons/          第三方插件
+├── addons/          第三方插件
+└── tests/           自动验收与截图（不参与游戏运行）
 ```
