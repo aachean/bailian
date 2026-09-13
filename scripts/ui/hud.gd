@@ -9,7 +9,7 @@ extends CanvasLayer
 @onready var _player: Node = get_parent()
 @onready var _hp_fill: ColorRect = $Status/HPBar/Fill
 @onready var _mp_fill: ColorRect = $Status/MPBar/Fill
-@onready var _exp_fill: ColorRect = $Status/ExpBar/Fill
+@onready var _exp_fill: ColorRect = $ExpBar/Fill
 @onready var _lv_label: Label = $Status/Level
 @onready var _bag_label: Label = $Bag/Count
 @onready var _panel: Panel = $CharPanel
@@ -54,16 +54,18 @@ func refresh() -> void:
 	refresh_skill_bar()
 
 	if _panel.visible:
+		# 造梦西游式属性表：一行一项，标签与数值对齐
 		var hp := 0 if h == null else h.hp
 		var max_hp := 0 if h == null else h.max_hp
 		var dmg: float = _player.get_node("Hitbox").damage_scale
-		_panel_text.text = "%s\n\n%s %d / %d　(%d%%)\n%s %d / %d\n\n%s +%d%%\n%s %d\n%s %s Lv.%d" % [
-			tr("PANEL_TITLE"),
-			tr("PANEL_HP"), hp, max_hp, int(h.ratio() * 100.0),
+		_panel_text.text = "%s %d\n%s %d / %d\n%s %d / %d\n%s %d / %d\n%s +%d%%\n%s %s ×%d\n%s %s Lv.%d" % [
+			tr("PANEL_LEVEL"), level,
+			tr("PANEL_EXP"), exp_pts, needed,
+			tr("PANEL_HP"), hp, max_hp,
 			tr("PANEL_MP"), mp, max_mp,
 			tr("PANEL_ATK"), int((dmg - 1.0) * 100.0),
-			tr("PANEL_EXP"), exp_pts,
 			tr("PANEL_SHARD"), tr("HUD_SHARD"), shards_of(),
+			tr("PANEL_WEAPON"), tr("HUD_WEAPON"), int(_player.get("upgrade_level")),
 		]
 
 
