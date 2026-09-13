@@ -43,7 +43,7 @@ func _refresh_continue() -> void:
 
 
 func _on_start() -> void:
-	SaveManager.write_progress(LEVEL_PATH)
+	SaveManager.request_new_game(LEVEL_PATH)
 	get_tree().change_scene_to_file(LEVEL_PATH)
 
 
@@ -54,6 +54,7 @@ func _on_continue() -> void:
 		SaveManager.erase_save()
 		_refresh_continue()
 		return
+	SaveManager.request_continue()
 	get_tree().change_scene_to_file(level)
 
 

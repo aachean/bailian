@@ -90,6 +90,20 @@ func is_alive() -> bool:
 	return not health.is_dead
 
 
+## 读档恢复（与 walker 同一契约）：血量、位置、死活，全是离开时的样子
+func apply_saved(d: Dictionary) -> void:
+	global_position = Vector2(float(d.get("x", global_position.x)), float(d.get("y", global_position.y)))
+	velocity = Vector2.ZERO
+	var hp := int(d.get("hp", max_hp))
+	if hp <= 0:
+		health.hp = 0
+		health.is_dead = true
+		_on_died()
+	else:
+		health.restore(hp)
+		_refresh_bar()
+
+
 func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: int) -> void:
 	hits_taken += 1
 	total_damage_taken += amount

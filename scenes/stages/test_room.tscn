@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/target_dummy.tscn" id="2_dummy"]
 [ext_resource type="Script" path="res://scripts/ui/hint.gd" id="3_hint"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="4_walker"]
+[ext_resource type="Script" path="res://scripts/core/stage.gd" id="5_stage"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(640, 24)
@@ -12,6 +13,7 @@ size = Vector2(640, 24)
 size = Vector2(96, 12)
 
 [node name="TestRoom" type="Node2D"]
+script = ExtResource("5_stage")
 
 [node name="Ground" type="StaticBody2D" parent="."]
 position = Vector2(320, 332)

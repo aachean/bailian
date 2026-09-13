@@ -113,6 +113,19 @@ var _spawn_point: Vector2 = Vector2.ZERO
 ## 掉到这条线以下视为掉出世界（场景高 360，地面在 320 附近）
 const FALL_KILL_Y := 800.0
 
+
+## 读档恢复（stage.gd 调用）：血量与位置回到离开那一刻。
+## 状态一律回到 FREE —— 存档瞬间可能在闪避/硬直里，那些不该被「续」上。
+func apply_saved(d: Dictionary) -> void:
+	_end_action()
+	_health.restore(int(d.get("hp", _health.max_hp)))
+	_hurt_flash = 0.0
+	_visuals.modulate = Color.WHITE
+	global_position = Vector2(float(d.get("x", _spawn_point.x)), float(d.get("y", _spawn_point.y)))
+	velocity = Vector2.ZERO
+	state = State.FREE
+	_state_frame = 0
+
 @onready var _visuals: Node2D = $Visuals
 @onready var _blade: ColorRect = $Visuals/Blade
 @onready var _hitbox: Hitbox = $Hitbox
@@ -419,8 +432,12 @@ func _overlaps_enemy() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# ESC 回主菜单。关卡里的进度在进入时已经写了档，返回不丢进度
+	# Esc 回主菜单。走之前把整个世界拍成快照写进存档 ——
+	# 「继续游戏」要回到离开那一刻：你的血、怪的血、谁站在哪，一样都不能变。
 	if event.is_action_pressed("ui_cancel") and state != State.DEAD:
+		var level := get_tree().current_scene
+		if level != null and level.has_method("collect"):
+			SaveManager.write_progress(level.scene_file_path, level.call("collect"))
 		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
 
 

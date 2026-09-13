@@ -259,6 +259,23 @@ func is_alive() -> bool:
 	return not health.is_dead
 
 
+## 读档恢复：摆回存档时的血量与位置。血空了就连死亡状态一起复现，
+## 让它按原定重生计时安静地等复活 —— 世界该是离开那一刻的样子。
+func apply_saved(d: Dictionary) -> void:
+	global_position = Vector2(float(d.get("x", global_position.x)), float(d.get("y", global_position.y)))
+	velocity = Vector2.ZERO
+	_stuck = 0
+	_enter(State.PATROL)
+	var hp := int(d.get("hp", data.max_hp))
+	if hp <= 0:
+		health.hp = 0
+		health.is_dead = true
+		_on_died()
+	else:
+		health.restore(hp)
+		_refresh_bar()
+
+
 func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: int) -> void:
 	hits_taken += 1
 	_spawn_number(amount, point, heavy)

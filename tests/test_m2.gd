@@ -22,6 +22,8 @@ func _ready() -> void:
 	await _t2_continue_visibility()
 	await _t3_save_roundtrip()
 	await _t4_language_button()
+	await _t5_world_snapshot_roundtrip()
+	await _t6_snapshot_survives_file()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -129,3 +131,73 @@ func _t4_language_button() -> void:
 			original, switched, back, original_text, switched_text])
 	menu.queue_free()
 	await _steps(2)
+
+
+## 世界快照往返：这是「继续游戏 = 回到离开那一刻」的核心。
+## 玩家血量/位置、每只怪的血量/位置，collect 之后再 apply 回来必须一致。
+## 用户验收原话：「我打了怪一点血量，继续游戏时小怪血量应该和之前一样。」
+func _t5_world_snapshot_roundtrip() -> void:
+	var room := (load("res://scenes/stages/test_room.tscn") as PackedScene).instantiate()
+	add_child(room)
+	for i in 5:
+		await get_tree().physics_frame
+
+	var player := room.get_node("Player")
+	var walker := room.get_node("Walker")
+	var player_h: Health = player.get_node("Health")
+	var walker_h: Health = walker.get_node("Health")
+
+	# 制造「离开时」的状态：玩家掉血挪位、怪掉血挪位
+	player_h.take_damage(13, Vector2.ZERO, false, 1)
+	player.global_position = Vector2(410.0, 288.0)
+	walker_h.take_damage(11, Vector2.ZERO, false, 1)
+	walker.global_position = Vector2(260.0, 288.0)
+	await get_tree().physics_frame
+
+	var snap := room.call("collect") as Dictionary
+	var want_player := {"hp": player_h.hp, "x": player.global_position.x, "y": player.global_position.y}
+	var want_walker_hp: int = walker_h.hp
+
+	# 把现场搅乱：全员满血回原位 —— 模拟「关卡重开」
+	player_h.restore(player_h.max_hp)
+	player.global_position = Vector2(320.0, 280.0)
+	walker_h.restore(walker_h.max_hp)
+	walker.global_position = Vector2(46.0, 288.0)
+	await get_tree().physics_frame
+
+	# 应用快照 —— 一切该回到「离开时」
+	room.call("_apply_state", snap)
+	await get_tree().physics_frame
+
+	var got_player := {"hp": player_h.hp, "x": player.global_position.x, "y": player.global_position.y}
+	var same_player: bool = int(got_player.hp) == int(want_player.hp) \
+		and absf(got_player.x - want_player.x) < 2.0 and absf(got_player.y - want_player.y) < 2.0
+	var same_walker: bool = walker_h.hp == want_walker_hp \
+		and absf(walker.global_position.x - 260.0) < 2.0
+
+	_check("5", "继续游戏恢复世界快照：玩家与怪的血量位置都是离开时的样子",
+		same_player and same_walker,
+		"玩家 %d/%d @(%.0f, %.0f)（期望 %d @%.0f）　怪血 %d（期望 %d）@x=%.0f（期望 260）" % [
+			got_player.hp, player_h.max_hp, got_player.x, got_player.y,
+			want_player.hp, want_player.x, walker_h.hp, want_walker_hp, walker.global_position.x])
+	room.queue_free()
+	await get_tree().process_frame
+
+
+## 快照随档序列化：写进存档文件再读回来，一个字段都不能少
+func _t6_snapshot_survives_file() -> void:
+	var snap := {"player": {"hp": 66, "x": 123.0, "y": 288.0}, "enemies": [
+		{"node": "Walker", "hp": 19, "x": 200.0, "y": 288.0}]}
+	SaveManager.write_progress("res://scenes/stages/test_room.tscn", snap)
+	var back := SaveManager.read_state()
+
+	var p := back.get("player", {}) as Dictionary
+	var e: Array = back.get("enemies", [])
+	var ok: bool = int(p.get("hp", -1)) == 66 and absf(float(p.get("x", 0)) - 123.0) < 0.01 \
+		and e.size() == 1 and int((e[0] as Dictionary).get("hp", -1)) == 19
+
+	SaveManager.write_progress("res://scenes/stages/test_room.tscn", {})   # 恢复干净进度
+	_check("6", "快照写进存档文件再读回，字段一个不少",
+		ok, "玩家血 %s @%s　怪 [0] 血 %s" % [
+			str(p.get("hp")), str(p.get("x")),
+			str((e[0] as Dictionary).get("hp", "?")) if e.size() > 0 else "?"])

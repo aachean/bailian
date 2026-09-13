@@ -67,3 +67,13 @@ func heal_full() -> void:
 	_post_hit = 0.0
 	revived.emit()
 	hp_changed.emit(hp, max_hp)
+
+
+## 恢复到指定血量（读档用）。与 take_damage 不同：不发 damaged、不触发死亡，
+## 只把血量和状态摆到位 —— 「继续游戏」时世界该是离开时的样子。
+func restore(value: int) -> void:
+	hp = clampi(value, 0, max_hp)
+	is_dead = false
+	invincible = false
+	_post_hit = 0.0
+	hp_changed.emit(hp, max_hp)
