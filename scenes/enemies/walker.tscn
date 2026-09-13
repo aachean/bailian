@@ -45,6 +45,15 @@ offset_bottom = -21.0
 mouse_filter = 2
 color = Color(0.95, 0.87, 0.46, 1)
 
+[node name="Swipe" type="ColorRect" parent="Visuals"]
+modulate = Color(1, 1, 1, 0)
+offset_left = 14.0
+offset_top = -10.0
+offset_right = 46.0
+offset_bottom = 8.0
+mouse_filter = 2
+color = Color(0.62, 0.78, 0.9, 1)
+
 [node name="Flash" type="ColorRect" parent="Visuals"]
 modulate = Color(1, 1, 1, 0)
 offset_left = -14.0

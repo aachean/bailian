@@ -110,6 +110,9 @@ var _facing: int = 1
 ## 测试里瞬移玩家不影响它 —— 重生永远回到关卡设计者定的那个点。
 var _spawn_point: Vector2 = Vector2.ZERO
 
+## 掉到这条线以下视为掉出世界（场景高 360，地面在 320 附近）
+const FALL_KILL_Y := 800.0
+
 @onready var _visuals: Node2D = $Visuals
 @onready var _blade: ColorRect = $Visuals/Blade
 @onready var _hitbox: Hitbox = $Hitbox
@@ -153,6 +156,10 @@ func _physics_process(delta: float) -> void:
 
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
+
+	# 掉出世界 = 死。走同一条死亡重生流程，不然被挤下边缘就无限下落。
+	if state != State.DEAD and global_position.y > FALL_KILL_Y:
+		_health.take_damage(9999, global_position, true, 0)
 
 	# 闪避结束之后，如果人还压在敌人身上，碰撞要晚一点再还原（见 _restore_body_collision_if_clear）
 	if state != State.DODGE:

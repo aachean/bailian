@@ -120,6 +120,8 @@ func _ready() -> void:
 	await _t29_enemy_hurts_player()
 	await _t30_player_hurt_stun()
 	await _t31_player_death_revive()
+	await _t32_no_bulldoze()
+	await _t33_fall_out_of_world()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -1044,5 +1046,78 @@ func _t31_player_death_revive() -> void:
 		dead and revived and full and dx < 24.0,
 		"死亡=%s　复活=%s　血量 %d/%d　离出生点 %.1f px（死时 %.0f 处）" % [
 			str(dead), str(revived), h.hp, h.max_hp, dx, pos_at_death.x])
+	await _settle()
+
+
+## 敌人贴脸等待时不得推挤玩家 —— 用户实测被一路拱到地图边缘掉出世界
+func _t32_no_bulldoze() -> void:
+	_release_all()
+	await _settle()
+	await _step(2)
+	_walker.ai_enabled = true
+	_walker.global_position = Vector2(46.0, GROUND_STAND_Y - 16.0)
+	_walker.velocity = Vector2.ZERO
+	_player.global_position = Vector2(85.0, GROUND_STAND_Y - 16.0)
+	_player.velocity = Vector2.ZERO
+	await _step(6)
+
+	# 采样 5 秒：敌人「贴脸等待」（追击状态 + 已进攻击距离）且玩家自由行动
+	# （非受击硬直、非顿帧）的那些帧里，玩家横向速度必须接近 0。
+	# 旧代码这里玩家会被 85 px/s 的追击速度顶着走 —— 推土机。
+	var max_push := 0.0
+	for i in 300:
+		await get_tree().physics_frame
+		if int(_walker.state) != W_CHASE:
+			continue
+		if _dist_walker_player() > 42.0:
+			continue
+		if int(_player.state) != 0 or int(_player.get("_hitstop")) != 0:
+			continue
+		max_push = maxf(max_push, absf(_player.velocity.x))
+
+	_check("32", "敌人贴脸等待时站住，不把玩家往边上推（推土机 bug）",
+		max_push < 5.0,
+		"贴脸等待期间玩家最大横向速度 %.1f px/s（>5 就是在被推）" % max_push)
+
+	_walker.ai_enabled = false
+	await _settle()
+
+
+func _dist_walker_player() -> float:
+	return absf(_walker.global_position.x - _player.global_position.x)
+
+
+## 玩家掉出世界（被挤下边缘 / 走出地图）：算死亡，在出生点满血重来
+func _t33_fall_out_of_world() -> void:
+	var h: Health = _player.get_node("Health")
+	var deaths0: int = _player.deaths
+
+	# 世界右缘外（地面只到 x=640），掉下去必须触发死亡重生，不许无限下落
+	_player.global_position = Vector2(660.0, 400.0)
+	_player.velocity = Vector2.ZERO
+
+	# 从 y=400 掉到触发线 y=800 要约 39 帧 —— 先等死亡真的发生，再等复活。
+	# （上一版只等 2 帧就断言，测的是「还没死」，红得毫无意义。）
+	var dead := false
+	for i in 200:
+		await get_tree().physics_frame
+		if int(_player.state) == 4:
+			dead = true
+			break
+
+	var revived := false
+	if dead:
+		for i in 140:
+			await get_tree().physics_frame
+			if int(_player.state) != 4:
+				revived = int(_player.state) == 0
+				break
+
+	var back: bool = absf(_player.global_position.x - _player._spawn_point.x) < 24.0
+	var full := h.hp == h.max_hp
+	_check("33", "掉出世界会在出生点满血重来，不是无限下落",
+		dead and revived and back and full and _player.deaths == deaths0 + 1,
+		"触发死亡=%s　复活=%s　回出生点=%s　血量 %d/%d　死亡计数 %d→%d" % [
+			str(dead), str(revived), str(back), h.hp, h.max_hp, deaths0, _player.deaths])
 	await _settle()
 

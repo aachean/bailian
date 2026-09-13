@@ -27,9 +27,14 @@ const RECOIL_KICK_HEAVY := 1.6
 @onready var health: Health = $Health
 @onready var visuals: Node2D = $Visuals
 @onready var flash: ColorRect = $Visuals/Flash
+@onready var swipe: ColorRect = $Visuals/Swipe
 @onready var bar: Node2D = $HealthBar
 @onready var bar_fill: ColorRect = $HealthBar/Fill
 @onready var _hitbox: Hitbox = $Hitbox
+
+## 掉到这条线以下就是掉出世界，走各自的善后流程。
+## 场景高 360，地面在 320 附近 —— 800 已经是「肯定出世界」的深度
+const FALL_KILL_Y := 800.0
 
 ## 供自动验收读取
 var state: int = State.PATROL
@@ -41,6 +46,9 @@ var _home_x := 0.0              # 出生点（巡逻围绕它）
 var _facing := 1
 var _cooldown := 0
 var _turn_cooldown := 0         # 巡逻折返后的方向锁定帧数
+var _stuck := 0                 # 追击卡住的连续帧数（贴墙/卡缝兜底）
+var _stuck_x := 0.0
+var _attack_pose := 0.0         # 攻击姿势偏移（前缩/后缩），叠加在后仰弹簧上
 var _skill: SkillData = null    # 攻击进行中引用的那张技能表
 var _hitstop := 0
 var _revive_t := 0.0
@@ -79,6 +87,15 @@ func _physics_process(delta: float) -> void:
 		_turn_cooldown -= 1
 
 	velocity.y += _gravity * delta
+
+	# 掉出世界（追玩家追下悬崖 / 地图边缘）：回到出生点上空落下来，满血，回巡逻。
+	# 跟玩家不同 —— 玩家掉出去算死亡，它只是个会重置的木桩加威胁。
+	if global_position.y > FALL_KILL_Y:
+		global_position = Vector2(_home_x, -40.0)
+		velocity = Vector2.ZERO
+		health.heal_full()
+		_enter(State.PATROL)
+		return
 
 	if not ai_enabled:
 		# 靶子模式：只保留物理与后仰，不跑 AI
@@ -141,9 +158,29 @@ func _chase() -> void:
 	if player == null or _dist(player) > data.deaggro_range:
 		_enter(State.PATROL)
 		return
-	if _dist(player) <= data.attack_range and _cooldown <= 0:
-		_start_attack()
+
+	# 攻击距离内就站住 —— 哪怕冷却没好也站着等。
+	# 继续全速顶着玩家走 = 一台推土机：把玩家一路拱到地图边缘掉出世界（实测翻过车）。
+	if _dist(player) <= data.attack_range:
+		_facing = -1 if player.global_position.x < global_position.x else 1
+		velocity.x = 0.0
+		_apply_facing()
+		if _cooldown <= 0:
+			_start_attack()
 		return
+
+	# 追击卡住兜底：贴墙、卡缝时位置不动，干瞪 45 帧就放弃这次追击回巡逻。
+	# 玩家在高台上时它会在墙下站着等 —— 这是正确行为，玩家得自己下来。
+	if absf(global_position.x - _stuck_x) < 0.5:
+		_stuck += 1
+		if _stuck > 45:
+			_stuck = 0
+			_enter(State.PATROL)
+			return
+	else:
+		_stuck = 0
+	_stuck_x = global_position.x
+
 	_facing = -1 if player.global_position.x < global_position.x else 1
 	velocity.x = data.chase_speed * float(_facing)
 	_apply_facing()
@@ -157,11 +194,33 @@ func _attack() -> void:
 		_hitbox.activate(_skill, self, _facing)
 	else:
 		_hitbox.deactivate()
-	if t >= _skill.total_frames():
+	# 攻击的视觉三拍：前摇蓄力后缩 → 判定帧刀光亮起 → 后摇熄灭。
+	# 没有这三拍，贴脸的玩家只看到色块突然掉血（实测反馈：没有攻击动作）。
+	if _skill == null:
+		return
+	var total := _skill.total_frames()
+	if t < _skill.startup_frames:
+		# 前摇：往后缩，告诉玩家「我要打了」
+		_attack_pose = -3.0 * float(_facing) * _ease_in(t, _skill.startup_frames)
+		swipe.modulate.a = 0.0
+	elif _skill.is_active_at(t):
+		_attack_pose = 4.0 * float(_facing)
+		swipe.modulate.a = 0.9
+	else:
+		_attack_pose = 0.0
+		swipe.modulate.a = maxf(0.9 * (1.0 - float(t - _skill.active_to()) / float(maxi(total - _skill.active_to(), 1))), 0.0)
+	if t >= total:
 		_hitbox.deactivate()
 		_skill = null
 		_cooldown = data.attack_cooldown_frames
 		_enter(State.CHASE)
+
+
+## 0→1 的缓入，前摇后缩用
+func _ease_in(t: int, span: int) -> float:
+	if span <= 1:
+		return 1.0
+	return clampf(float(t) / float(span - 1), 0.0, 1.0)
 
 
 func _start_attack() -> void:
@@ -175,6 +234,8 @@ func _enter(s: int) -> void:
 	# 离开攻击状态时必须关判定 —— 判定框是多留一帧都会多结算一次的东西
 	if state == State.ATTACK and s != State.ATTACK:
 		_hitbox.deactivate()
+		_attack_pose = 0.0
+		swipe.modulate.a = 0.0
 	state = s
 	_frame = 0
 	_apply_facing()
@@ -247,7 +308,8 @@ func _process(delta: float) -> void:
 func _update_recoil(delta: float) -> void:
 	_recoil_v += (-_recoil * RECOIL_STIFF - _recoil_v * RECOIL_DAMP) * delta
 	_recoil += _recoil_v * delta
-	visuals.position.x = _recoil
+	# 受击后仰（弹簧）与攻击姿势（前缩/后缩）叠在同一根视觉骨骼上
+	visuals.position.x = _recoil + _attack_pose
 
 
 func _spawn_number(amount: int, point: Vector2, heavy: bool) -> void:
