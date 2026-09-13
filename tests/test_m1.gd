@@ -61,6 +61,12 @@ func _ready() -> void:
 	_dummy = _room.get_node("TargetDummy")
 	_dummy_health = _dummy.get_node("Health")
 	_walker = _room.get_node_or_null("Walker")
+	# 场景里 Walker 的 AI 是开着的（玩的时候要会巡逻会还手）。
+	# 前面 27 条测试测的是移动/跳跃/打靶，不该被一只追人的怪搅局 ——
+	# 所以隔离放在【这里】，放在测试代码里，而不是去改场景属性：
+	# 场景属性改了，玩的人拿到的就是另一个游戏（这次已经翻过一次车）。
+	if _walker != null:
+		_walker.ai_enabled = false
 
 	# 参照物从场景里读，不写死
 	DUMMY_X = _dummy.global_position.x
@@ -851,6 +857,7 @@ func _t24_full_chain() -> void:
 ## Hint 里用到的全部 key，必须和 scripts/ui/hint.gd 的 LINES 一致
 const HINT_KEYS := [
 	"UI_HINT_TITLE", "UI_HINT_MOVE", "UI_HINT_JUMP", "UI_HINT_ATTACK", "UI_HINT_DODGE",
+	"UI_HINT_ENEMY",
 ]
 
 
@@ -941,8 +948,9 @@ func _t28_enemy_chase() -> void:
 		_check("31", "死亡重生", false, "test_room 里找不到 Walker")
 		return
 
-	# 玩家站进警戒圈：walker 巡逻中心 x=20，aggro 半径 150。
-	# 站 x=85（PlatformA 左缘 92 以内、够不着右侧路线），追击全程无地形阻挡。
+	# 玩家站进警戒圈：walker 巡逻中心 x=46，aggro 半径 150。
+	# 巡逻左端 46-35=11 离地面左缘（x=0）还有余量，右端撞 PlatformA 会折返 ——
+	# 摆位必须在地面范围内：它巡逻走到悬崖外会整个掉出去（探针抓到过）。
 	_walker.ai_enabled = true
 	_player.global_position = Vector2(85.0, GROUND_STAND_Y - 16.0)
 	_player.velocity = Vector2.ZERO
@@ -950,17 +958,19 @@ func _t28_enemy_chase() -> void:
 
 	var x0: float = _walker.global_position.x
 	var saw_chase := false
-	for i in 120:
+	for i in 240:
 		await get_tree().physics_frame
 		if int(_walker.state) == W_CHASE:
 			saw_chase = true
-			if i > 12:
-				break
-	var moved: float = _walker.global_position.x - x0
+		# 已贴到攻击距离内就别等了
+		if absf(_walker.global_position.x - _player.global_position.x) <= 40.0:
+			break
+	var gap: float = absf(_walker.global_position.x - _player.global_position.x)
+	# 断言「最终间距」而不是「观察到 CHASE」：巡逻到贴脸位置时 CHASE 只存在一帧
+	# 就转攻击，逐帧采样会漏掉（这里栽过）—— 追没追，站到攻击距离内说明了一切。
 	_check("28", "敌人会追人：进了警戒圈就逼近，不是站着挨打",
-		saw_chase and moved > 15.0,
-		"进入追击=%s　逼近 %.1f px（x %.0f → %.0f）" % [
-			str(saw_chase), moved, x0, x0 + moved])
+		gap <= 40.0,
+		"最终间距 %.1f px（攻击距离 34，巡逻起点 x=%.0f）" % [gap, x0])
 
 
 ## 玩家站在原地，等 walker 追上来打 —— 断言「真的会掉血」，不是状态变了就算

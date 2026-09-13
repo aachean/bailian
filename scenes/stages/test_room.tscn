@@ -65,8 +65,7 @@ shape = SubResource("RectangleShape2D_platform")
 position = Vector2(590, 288)
 
 [node name="Walker" parent="." instance=ExtResource("4_walker")]
-position = Vector2(20, 288)
-ai_enabled = false
+position = Vector2(46, 288)
 
 [node name="Player" parent="." instance=ExtResource("1_player")]
 position = Vector2(200, 280)
