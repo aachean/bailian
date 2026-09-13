@@ -17,6 +17,11 @@ signal hp_changed(hp: int, max_hp: int)
 @export var max_hp: int = 120
 ## 挨打之后的无敌时长（秒）。要略大于一次挥砍的判定持续帧数
 @export var post_hit_invincible: float = 0.10
+## 减伤比例（0.25 = 挨打少掉 25% 的血）。装备的「防御」词条写这里，敌人默认 0
+@export var damage_reduction: float = 0.0
+
+## 减伤上限。留住这道天花板是为了「堆防御到无敌」不会成为解 —— 见 docs/adr/0005
+const MAX_DAMAGE_REDUCTION := 0.6
 
 var hp: int = 0
 var is_dead: bool = false
@@ -46,11 +51,14 @@ func can_be_hit() -> bool:
 
 ## 扣血。返回实际造成的伤害；0 表示这次没打中（无敌 / 已死 / 已在受击无敌里）。
 ## 攻击方靠这个返回值决定「算不算命中」，所以要严格区分 0 和「打出了 0 点伤害」。
+## 护甲（damage_reduction）在这一层生效：攻击方算出的伤害先去减伤，再落到血上。
+## 放在 Health 而不是攻击方，是因为「挨打的人有多硬」属于挨打的人。
 func take_damage(amount: int, point: Vector2 = Vector2.ZERO, heavy: bool = false, dir: int = 0) -> int:
 	if not can_be_hit() or amount <= 0:
 		return 0
-	var dealt: int = mini(amount, hp)
-	hp = maxi(hp - amount, 0)
+	var actual := _reduced(amount)
+	var dealt: int = mini(actual, hp)
+	hp = maxi(hp - actual, 0)
 	_post_hit = post_hit_invincible
 	damaged.emit(dealt, hp, point, heavy, dir)
 	hp_changed.emit(hp, max_hp)
@@ -58,6 +66,15 @@ func take_damage(amount: int, point: Vector2 = Vector2.ZERO, heavy: bool = false
 		is_dead = true
 		died.emit()
 	return dealt
+
+
+## 减伤计算。至少留 1 点 —— 「全身神装站着不掉血」会让挨打彻底失去代价，
+## 而保底 1 点守住了这条底线（掉出世界的 9999 点照样秒杀，减伤不吃掉它）
+func _reduced(amount: int) -> int:
+	var r := clampf(damage_reduction, 0.0, MAX_DAMAGE_REDUCTION)
+	if r <= 0.0:
+		return amount
+	return maxi(1, int(round(float(amount) * (1.0 - r))))
 
 
 func heal_full() -> void:

@@ -292,6 +292,7 @@ func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: i
 func _on_died() -> void:
 	_enter(State.DEAD)
 	_drop_shards()
+	_drop_item()
 	PlayerState.add_exp(data.exp_reward)   # 击杀经验进玩家成长
 	_revive_t = data.revive_delay
 	_target_alpha = 0.0
@@ -309,6 +310,21 @@ func _drop_shards() -> void:
 		host.add_child(p)
 		p.global_position = global_position + Vector2(
 			_rng.randf_range(-24.0, 24.0), _rng.randf_range(-16.0, 4.0))
+
+
+## 死亡掉装备：按 EnemyData 的概率，从掉落池里随机抽一件扔在地上。
+## item_path 必须在 add_child 【之前】设好 —— pickup 的 _ready 要拿它决定颜色
+func _drop_item() -> void:
+	var host := get_tree().current_scene
+	if host == null or data.drop_items.is_empty():
+		return
+	if data.drop_item_chance < 1.0 and _rng.randf() > data.drop_item_chance:
+		return
+	var path: String = data.drop_items[_rng.randi_range(0, data.drop_items.size() - 1)]
+	var p: Node2D = PICKUP.instantiate()
+	p.set("item_path", path)
+	host.add_child(p)
+	p.global_position = global_position + Vector2(_rng.randf_range(-18.0, 18.0), -8.0)
 
 
 func _on_revived() -> void:

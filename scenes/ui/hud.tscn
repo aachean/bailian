@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 
 [node name="HUD" type="CanvasLayer"]
+process_mode = 3
 script = ExtResource("1_hud")
 
 [node name="Status" type="Panel" parent="."]
@@ -144,28 +145,28 @@ text = "L"
 visible = false
 offset_left = 6.0
 offset_top = 72.0
-offset_right = 220.0
-offset_bottom = 268.0
+offset_right = 232.0
+offset_bottom = 286.0
 mouse_filter = 2
 
 [node name="Border" type="ColorRect" parent="CharPanel"]
-offset_right = 214.0
-offset_bottom = 196.0
+offset_right = 226.0
+offset_bottom = 214.0
 mouse_filter = 2
 color = Color(0.47, 0.4, 0.26, 1)
 
 [node name="BG" type="ColorRect" parent="CharPanel"]
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 212.0
-offset_bottom = 194.0
+offset_right = 224.0
+offset_bottom = 212.0
 mouse_filter = 2
 color = Color(0.09, 0.09, 0.12, 0.97)
 
 [node name="TitleBar" type="ColorRect" parent="CharPanel"]
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 212.0
+offset_right = 224.0
 offset_bottom = 26.0
 mouse_filter = 2
 color = Color(0.3, 0.24, 0.16, 1)
@@ -173,7 +174,7 @@ color = Color(0.3, 0.24, 0.16, 1)
 [node name="Title" type="Label" parent="CharPanel"]
 offset_left = 10.0
 offset_top = 4.0
-offset_right = 200.0
+offset_right = 216.0
 offset_bottom = 24.0
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
@@ -182,7 +183,81 @@ text = "角色信息"
 [node name="Text" type="Label" parent="CharPanel"]
 offset_left = 12.0
 offset_top = 32.0
-offset_right = 208.0
-offset_bottom = 192.0
+offset_right = 222.0
+offset_bottom = 210.0
+theme_override_constants/line_spacing = -5
 theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="BagPanel" type="Panel" parent="."]
+visible = false
+offset_left = 384.0
+offset_top = 40.0
+offset_right = 628.0
+offset_bottom = 254.0
+mouse_filter = 2
+
+[node name="Border" type="ColorRect" parent="BagPanel"]
+offset_right = 244.0
+offset_bottom = 214.0
+mouse_filter = 2
+color = Color(0.47, 0.4, 0.26, 1)
+
+[node name="BG" type="ColorRect" parent="BagPanel"]
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 242.0
+offset_bottom = 212.0
+mouse_filter = 2
+color = Color(0.09, 0.09, 0.12, 0.97)
+
+[node name="TitleBar" type="ColorRect" parent="BagPanel"]
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 242.0
+offset_bottom = 26.0
+mouse_filter = 2
+color = Color(0.3, 0.24, 0.16, 1)
+
+[node name="Title" type="Label" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 4.0
+offset_right = 234.0
+offset_bottom = 24.0
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
+text = "背包"
+
+[node name="EquipText" type="Label" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 30.0
+offset_right = 236.0
+offset_bottom = 92.0
+theme_override_constants/line_spacing = -5
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="Divider" type="ColorRect" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 96.0
+offset_right = 234.0
+offset_bottom = 98.0
+mouse_filter = 2
+color = Color(0.4, 0.35, 0.25, 1)
+
+[node name="Rows" type="VBoxContainer" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 102.0
+offset_right = 236.0
+offset_bottom = 186.0
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Hint" type="Label" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 190.0
+offset_right = 236.0
+offset_bottom = 208.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.78, 0.74, 0.64, 1)
 text = ""

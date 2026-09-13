@@ -40,6 +40,10 @@ extends Resource
 @export var drop_shards: int = 1
 ## 死亡时给多少经验
 @export var exp_reward: int = 8
+## 装备掉落池（data/items/*.tres 的资源路径）。空数组 = 不掉装备
+@export var drop_items: Array[String] = []
+## 掉一件装备的概率（0..1）。1.0 = 必掉（Boss），0 = 不掉
+@export var drop_item_chance: float = 0.0
 
 @export_group("投射物（远程怪用，0 = 没有远程手段）")
 ## 投射物飞行速度（像素/秒）。0 = 不投掷

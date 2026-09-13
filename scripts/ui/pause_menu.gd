@@ -26,7 +26,21 @@ func _ready() -> void:
 ## ALWAYS 模式：暂停与否都收得到
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
+		# 装备背包开着时不抢 Esc —— 两个界面都要用 Esc / B，叠起来只会互相打架。
+		# 此时先按 B 关背包，再按 Esc 才能开暂停菜单
+		if not _root.visible and _bag_open():
+			return
 		toggle()
+
+
+## 菜单是否开着（HUD 靠它判断「该不该叠背包」）
+func is_open() -> bool:
+	return _root.visible
+
+
+func _bag_open() -> bool:
+	var hud := get_parent().get_node_or_null("HUD")
+	return hud != null and hud.has_method("is_bag_open") and bool(hud.call("is_bag_open"))
 
 
 func toggle() -> void:
@@ -49,7 +63,9 @@ func _close() -> void:
 	_save_btn.text = tr("UI_PAUSE_SAVE")
 
 
-func _refresh_texts() -> void:
+## 参数必须留着：Godot 按参数个数严格匹配信号连接，少一个会「连上了但一调用就报错」，
+## 界面静默不刷新（M1 的语言切换用例抓到过这个家族）
+func _refresh_texts(_locale: String = "") -> void:
 	_continue_btn.text = tr("UI_PAUSE_CONTINUE")
 	_save_btn.text = tr("UI_PAUSE_SAVE")
 	_menu_btn.text = tr("UI_PAUSE_MENU")

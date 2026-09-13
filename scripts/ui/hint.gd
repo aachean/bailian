@@ -12,6 +12,7 @@ const LINES := [
 	"UI_HINT_ATTACK",
 	"UI_HINT_DODGE",
 	"UI_HINT_ENEMY",
+	"UI_HINT_SYSTEM",
 ]
 
 

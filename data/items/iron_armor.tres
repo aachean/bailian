@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"iron_armor"
+name_key = &"ITEM_IRON_ARMOR"
+slot = 2
+tier = 1
+def_bonus = 0.25

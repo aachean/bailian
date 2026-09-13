@@ -164,7 +164,7 @@ func _t4_skill_casts_and_hits() -> void:
 	# 扣蓝断言容忍 ±1（自然回蓝混进窗口）；伤害容忍 ±15% 浮动的下限
 	_check("4", "技能旋风斩：扣 30 蓝、周身大范围命中",
 		casted and mp_spent >= 29 and dealt >= 12,
-		"施放=%s　扣蓝 %d（期望 30±1）　命中打 %d 点（14±15% → ≥12）" % [
+		"施放=%s　扣蓝 %d（期望 30±1）　命中打 %d 点（14±15%% → ≥12）" % [
 			str(casted), mp_spent, dealt])
 
 
@@ -247,12 +247,13 @@ func _t9_whirl_fx_visible() -> void:
 	_press("skill")
 	await _pframes(14)               # 前摇 8 帧后进入判定 + 特效窗口
 	var during: bool = fx.visible and fx.modulate.a > 0.3
+	var alpha_at: float = fx.modulate.a     # 存下来：60 帧后特效已收起，a 会变成 0
 	await _pframes(60)
 	var after: bool = fx.visible
 	_check("9", "旋风斩有技能效果：判定期间剑光旋转可见，结束收起",
 		(not was) and during and (not after),
 		"释放前=%s　判定期间=%s（alpha %.2f）　结束后=%s" % [
-			str(was), str(during), fx.modulate.a, str(after)])
+			str(was), str(during), alpha_at, str(after)])
 
 
 ## 升级有反馈：金光标记 + 「升级！」飘字节点出现

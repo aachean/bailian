@@ -135,7 +135,6 @@ const FALL_KILL_Y := 800.0
 ## 状态一律回到 FREE —— 存档瞬间可能在闪避/硬直里，那些不该被「续」上。
 func apply_saved(d: Dictionary) -> void:
 	_end_action()
-	_health.restore(int(d.get("hp", _health.max_hp)))
 	shards = int(d.get("shards", shards))
 	upgrade_level = int(d.get("upgrade", upgrade_level))
 	level = int(d.get("level", level))
@@ -145,9 +144,15 @@ func apply_saved(d: Dictionary) -> void:
 	PlayerState.upgrade_level = upgrade_level
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
+	# 装备栏 / 背包也在快照里，先摆回 PlayerState 再算属性
+	if d.has("equipped") or d.has("bag"):
+		PlayerState.set_equipment(d.get("equipped", {}) as Dictionary, d.get("bag", []) as Array)
 	max_mp = 50 + (level - 1) * 10
-	_health.max_hp = 100 + (level - 1) * 15
+	# 装备栏住在 PlayerState（存档恢复时已一并回填），这里按它重算上限与倍率。
+	# 血量必须在这之后再摆 —— _set_max_hp 会动 hp，
+	# 先 restore 再改上限的话，读回来的血量会被上限变动改写
 	_apply_upgrade()
+	_health.restore(int(d.get("hp", _health.max_hp)))
 	_hurt_flash = 0.0
 	_visuals.modulate = Color.WHITE
 	global_position = Vector2(float(d.get("x", _spawn_point.x)), float(d.get("y", _spawn_point.y)))
@@ -191,18 +196,22 @@ func _ready() -> void:
 	# 回城即治疗：进场景满血满蓝；等级越高蓝上限越高
 	max_mp = 50 + (level - 1) * 10
 	mp = max_mp
-	_health.max_hp = 100 + (level - 1) * 15
-	_health.hp = _health.max_hp
 	if not PlayerState.level_up.is_connected(_on_level_up):
 		PlayerState.level_up.connect(_on_level_up)
 	if not PlayerState.exp_changed.is_connected(_on_exp_changed):
 		PlayerState.exp_changed.connect(_on_exp_changed)
+	if not PlayerState.equipment_changed.is_connected(_on_equipment_changed):
+		PlayerState.equipment_changed.connect(_on_equipment_changed)
+	# 先按「等级 + 强化 + 装备」算全属性，再满血 —— 顺序反了的话
+	# 装备加的生命上限会被 heal_full 用旧上限截掉
 	_apply_upgrade()
+	_health.heal_full()
 	_spawn_point = global_position
 
 
 func _exit_tree() -> void:
-	# 离开场写回：下一次进任何场景，碎片和等级都还在
+	# 离开场写回：下一次进任何场景，碎片和等级都还在。
+	# 装备栏 / 背包不在这里写回 —— 它们本来就住在 PlayerState，玩家节点只是读者
 	PlayerState.shards = shards
 	PlayerState.upgrade_level = upgrade_level
 	PlayerState.level = level
@@ -221,8 +230,10 @@ func _on_exp_changed(new_exp: int) -> void:
 ## 升级就该有仪式感，没反馈的成长等于没升级（用户实测反馈）
 func _on_level_up(new_level: int) -> void:
 	level = new_level
-	_health.max_hp = 100 + (level - 1) * 15
 	max_mp = 50 + (level - 1) * 10
+	# 血上限、攻击倍率、减伤统一由 _apply_upgrade 重算（含装备词条），
+	# 再回满 —— 升级是「上限涨了并且当场补满」，不是「上限涨了血条变短」
+	_apply_upgrade()
 	_health.heal_full()
 	mp = max_mp
 	_level_up_fx()
@@ -251,15 +262,71 @@ func _update_hp_bar(_hp: int, _max_hp: int) -> void:
 	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
 
 
-## 武器强化每级 +20%；角色等级每级 +5%（与强化叠加）
+## 武器强化每级 +20%；角色等级每级 +5%；装备的攻击词条直接相加（同一个乘区）。
 ## 改的是 Hitbox 的伤害倍率，技能表（招式本身）不动 —— 强化的是人，不是招
 const UPGRADE_STEP := 0.2
 const LEVEL_ATK_STEP := 0.05
 
 
+## 重算玩家身上所有「由外部数据推导出来」的属性：攻击倍率 / 生命上限 / 减伤。
+## 触发点：开局、升级、铁砧强化、换装备、读档。
+## 名字保留 _apply_upgrade（原本只干「强化」一件事）是因为调用方已经散布在
+## anvil.gd / HUD / 测试里，改名的收益小于风险。
 func _apply_upgrade() -> void:
+	var bonus := PlayerState.bonus_total()
 	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level) \
-		+ LEVEL_ATK_STEP * float(level - 1)
+		+ LEVEL_ATK_STEP * float(level - 1) + float(bonus.get("atk", 0.0))
+	_set_max_hp(100 + (level - 1) * 15 + int(bonus.get("hp", 0)))
+	_health.damage_reduction = float(bonus.get("def", 0.0))
+	_refresh_hud()
+
+
+## 改生命上限时把新增的那截补进当前血（上限变低则把血夹回去）。
+## 少了这一步，穿上 +45 血的铁盔会出现「血条瞬间掉一截」这类观感问题。
+## 注意是【补差值】不是【设满血】—— 否则换装就成了免费回血，挨打的代价被抹掉
+func _set_max_hp(value: int) -> void:
+	var old := _health.max_hp
+	_health.max_hp = value
+	if value > old:
+		_health.hp = mini(_health.hp + (value - old), value)
+	else:
+		_health.hp = mini(_health.hp, value)
+
+
+## 换装 / 捡装备：重算属性并刷新界面
+func _on_equipment_changed() -> void:
+	_apply_upgrade()
+
+
+## 拾取装备（地面掉落物调）。装备本体进 PlayerState 的背包，玩家节点只负责表现
+func collect_item(path: String) -> void:
+	if not PlayerState.add_item(path):
+		return
+	var it := load(path) as ItemData
+	if it != null:
+		_item_pickup_fx(it)
+
+
+## 捡到装备时头顶飘出装备名（按品质上色）——
+## 掉落拾取必须有反馈，否则玩家不知道自己捡到了什么（设计规范：反馈原则）
+func _item_pickup_fx(item: ItemData) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var lbl := Label.new()
+	lbl.z_index = 50
+	lbl.text = tr(item.name_key)
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", item.tier_color())
+	lbl.position = global_position + Vector2(-20, -56)
+	host.add_child(lbl)
+	var tw := lbl.create_tween()
+	tw.tween_property(lbl, "position:y", lbl.position.y - 26.0, 0.9)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.9)
+	tw.tween_callback(lbl.queue_free)
+
+
+func _refresh_hud() -> void:
 	var hud := get_node_or_null("HUD")
 	if hud != null and hud.has_method("refresh"):
 		hud.call("refresh")
@@ -269,9 +336,7 @@ func _apply_upgrade() -> void:
 func collect_shard() -> void:
 	shards += 1
 	PlayerState.shards = shards
-	var hud := get_node_or_null("HUD")
-	if hud != null and hud.has_method("refresh"):
-		hud.call("refresh")
+	_refresh_hud()
 
 
 func _physics_process(delta: float) -> void:

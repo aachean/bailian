@@ -1,0 +1,455 @@
+extends Node
+## 《百炼》M3 增量 2 自动验收：装备系统（掉落 / 穿戴 / 词条 / 存档 / 界面）
+##
+## 跑法（无头）：
+##     godot --headless --fixed-fps 60 --path <项目根> res://tests/test_m5.tscn
+##
+## 纪律：能自动判定的绝不留给用户回答。这里测的是「行为」，不是「实现」——
+## 断言的是装备穿上去以后伤害倍率 / 血上限 / 挨打掉血的变化量，
+## 不是「某个字段被赋值了」。
+
+const ROOM := preload("res://scenes/stages/test_room.tscn")
+const PICKUP := preload("res://scenes/components/pickup.tscn")
+const BOSS := preload("res://scenes/enemies/boss.tscn")
+
+const IRON_SWORD := "res://data/items/iron_sword.tres"      # 武器｜攻 +15%
+const FLAME_BLADE := "res://data/items/flame_blade.tres"    # 武器｜攻 +30%
+const IRON_HELM := "res://data/items/iron_helm.tres"        # 头盔｜血 +45
+const IRON_ARMOR := "res://data/items/iron_armor.tres"      # 护甲｜防 +25%
+
+var _pass := 0
+var _fail := 0
+var _room: Node2D
+var _player: Node
+var _walker: Node
+
+
+func _ready() -> void:
+	await get_tree().process_frame
+	print("")
+	print("═══ 《百炼》M3 增量 2 自动验收 · 装备系统 ═══")
+	_room = ROOM.instantiate()
+	add_child(_room)
+	for i in 5:
+		await get_tree().physics_frame
+	_player = _room.get_node("Player")
+	_walker = _room.get_node("Walker")
+	_walker.ai_enabled = false
+	_reset_stats()
+
+	await _t1_boss_drops_item()
+	await _t2_walk_over_pickup()
+	await _t3_equip_raises_attack()
+	await _t4_same_slot_replaces()
+	await _t5_unequip_returns_to_bag()
+	await _t6_hp_bonus_raises_max_hp()
+	await _t7_def_bonus_reduces_damage()
+	await _t8_equipment_survives_snapshot()
+	await _t9_bag_key_pauses_and_shows()
+	await _t10_cursor_and_equip_by_key()
+	await _t11_panel_shows_names_and_stats()
+	await _t12_empty_bag_state()
+	await _t13_no_translation_key_leak()
+
+	print("")
+	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
+	get_tree().paused = false          # 安全网：绝不能带着暂停退出
+	get_tree().quit(0 if _fail == 0 else 1)
+
+
+func _check(id: String, desc: String, ok: bool, detail: String) -> void:
+	if ok:
+		_pass += 1
+		print("  PASS  #%-3s %s\n              %s" % [id, desc, detail])
+	else:
+		_fail += 1
+		print("  FAIL  #%-3s %s\n              %s" % [id, desc, detail])
+
+
+func _pframes(n: int) -> void:
+	for _i in n:
+		await get_tree().physics_frame
+
+
+func _press(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	ev.strength = 1.0
+	Input.parse_input_event(ev)
+
+
+func _release(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = false
+	Input.parse_input_event(ev)
+
+
+## 发一个真实按键事件 —— 背包界面读的是 keycode，不是 InputMap 动作
+func _key(code: int) -> void:
+	var ev := InputEventKey.new()
+	ev.keycode = code
+	ev.physical_keycode = code
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+
+## 把成长值钉在基线：等级 1、无强化、无装备 —— 否则倍率断言算不准
+func _reset_stats() -> void:
+	PlayerState.set_equipment({}, [])
+	PlayerState.level = 1
+	PlayerState.exp = 0
+	_player.set("level", 1)
+	_player.set("exp_pts", 0)
+	_player.set("upgrade_level", 0)
+	_player.set("shards", 0)
+	_player.call("_apply_upgrade")
+	_player.get_node("Health").heal_full()
+
+
+func _scale() -> float:
+	return float(_player.get_node("Hitbox").damage_scale)
+
+
+func _max_hp() -> int:
+	return int((_player.get_node("Health") as Health).max_hp)
+
+
+func _place(x: float) -> void:
+	_player.global_position = Vector2(x, 288.0)
+	_player.velocity = Vector2.ZERO
+	await _pframes(2)
+	var n := 0
+	while not _player.is_on_floor() and n < 60:
+		await get_tree().physics_frame
+		n += 1
+	await _pframes(2)
+
+
+## 地上还没被捡走的装备掉落物数量。
+## 注意：掉落物挂到 get_tree().current_scene 下（怪在真实关卡里就是这么做的），
+## 测试环境里 current_scene 是测试根，不是 _room —— 遍历 _room 会永远数到 0
+func _item_pickups() -> int:
+	var host := get_tree().current_scene
+	if host == null:
+		return 0
+	var n := 0
+	for c in host.get_children():
+		var p = c.get("item_path")
+		if p != null and str(p) != "":
+			n += 1
+	return n
+
+
+## 杀掉关卡尽头的 Boss，必掉一件装备（掉落池 100% 触发）
+func _t1_boss_drops_item() -> void:
+	await _place(320.0)
+	var boss := BOSS.instantiate()
+	_room.add_child(boss)
+	boss.global_position = Vector2(90.0, 288.0)     # 离玩家远点，别一掉就被吸走
+	await _pframes(3)
+	var before := _item_pickups()
+	boss.get_node("Health").take_damage(9999, Vector2.ZERO, true, 1)
+	await _pframes(3)
+	var after := _item_pickups()
+	boss.queue_free()
+	await _pframes(2)
+	_check("1", "打死 Boss 必掉一件装备（地上多出一个装备掉落物）",
+		after > before,
+		"地上装备掉落物 %d → %d（Boss 掉落率 100%%）" % [before, after])
+
+
+## 走近掉落物自动吸附拾取，进背包
+func _t2_walk_over_pickup() -> void:
+	await _place(320.0)
+	var before: int = PlayerState.bag.size()
+	var p: Node2D = PICKUP.instantiate()
+	p.set("item_path", IRON_SWORD)
+	_room.add_child(p)
+	p.global_position = _player.global_position + Vector2(6.0, 0.0)
+	await _pframes(5)
+	var gained: int = PlayerState.bag.size() - before
+	var on_ground := _item_pickups()
+	_check("2", "走到装备上自动拾取，进背包（地上不再留着）",
+		gained == 1 and PlayerState.bag.has(IRON_SWORD),
+		"背包 %d → %d（+%d）　地上剩余装备掉落物 %d" % [
+			before, PlayerState.bag.size(), gained, on_ground])
+
+
+## 穿上武器：攻击倍率当场 +15%
+func _t3_equip_raises_attack() -> void:
+	await _place(320.0)
+	# 前面打 Boss 给了 60 经验，等级已经变了 —— 倍率断言要先把成长值钉回基线
+	_reset_stats()
+	if not PlayerState.bag.has(IRON_SWORD):
+		PlayerState.add_item(IRON_SWORD)
+	var before := _scale()
+	PlayerState.equip(IRON_SWORD)
+	await _pframes(2)
+	var after := _scale()
+	_check("3", "穿上铁剑：攻击倍率 +15%（装备词条进了伤害管线）",
+		is_equal_approx(round((after - before) * 100.0) / 100.0, 0.15) and after > before,
+		"倍率 %.2f → %.2f（+%.0f%%，期望 +15%%）" % [before, after, (after - before) * 100.0])
+
+
+## 同部位再穿一件：旧的自动回背包，不丢东西
+func _t4_same_slot_replaces() -> void:
+	PlayerState.add_item(FLAME_BLADE)
+	var bag_before: int = PlayerState.bag.size()
+	PlayerState.equip(FLAME_BLADE)
+	await _pframes(2)
+	var wearing := PlayerState.item_at(&"weapon")
+	var back_in_bag := PlayerState.bag.has(IRON_SWORD)
+	var scale_now := _scale()
+	_check("4", "换同部位装备：旧的自动回背包，新件生效（+30%）",
+		wearing != null and wearing.id == &"flame_blade" and back_in_bag \
+			and is_equal_approx(round(scale_now * 100.0) / 100.0, 1.30),
+		"槽里=%s　铁剑回背包=%s　倍率 %.2f（期望 1.30）　背包 %d 件" % [
+			str(wearing.id if wearing != null else &"空"), str(back_in_bag),
+			scale_now, PlayerState.bag.size() - bag_before])
+
+
+## 卸下：装备回背包，倍率回落
+func _t5_unequip_returns_to_bag() -> void:
+	var before := _scale()
+	PlayerState.unequip(&"weapon")
+	await _pframes(2)
+	var after := _scale()
+	var slot_empty := PlayerState.item_at(&"weapon") == null
+	var back := PlayerState.bag.has(FLAME_BLADE)
+	_check("5", "卸下武器：回背包、倍率回落到没穿装备的水平",
+		slot_empty and back and is_equal_approx(round(after * 100.0) / 100.0, 1.0),
+		"槽空=%s　烈焰刃回背包=%s　倍率 %.2f → %.2f（期望 1.00）" % [
+			str(slot_empty), str(back), before, after])
+
+
+## 头盔的生命词条：血上限 +45，且当前血跟着补上那 45（不是掉一截）
+func _t6_hp_bonus_raises_max_hp() -> void:
+	(_player.get_node("Health") as Health).heal_full()
+	await _pframes(1)
+	var hp_before := _max_hp()
+	var cur_before := int((_player.get_node("Health") as Health).hp)
+	PlayerState.add_item(IRON_HELM)
+	PlayerState.equip(IRON_HELM)
+	await _pframes(2)
+	var hp_after := _max_hp()
+	var cur_after := int((_player.get_node("Health") as Health).hp)
+	_check("6", "穿上铁盔：血上限 +45，当前血跟着补上那 45",
+		hp_after - hp_before == 45 and cur_after - cur_before == 45,
+		"血上限 %d → %d　当前血 %d → %d" % [hp_before, hp_after, cur_before, cur_after])
+
+
+## 护甲的防御词条：挨同样一下，掉的血更少（25% 减伤）
+func _t7_def_bonus_reduces_damage() -> void:
+	await _place(320.0)
+	var h := _player.get_node("Health") as Health
+	h.heal_full()
+	var no_armor: int = h.take_damage(20, Vector2.ZERO, false, 0)
+	h.heal_full()
+	PlayerState.add_item(IRON_ARMOR)
+	PlayerState.equip(IRON_ARMOR)
+	await _pframes(2)
+	var reduction: float = h.damage_reduction
+	h.heal_full()
+	var with_armor: int = h.take_damage(20, Vector2.ZERO, false, 0)
+	h.heal_full()
+	# 20 点攻击、25% 减伤 → 15 点
+	_check("7", "穿上铁甲：同样一下打 20 点，掉血变成 15（25% 减伤）",
+		no_armor == 20 and with_armor == 15 and is_equal_approx(reduction, 0.25),
+		"无甲掉 %d　有甲掉 %d（期望 15）　减伤 %.0f%%" % [
+			no_armor, with_armor, reduction * 100.0])
+
+
+## 装备栏与背包进快照，读档原样回来
+func _t8_equipment_survives_snapshot() -> void:
+	await _place(320.0)
+	PlayerState.add_item(IRON_SWORD)
+	PlayerState.add_item(FLAME_BLADE)
+	var snap := _room.call("collect") as Dictionary
+	var equipped_before: Dictionary = PlayerState.equipped.duplicate()
+	var bag_before: Array = PlayerState.bag.duplicate()
+
+	PlayerState.set_equipment({}, [])
+	await _pframes(1)
+	var wiped: bool = PlayerState.equipped.is_empty() and PlayerState.bag.is_empty()
+
+	_room.call("_apply_state", snap)
+	await _pframes(2)
+	var same_equipped: bool = PlayerState.equipped == equipped_before
+	var same_bag: bool = PlayerState.bag == bag_before
+	_check("8", "装备栏与背包进快照，读档原样回来",
+		wiped and same_equipped and same_bag,
+		"清空成功=%s　装备栏一致=%s（%s）　背包一致=%s（%d 件）" % [
+			str(wiped), str(same_equipped), str(PlayerState.equipped),
+			str(same_bag), PlayerState.bag.size()])
+
+
+## B 键开背包：面板可见 + 世界真暂停；再按一次关掉并恢复
+func _t9_bag_key_pauses_and_shows() -> void:
+	await _place(320.0)
+	var hud := _player.get_node("HUD")
+	var panel := hud.get_node("BagPanel") as Panel
+	var was := panel.visible
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+	var opened: bool = panel.visible and hud.call("is_bag_open") == true and get_tree().paused
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+	var closed: bool = (not panel.visible) and (not get_tree().paused)
+
+	_check("9", "B 键开关装备背包：打开即暂停世界，再按关闭即恢复",
+		(not was) and opened and closed,
+		"初始关=%s　按后可见+暂停=%s　再按关闭+恢复=%s" % [
+			str(not was), str(opened), str(closed)])
+
+
+## 光标上下移动 + J 穿戴（用真实按键事件，不是动作）
+func _t10_cursor_and_equip_by_key() -> void:
+	var hud := _player.get_node("HUD")
+	PlayerState.set_equipment({}, [FLAME_BLADE])
+	await _pframes(2)
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	var c0: int = int(hud.get("_cursor"))
+	for i in ItemData.SLOT_IDS.size():
+		_key(KEY_DOWN)
+		await _pframes(2)
+	var c1: int = int(hud.get("_cursor"))
+	_key(KEY_J)
+	await _pframes(3)
+
+	var equipped_now := PlayerState.item_at(&"weapon")
+	var bag_now: int = PlayerState.bag.size()
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	_check("10", "背包里上下移动光标，按 J 把选中的装备穿上",
+		c1 == ItemData.SLOT_IDS.size() and equipped_now != null \
+			and equipped_now.id == &"flame_blade" and bag_now == 0,
+		"光标 %d → %d（期望 %d=背包第一行）　穿上的=%s　背包剩 %d 件" % [
+			c0, c1, ItemData.SLOT_IDS.size(),
+			str(equipped_now.id if equipped_now != null else &"无"), bag_now])
+
+
+## 面板上真的写出了装备名和词条 —— 防「静默空白 / 显示 key 本身」
+func _t11_panel_shows_names_and_stats() -> void:
+	var hud := _player.get_node("HUD")
+	PlayerState.set_equipment({}, [])
+	PlayerState.add_item(IRON_HELM)
+	PlayerState.add_item(FLAME_BLADE)
+	PlayerState.equip(IRON_HELM)
+	PlayerState.equip(FLAME_BLADE)
+	await _pframes(2)
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	var equip_text: String = str((hud.get_node("BagPanel/EquipText") as Label).text)
+	var hint: String = str((hud.get_node("BagPanel/Hint") as Label).text)
+	var title: String = str((hud.get_node("BagPanel/Title") as Label).text)
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	var has_weapon_name := equip_text.contains(tr("ITEM_FLAME_BLADE"))
+	var has_helm_name := equip_text.contains(tr("ITEM_IRON_HELM"))
+	var has_stat := equip_text.contains(tr("STAT_ATK")) or equip_text.contains(tr("STAT_HP"))
+	var no_key_leak: bool = not equip_text.contains("ITEM_") and not title.contains("UI_") \
+		and not hint.contains("UI_")
+	_check("11", "面板写出装备名与词条，且不显示翻译 key 本身",
+		has_weapon_name and has_helm_name and has_stat and no_key_leak and not hint.is_empty(),
+		"武器名=%s　头盔名=%s　词条=%s　无 key 泄漏=%s\n              「%s」" % [
+			str(has_weapon_name), str(has_helm_name), str(has_stat),
+			str(no_key_leak), equip_text.replace("\n", " ／ ")] + "\n              操作提示「%s」" % hint)
+
+
+## 空背包：面板得说「（空）」，光标也不能越界
+func _t12_empty_bag_state() -> void:
+	var hud := _player.get_node("HUD")
+	PlayerState.set_equipment({}, [])
+	await _pframes(2)
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+	var cursor_before: int = int(hud.get("_cursor"))
+	_key(KEY_DOWN)
+	await _pframes(2)
+	_key(KEY_DOWN)
+	await _pframes(2)
+	var cursor_after: int = int(hud.get("_cursor"))
+
+	var rows := (hud.get_node("BagPanel/Rows") as VBoxContainer)
+	var first_row: String = (rows.get_child(0) as Label).text
+	var equip_text: String = str((hud.get_node("BagPanel/EquipText") as Label).text)
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	_check("12", "背包空着时面板写明「（空）」，光标也不会越界",
+		first_row == tr("UI_BAG_EMPTY") and equip_text.contains(tr("UI_BAG_EMPTY")) \
+			and cursor_after <= ItemData.SLOT_IDS.size() - 1,
+		"背包首行=「%s」　槽位显示含空=%s　光标 %d → %d（上限 %d）" % [
+			first_row, str(equip_text.contains(tr("UI_BAG_EMPTY"))),
+			cursor_before, cursor_after, ItemData.SLOT_IDS.size() - 1])
+
+
+## 界面上不许出现翻译 key 本身。
+## 漏翻 / 拼错 key **不报任何错**，界面上就显示 "PANEL_SHARD" 这种字样 ——
+## 只有截图和断言抓得到。这条就是为「静默失败」专门设的探针
+## （写这条时立刻抓到一处：角色面板的 PANEL_SHARD 是个不存在的 key）
+func _t13_no_translation_key_leak() -> void:
+	var hud := _player.get_node("HUD")
+	hud.get_node("CharPanel").visible = true
+	hud.call("refresh")
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	var texts: Array[String] = []
+	for path in [
+		"CharPanel/Text", "BagPanel/Title", "BagPanel/EquipText", "BagPanel/Hint",
+		"Status/Level", "Bag/Count",
+	]:
+		var n := hud.get_node_or_null(path)
+		if n is Label:
+			texts.append((n as Label).text)
+	for l in (hud.get_node("BagPanel/Rows") as VBoxContainer).get_children():
+		texts.append((l as Label).text)
+
+	var leaks := PackedStringArray()
+	var re := RegEx.new()
+	re.compile("(UI|PANEL|HUD|ITEM|SLOT|STAT)_[A-Z_]+")
+	for t in texts:
+		for m in re.search_all(t):
+			leaks.append(m.get_string())
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+	hud.get_node("CharPanel").visible = false
+
+	_check("13", "两个面板上都不出现翻译 key 本身（漏翻是静默失败，只能这么抓）",
+		leaks.is_empty(),
+		"扫了 %d 段文本　泄漏的 key：%s" % [
+			texts.size(), "无" if leaks.is_empty() else ", ".join(leaks)])

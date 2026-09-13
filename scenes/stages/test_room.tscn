@@ -74,7 +74,7 @@ position = Vector2(200, 280)
 
 [node name="Hint" type="Label" parent="."]
 offset_left = 170.0
-offset_top = 306.0
+offset_top = 238.0
 offset_right = 636.0
 offset_bottom = 358.0
 mouse_filter = 2

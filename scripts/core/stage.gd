@@ -48,6 +48,10 @@ func collect() -> Dictionary:
 			"level": int(player.get("level")),
 			"exp": int(player.get("exp_pts")),
 			"mp": int(player.get("mp")),
+			# 装备栏 / 背包的真相在 PlayerState（autoload），不在玩家节点上 ——
+			# 这里只是把它抄进快照，读档时由 player.apply_saved 抄回去
+			"equipped": PlayerState.equipped.duplicate(),
+			"bag": PlayerState.bag.duplicate(),
 		}
 	var enemies: Array = []
 	for e in get_tree().get_nodes_in_group("enemy"):

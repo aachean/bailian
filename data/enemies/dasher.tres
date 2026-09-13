@@ -19,3 +19,5 @@ attack_range = 30.0
 attack_cooldown_frames = 36
 attack_skill = ExtResource("2_skill")
 exp_reward = 10
+drop_item_chance = 0.22
+drop_items = Array[String](["res://data/items/leather_cap.tres", "res://data/items/cloth_robe.tres", "res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres"])

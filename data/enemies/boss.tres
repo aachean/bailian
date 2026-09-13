@@ -20,3 +20,5 @@ attack_cooldown_frames = 70
 attack_skill = ExtResource("2_skill")
 exp_reward = 60
 drop_shards = 10
+drop_item_chance = 1.0
+drop_items = Array[String](["res://data/items/flame_blade.tres", "res://data/items/iron_helm.tres", "res://data/items/iron_armor.tres", "res://data/items/jade_talisman.tres"])

@@ -7,7 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇 Hub（传送门进关卡）→ 3 屏关卡：相机跟随，三种小怪（游荡者 / 疾行者 / 掷矛手）；存档会记下你离开时每个人的血量和位置，「继续游戏」原样回来 |
+| 现在能玩到 | 主菜单 → 城镇 Hub（传送门进关卡）→ 3 屏关卡：相机跟随，三种小怪（游荡者 / 疾行者 / 掷矛手）+ Boss；升级加点、旋风斩、**打怪掉装备**（四部位词条）+ 铁砧强化；存档会记下你离开时每个人的血量位置、装备与背包 |
 
 ---
 
@@ -16,10 +16,11 @@
 1. 用 Godot 4.7.x 打开本目录下的 `project.godot`
 2. 按 `F5` —— 进主菜单：开始游戏 / 继续游戏（有存档时）/ 语言切换 / 退出
 
-**操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击（连点三下是三段连招）　·　`K` 闪避（可打断自己的攻击）　·　`Esc` 回主菜单
+**操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击（连点三下是三段连招）　·　`K` 闪避（可打断自己的攻击）　·　`L` 旋风斩　·　`C` 角色面板　·　`B` 装备背包　·　`Esc` 暂停菜单
 
-**存档**：开始游戏时自动写档（`user://save.cfg`）。目前只记「进度到哪了」，
-装备与强化等 M2 后续增量接入。
+**存档**：3 个存档槽（`user://save_1..3.cfg`）。写档时机是暂停菜单里的「保存游戏」与回主菜单。
+当前记录：关卡进度、玩家血量位置、每只怪的血量位置、精铁与武器强化等级、
+等级与经验、**装备栏与背包**。
 
 ---
 
@@ -66,13 +67,29 @@ godot --path . res://tests/shot_i18n.tscn    # 中英各截一张到 build/shots
 godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 ```
 
-它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。M2 起另有两组：
+它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。后续增量各自一组：
 
 ```
-godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn   # 菜单 / 槽位存档 / 语言（6 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn   # 相机 / 传送门 / 新怪（12 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn   # 等级 / 蓝量 / 技能（7 条）
+godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（16 个场景，缺节点即红）
+godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 传送门 / 新怪（12 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击（15 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 背包界面（13 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
+```
+
+> 新增带 `class_name` 的脚本后，第一次跑之前要先 `godot --headless --import`：
+> 全局类缓存是在导入阶段写的，autoload 比它先加载，会报「Could not find type X」。
+
+### 装备系统落在哪
+
+```
+data/items/*.tres          八件装备（部位 / 品质 / 三条词条），加装备不改代码
+scripts/core/item_data.gd  ItemData：槽位与品质枚举、词条字段
+scripts/core/player_state.gd  装备栏与背包（真相在这，玩家节点只是读者）+ 词条聚合缓存
+scripts/characters/player.gd  _apply_upgrade() 把「强化 + 等级 + 装备」算成一个伤害倍率
+scripts/components/health.gd  damage_reduction：挨打侧减伤，上限 60%、保底 1 点
+scripts/ui/hud.gd          B 键装备背包（打开即暂停）+ C 键角色面板的装备概览
 ```
 
 ### 断言纪律（别破）
