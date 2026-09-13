@@ -7,7 +7,12 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇 Hub（**老铁匠 NPC 会给你第一把剑** + 铁砧 + 传送门）→ **三关连成一条路**：第一关（3 屏 · 磨刀石守卫）→ 第二关（4.5 屏 · 重锤兵 / 掷火者 · 石甲卫）→ 第三关（5 屏 · 绝顶）。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**关底 Boss 封着通往下一关的门**，中途有复活点，回城再出来直接送到你解锁到的最远那一关；存档记录离开时的血量位置、装备与背包、剧情进度 |
+| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + 铁砧 + 传送门）→ **三关连成一条路**：第一关（3 屏 · 磨刀石守卫）→ 第二关（4.5 屏 · 重锤兵 / 掷火者 · 石甲卫）→ 第三关（5 屏 · 绝顶）。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；关底 Boss 封着通往下一关的门，中途有复活点；存档记录离开时的血量位置、装备与背包、剧情进度 |
+
+> **结构正在重切**（尚未开始）：这三关要拆成「地图 → 副本 → 关卡」三层 ——
+> 淬火岭 / 砺场·断淬渠·炉喉 / 约 12 个一屏关卡，靠安全区的舆图台按 `P` 选关进入。
+> 届时**门封印与复活点会退役**（逐关进入不再需要它们）。
+> **设计与决策文档不在本仓库** —— 所以别在代码里找「为什么」。
 
 ---
 
@@ -77,7 +82,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（24 个场景，缺节点即红）
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 传送门 / 新怪（12 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环（16 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环 / 血蓝数值（17 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框 / NPC / 主线推进（8 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
@@ -127,6 +132,11 @@ scripts/ui/skill_icon.gd     技能图标：每个技能一个手画形状 + 固
 
 ### 关卡推进落在哪
 
+> ⚠️ **这一节里的门封印与复活点即将退役**（见本文件顶部「结构正在重切」）。
+> 代码暂时保留、也仍被当前三关使用，重切后会停止使用。下面的规矩仍然成立，
+> 只是承载它的东西会换：**「下一关能不能进」从一扇门变成一个锁定的图标**，
+> **「死后回到哪」从复活点变成"重开本关"**。
+
 ```
 scenes/stages/level_1/2/3.tscn  三关连成一条路（3 屏 / 4.5 屏 / 5 屏）
 data/enemies/*.tres             5 种小怪 + 2 个 Boss —— 新怪全是数据，不改代码
@@ -140,7 +150,8 @@ scripts/core/save_manager.gd    unlock_level / furthest_level：把「解锁到�
 - **关底 Boss 不重生**（`revive_delay = 0`）。小怪 2 秒站起来是对的，
   关底 Boss 重生的话「通关」这件事根本不成立。
 - **读档复现尸体不能重放掉落**。`_on_died()` 拆成 `_dead_pose()`（摆尸）+
-  「掉落 + 经验」，读档只走前半 —— 否则反复读档就能刷 Boss 掉落。
+  「掉落 + 经验」，读档只走前半 —— **否则反复读档就能刷掉落**。
+  这一条在关卡可以反复进出的新结构下危害更大（每一关的每一个怪都能刷）。
 - **封印要学会复查**：门的解锁不能只靠 `Health.died` 信号。读档是关卡根在自己
   `_ready` 里把 Boss 摆成尸体的，信号早响过了，门会永远锁着。
 - **地形要在跳跃预算之内**：抬升 ≤ 60px（跳跃高度约 73）、断口 ≤ 90px
@@ -217,18 +228,23 @@ godot --path . res://tests/screenshot.tscn
 res://
 ├── scenes/          场景（.tscn）
 │   ├── characters/  角色
-│   ├── enemies/     敌人
-│   ├── stages/      关卡与测试房间
-│   └── ui/          界面
-├── scripts/         脚本（.gd）
-│   ├── core/        核心服务：状态机、存档、事件总线、RNG
-│   ├── components/  可复用组件：Hitbox / Hurtbox / Health / Skill
-│   └── characters/  角色逻辑
+│   ├── enemies/     敌人与投射物
+│   ├── core/        场景中的实体：传送门 / 铁砧 / NPC / 复活点
+│   ├── components/  可复用部件：掉落物 / 血条
+│   ├── skills/      技能产生的场景（剑气波）
+│   ├── stages/      城镇、关卡、测试房间
+│   └── ui/          HUD / 面板 / 对话框 / 主菜单
+├── scripts/         脚本（.gd），与 scenes 同构
+│   ├── core/        真相与服务：PlayerState / SaveManager / GameSettings / 各资源类
+│   ├── components/  Health / Hitbox / Pickup / Projectile
+│   ├── characters/  玩家状态机
+│   ├── enemies/     敌人 AI（walker 一个脚本覆盖全部小怪与 Boss）
+│   └── ui/          HUD / 图标绘制 / 对话框
 ├── data/            数据资源（.tres）← 内容都长在这里，脚本里不写魔法数字
-│   ├── characters/  enemies/  equipment/  skills/  stages/
+│   ├── enemies/  items/  skills/  dialogue/
 │   └── i18n/        界面文案（csv 源文件 + 导入产物）
-├── assets/          sprites / audio / fonts（中文字体见上）
-├── addons/          第三方插件 + ai_bridge（AI 实时操控桥，见上）
+├── assets/          字体（含 OFL 授权）、CREDITS.md
+├── addons/          第三方插件 + ai_bridge（AI 实时操控桥）
 ├── tools/           资源构建脚本（字体子集化等，不参与游戏运行）
 └── tests/           自动验收 / 可视化回放 / 截图（不参与游戏运行）
 ```
