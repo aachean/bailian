@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
@@ -6,9 +6,6 @@
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1280, 24)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_house"]
-size = Vector2(120, 90)
 
 [node name="Town" type="Node2D"]
 script = ExtResource("1_stage")
@@ -30,10 +27,8 @@ color = Color(0.31, 0.29, 0.26, 1)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
 shape = SubResource("RectangleShape2D_ground")
 
-[node name="House1" type="StaticBody2D" parent="."]
+[node name="House1" type="Node2D" parent="."]
 position = Vector2(300, 242)
-collision_layer = 4
-collision_mask = 0
 
 [node name="Visual" type="ColorRect" parent="House1"]
 offset_left = -60.0
@@ -43,13 +38,16 @@ offset_bottom = 45.0
 mouse_filter = 2
 color = Color(0.4, 0.34, 0.28, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="House1"]
-shape = SubResource("RectangleShape2D_house")
+[node name="Roof1" type="ColorRect" parent="House1"]
+offset_left = -66.0
+offset_top = -53.0
+offset_right = 66.0
+offset_bottom = -43.0
+mouse_filter = 2
+color = Color(0.3, 0.25, 0.21, 1)
 
-[node name="House2" type="StaticBody2D" parent="."]
+[node name="House2" type="Node2D" parent="."]
 position = Vector2(620, 252)
-collision_layer = 4
-collision_mask = 0
 
 [node name="Visual" type="ColorRect" parent="House2"]
 offset_left = -48.0
@@ -59,8 +57,13 @@ offset_bottom = 35.0
 mouse_filter = 2
 color = Color(0.36, 0.31, 0.26, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="House2"]
-shape = SubResource("RectangleShape2D_house")
+[node name="Roof2" type="ColorRect" parent="House2"]
+offset_left = -54.0
+offset_top = -43.0
+offset_right = 54.0
+offset_bottom = -33.0
+mouse_filter = 2
+color = Color(0.27, 0.23, 0.19, 1)
 
 [node name="ExitPortal" parent="." instance=ExtResource("3_portal")]
 position = Vector2(1220, 290)

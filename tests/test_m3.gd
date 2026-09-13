@@ -24,6 +24,7 @@ func _ready() -> void:
 	await _t3_spearman_throws()
 	await _t4_dasher_is_distinct()
 	await _t5_portal_not_armed_inside()
+	await _t6_town_walkable()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -42,6 +43,48 @@ func _check(id: String, desc: String, ok: bool, detail: String) -> void:
 func _pframes(n: int) -> void:
 	for _i in n:
 		await get_tree().physics_frame
+
+
+func _press(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	ev.strength = 1.0
+	Input.parse_input_event(ev)
+
+
+func _release(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = false
+	Input.parse_input_event(ev)
+
+
+## 城镇完整链路：从出生点一路向右，必须能走到出口传送门。
+## 「装饰物把通道堵死」这种 bug 只有真的走一遍才抓得到 ——
+## 用户实测：房子碰撞体比视觉大，把唯一的路堵死，整局没法往后玩。
+func _t6_town_walkable() -> void:
+	var town := TOWN.instantiate()
+	add_child(town)
+	await _pframes(5)
+	var player := town.get_node("Player")
+	player.global_position = Vector2(120.0, 280.0)
+	player.velocity = Vector2.ZERO
+	await _pframes(10)
+
+	_press("move_right")
+	var n := 0
+	while n < 600 and player.global_position.x < 1150.0:
+		await get_tree().physics_frame
+		n += 1
+	_release("move_right")
+	var reached: bool = player.global_position.x >= 1150.0
+	_check("6", "城镇畅通：从出生点一路向右能走到出口传送门",
+		reached,
+		"按住 → 走 %d 帧，到 x=%.0f（目标 ≥1150，出生 x=120）" % [
+			n, player.global_position.x])
+	town.queue_free()
+	await _pframes(2)
 
 
 ## 两个新场景结构齐全：城镇有出口、关卡有回城门和四种怪、玩家带相机
