@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"dash_slash"
+display_name = "疾斩"
+kind = 0
+startup_frames = 5
+active_frames = 3
+recovery_frames = 10
+damage = 6
+damage_variance = 0.12
+knockback = 120.0
+hitstop_frames = 3
+heavy = false
+chainable = false
+hitbox_size = Vector2(32, 24)
+hitbox_offset = Vector2(18, -2)
+lunge_speed = 120.0
+lunge_decay_frames = 5
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 0

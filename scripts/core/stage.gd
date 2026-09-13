@@ -13,8 +13,19 @@ extends Node2D
 
 const PLAYER_PATH := "Player"
 
+## 相机活动范围（世界坐标）。单屏关卡（如 test_room 640×360）设成与视口同大，
+## 相机就不动；多屏关卡设成关卡实际尺寸，视野跟着玩家走、到边就停。
+@export var bounds: Rect2 = Rect2(0, 0, 640, 360)
+
 
 func _ready() -> void:
+	var cam := get_node_or_null(PLAYER_PATH + "/Camera") as Camera2D
+	if cam != null:
+		cam.limit_left = int(bounds.position.x)
+		cam.limit_top = int(bounds.position.y)
+		cam.limit_right = int(bounds.end.x)
+		cam.limit_bottom = int(bounds.end.y)
+		cam.reset_smoothing()
 	var st := SaveManager.take_pending_state()
 	if not st.is_empty():
 		_apply_state(st)

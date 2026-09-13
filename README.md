@@ -6,8 +6,8 @@
 |---|---|
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
-| 界面语言 | 中文（默认）；英文文案已就绪，设置界面待 M2 |
-| 现在能玩到 | 一个色块角色：左右跑、跳、落地（含土狼时间与跳跃缓冲）；三段连招、闪避（带无敌帧）；一个不还手、打死会满血重生的训练靶子；一种会巡逻、追击、挥击的近战小怪——挨打会硬直，死亡在出生点满血重来 |
+| 界面语言 | 中文（默认），主菜单可切换英文 |
+| 现在能玩到 | 主菜单 → 城镇 Hub（传送门进关卡）→ 3 屏关卡：相机跟随，三种小怪（游荡者 / 疾行者 / 掷矛手）；存档会记下你离开时每个人的血量和位置，「继续游戏」原样回来 |
 
 ---
 
@@ -66,7 +66,13 @@ godot --path . res://tests/shot_i18n.tscn    # 中英各截一张到 build/shots
 godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 ```
 
-它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。
+它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。M2 起另有两组：
+
+```
+godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn   # 菜单 / 存档 / 语言（6 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn   # 相机 / 传送门 / 新怪（5 条）
+godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
+```
 
 ### 断言纪律（别破）
 

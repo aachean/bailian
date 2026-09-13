@@ -1,0 +1,126 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/core/portal.tscn" id="3_portal"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="4_walker"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/dasher.tscn" id="5_dasher"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/spearman.tscn" id="6_spearman"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(1920, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat_a"]
+size = Vector2(120, 12)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat_b"]
+size = Vector2(120, 12)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat_c"]
+size = Vector2(140, 12)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_step"]
+size = Vector2(160, 40)
+
+[node name="Level1" type="Node2D"]
+script = ExtResource("1_stage")
+bounds = Rect2(0, 0, 1920, 360)
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(960, 332)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Ground"]
+offset_left = -960.0
+offset_top = -12.0
+offset_right = 960.0
+offset_bottom = 12.0
+mouse_filter = 2
+color = Color(0.27, 0.25, 0.23, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="Step1" type="StaticBody2D" parent="."]
+position = Vector2(760, 292)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Step1"]
+offset_left = -80.0
+offset_top = -20.0
+offset_right = 80.0
+offset_bottom = 20.0
+mouse_filter = 2
+color = Color(0.35, 0.33, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Step1"]
+shape = SubResource("RectangleShape2D_step")
+
+[node name="PlatA" type="StaticBody2D" parent="."]
+position = Vector2(1080, 250)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="PlatA"]
+offset_left = -60.0
+offset_top = -6.0
+offset_right = 60.0
+offset_bottom = 6.0
+mouse_filter = 2
+color = Color(0.35, 0.33, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatA"]
+shape = SubResource("RectangleShape2D_plat_a")
+
+[node name="PlatB" type="StaticBody2D" parent="."]
+position = Vector2(1440, 220)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="PlatB"]
+offset_left = -60.0
+offset_top = -6.0
+offset_right = 60.0
+offset_bottom = 6.0
+mouse_filter = 2
+color = Color(0.35, 0.33, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatB"]
+shape = SubResource("RectangleShape2D_plat_b")
+
+[node name="PlatC" type="StaticBody2D" parent="."]
+position = Vector2(1760, 260)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="PlatC"]
+offset_left = -70.0
+offset_top = -6.0
+offset_right = 70.0
+offset_bottom = 6.0
+mouse_filter = 2
+color = Color(0.35, 0.33, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlatC"]
+shape = SubResource("RectangleShape2D_plat_c")
+
+[node name="HomePortal" parent="." instance=ExtResource("3_portal")]
+position = Vector2(40, 290)
+target_scene = "res://scenes/stages/town.tscn"
+
+[node name="Walker1" parent="." instance=ExtResource("4_walker")]
+position = Vector2(430, 288)
+
+[node name="Walker2" parent="." instance=ExtResource("4_walker")]
+position = Vector2(920, 288)
+
+[node name="Dasher1" parent="." instance=ExtResource("5_dasher")]
+position = Vector2(1200, 288)
+
+[node name="Spearman1" parent="." instance=ExtResource("6_spearman")]
+position = Vector2(1620, 288)
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(150, 280)

@@ -5,8 +5,8 @@ extends Control
 ## 语言按钮循环切换已支持的语言 —— GameSettings 落地时用户等的那半句
 ## 「设置里可以选不同语言」，从这一版开始成立（设置界面本身仍归 M2 的极简 UI 收尾）。
 
-## 现在唯一的关卡。M2 增量 3 加城镇后，这里换成「进入城镇」
-const LEVEL_PATH := "res://scenes/stages/test_room.tscn"
+## 现在的流程起点：城镇。从这里经传送门进入关卡（增量 3 起）
+const LEVEL_PATH := "res://scenes/stages/town.tscn"
 
 @onready var _start_btn: Button = $Panel/Box/Start
 @onready var _continue_btn: Button = $Panel/Box/Continue

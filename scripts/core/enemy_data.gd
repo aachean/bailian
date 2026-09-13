@@ -34,3 +34,10 @@ extends Resource
 @export_group("动作")
 ## 攻击用哪张技能表（data/skills/ 里的 SkillData）
 @export var attack_skill: SkillData
+
+@export_group("投射物（远程怪用，0 = 没有远程手段）")
+## 投射物飞行速度（像素/秒）。0 = 不投掷
+@export var projectile_speed: float = 0.0
+@export var projectile_damage: int = 0
+## 投射物最长飞行时间（秒），超时消散
+@export var projectile_life: float = 1.6
