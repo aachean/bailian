@@ -25,6 +25,8 @@ const SCENES := [
 	"res://scenes/enemies/projectile.tscn",
 	"res://scenes/core/portal.tscn",
 	"res://scenes/core/anvil.tscn",
+	"res://scenes/core/npc.tscn",
+	"res://scenes/ui/dialogue_box.tscn",
 	"res://scenes/stages/test_room.tscn",
 	"res://scenes/stages/town.tscn",
 	"res://scenes/stages/level_1.tscn",

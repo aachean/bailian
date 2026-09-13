@@ -26,9 +26,9 @@ func _ready() -> void:
 ## ALWAYS 模式：暂停与否都收得到
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		# 装备背包开着时不抢 Esc —— 两个界面都要用 Esc / B，叠起来只会互相打架。
-		# 此时先按 B 关背包，再按 Esc 才能开暂停菜单
-		if not _root.visible and _bag_open():
+		# 装备背包 / 对话框开着时不抢 Esc —— 三个界面都要用同一批按键，
+		# 叠起来只会互相打架。先关掉手头那个，再按 Esc
+		if not _root.visible and (_bag_open() or _dialogue_open()):
 			return
 		toggle()
 
@@ -41,6 +41,11 @@ func is_open() -> bool:
 func _bag_open() -> bool:
 	var hud := get_parent().get_node_or_null("HUD")
 	return hud != null and hud.has_method("is_bag_open") and bool(hud.call("is_bag_open"))
+
+
+func _dialogue_open() -> bool:
+	var box := get_tree().get_first_node_in_group("dialogue_box")
+	return box != null and bool(box.call("is_open"))
 
 
 func toggle() -> void:

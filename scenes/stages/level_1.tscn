@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
@@ -7,6 +7,8 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/dasher.tscn" id="5_dasher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/spearman.tscn" id="6_spearman"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/boss.tscn" id="7_boss"]
+[ext_resource type="PackedScene" path="res://scenes/core/npc.tscn" id="8_npc"]
+[ext_resource type="Resource" path="res://data/dialogue/hunter_warn.tres" id="9_hunter"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1920, 24)
@@ -110,6 +112,11 @@ shape = SubResource("RectangleShape2D_plat_c")
 [node name="HomePortal" parent="." instance=ExtResource("3_portal")]
 position = Vector2(40, 290)
 target_scene = "res://scenes/stages/town.tscn"
+
+[node name="Hunter" parent="." instance=ExtResource("8_npc")]
+position = Vector2(250, 302)
+name_key = &"NPC_HUNTER"
+dialogue = ExtResource("9_hunter")
 
 [node name="Walker1" parent="." instance=ExtResource("4_walker")]
 position = Vector2(430, 288)

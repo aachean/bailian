@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="DialogueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/dialogue_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+speaker_key = &"NPC_SMITH"
+lines = Array[String](["DLG_SMITH_R1", "DLG_SMITH_R2"])

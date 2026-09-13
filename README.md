@@ -7,7 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇 Hub（传送门进关卡）→ 3 屏关卡：相机跟随，三种小怪（游荡者 / 疾行者 / 掷矛手）+ Boss；升级加点、旋风斩、**打怪掉装备**（四部位词条）+ 铁砧强化；存档会记下你离开时每个人的血量位置、装备与背包 |
+| 现在能玩到 | 主菜单 → 城镇 Hub（**老铁匠 NPC 会给你第一把剑** + 铁砧 + 传送门进关卡）→ 3 屏关卡：相机跟随，三种小怪（游荡者 / 疾行者 / 掷矛手）+ Boss；**对话与主线**、升级加点、旋风斩、打怪掉装备（四部位词条 + 图标）、铁砧强化；存档记录离开时的血量位置、装备与背包、剧情进度 |
 
 ---
 
@@ -16,11 +16,11 @@
 1. 用 Godot 4.7.x 打开本目录下的 `project.godot`
 2. 按 `F5` —— 进主菜单：开始游戏 / 继续游戏（有存档时）/ 语言切换 / 退出
 
-**操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击（连点三下是三段连招）　·　`K` 闪避（可打断自己的攻击）　·　`L` 旋风斩　·　`C` 角色面板　·　`B` 装备背包　·　`Esc` 暂停菜单
+**操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击 / **交谈**（连点三下是三段连招）　·　`K` 闪避（可打断自己的攻击）　·　`L` 旋风斩　·　`C` 角色面板　·　`B` 装备背包　·　`Esc` 暂停菜单
 
 **存档**：3 个存档槽（`user://save_1..3.cfg`）。写档时机是暂停菜单里的「保存游戏」与回主菜单。
 当前记录：关卡进度、玩家血量位置、每只怪的血量位置、精铁与武器强化等级、
-等级与经验、**装备栏与背包**。
+等级与经验、**装备栏与背包**、**剧情进度标记**。
 
 ---
 
@@ -75,6 +75,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 传送门 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框 / NPC / 主线推进（8 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -99,6 +100,20 @@ scripts/ui/hud.gd          B 键装备背包（打开即暂停）+ C 键角色�
 以及角色攻击时的光刃上**形状与颜色完全一致** —— 换了一件装备，四个地方一起变。
 面板每行是代码建的 `[ItemIcon][Label]`；收文本做断言走 `hud.panel_texts()`，
 布局怎么改都不用动断言。
+
+### 剧情落在哪
+
+```
+data/dialogue/*.tres      一段对话：说话人 key + 若干句台词 key + 赠礼 + 进度 flag
+scripts/core/dialogue_data.gd  DialogueData 资源类
+scripts/ui/dialogue_box.gd     对话框（打字机 / J 推进 / 暂停世界 / 收起 HUD）
+scripts/core/npc.gd            可交谈 NPC（走近按 J）
+scripts/core/player_state.gd   flags：主线进度标记，进存档
+```
+
+**加一段剧情 = 加一个 `.tres` + 往 `data/i18n/ui.csv` 加几行**，不改代码。
+「聊过没有」存在 `PlayerState.flags` 里而不是 NPC 身上 ——
+切场景会重建 NPC，存在节点上的状态会丢（碎片那轮踩过这个坑）。
 
 ### 断言纪律（别破）
 

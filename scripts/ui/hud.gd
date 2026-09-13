@@ -159,8 +159,8 @@ func is_bag_open() -> bool:
 
 
 func toggle_bag() -> void:
-	# 暂停菜单开着时不叠背包：两个界面都要抢 Esc / B，叠起来只会互相打架
-	if not _bag_open and _pause_menu_open():
+	# 暂停菜单或对话框开着时不叠背包：几个界面都要抢 Esc / B / J，叠起来只会互相打架
+	if not _bag_open and (_pause_menu_open() or _dialogue_open()):
 		return
 	_bag_open = not _bag_open
 	_bag_panel.visible = _bag_open
@@ -206,6 +206,11 @@ func _clamp_cursor() -> void:
 func _pause_menu_open() -> bool:
 	var pm := _player.get_node_or_null("PauseMenu")
 	return pm != null and pm.has_method("is_open") and bool(pm.call("is_open"))
+
+
+func _dialogue_open() -> bool:
+	var box := get_tree().get_first_node_in_group("dialogue_box")
+	return box != null and bool(box.call("is_open"))
 
 
 func refresh_bag() -> void:

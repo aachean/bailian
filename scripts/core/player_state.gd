@@ -46,6 +46,12 @@ var equipped: Dictionary = {}
 ## 背包：捡到但没穿的装备资源路径，按捡到的先后排
 var bag: Array = []
 
+## 主线进度标记（对话有没有发生过、奖励有没有给过）。键是字符串 flag 名，值都是 true。
+## 为什么用字典而不是一堆 bool 成员：flag 会越来越多（每个 NPC、每个主线节点一个），
+## 加一个就要改存档结构、改 reset、改测试。字典是加一个 flag 零成本的形状。
+## 存档里存的是普通字符串键，没进过历史的 flag 直接不存在 —— 老存档天然兼容。
+var flags: Dictionary = {}
+
 ## 词条聚合缓存。装备一变就重算，免得 HUD 每帧去 load 一遍所有装备资源
 var _bonus: Dictionary = {"atk": 0.0, "hp": 0, "def": 0.0}
 
@@ -57,6 +63,7 @@ func reset_for_new_game() -> void:
 	exp = 0
 	equipped.clear()
 	bag.clear()
+	flags.clear()
 	_recalc_bonus()
 	equipment_changed.emit()
 
@@ -68,6 +75,7 @@ func load_from(d: Dictionary) -> void:
 	exp = int(d.get("exp", exp))
 	equipped = (d.get("equipped", {}) as Dictionary).duplicate()
 	bag = (d.get("bag", []) as Array).duplicate()
+	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	_recalc_bonus()
 	equipment_changed.emit()
 
@@ -80,7 +88,20 @@ func save_to() -> Dictionary:
 		"exp": exp,
 		"equipped": equipped.duplicate(),
 		"bag": bag.duplicate(),
+		"flags": flags.duplicate(),
 	}
+
+
+# ── 主线进度标记 ───────────────────────────────────────────────
+
+func set_flag(name: StringName) -> void:
+	if name == &"":
+		return
+	flags[String(name)] = true
+
+
+func has_flag(name: StringName) -> bool:
+	return name != &"" and flags.has(String(name))
 
 
 # ── 装备栏操作 ─────────────────────────────────────────────────

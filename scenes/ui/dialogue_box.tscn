@@ -1,0 +1,66 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/dialogue_box.gd" id="1_dlg"]
+
+[node name="DialogueBox" type="CanvasLayer"]
+layer = 15
+process_mode = 3
+script = ExtResource("1_dlg")
+
+[node name="Root" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="Panel" parent="Root"]
+offset_left = 16.0
+offset_top = 244.0
+offset_right = 624.0
+offset_bottom = 344.0
+mouse_filter = 2
+
+[node name="Border" type="ColorRect" parent="Root/Panel"]
+offset_right = 608.0
+offset_bottom = 100.0
+mouse_filter = 2
+color = Color(0.47, 0.4, 0.26, 1)
+
+[node name="BG" type="ColorRect" parent="Root/Panel"]
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 606.0
+offset_bottom = 98.0
+mouse_filter = 2
+color = Color(0.08, 0.08, 0.11, 0.86)
+
+[node name="Speaker" type="Label" parent="Root/Panel"]
+offset_left = 14.0
+offset_top = 6.0
+offset_right = 400.0
+offset_bottom = 26.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
+text = ""
+
+[node name="Text" type="Label" parent="Root/Panel"]
+offset_left = 14.0
+offset_top = 28.0
+offset_right = 594.0
+offset_bottom = 76.0
+theme_override_constants/line_spacing = -2
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 3
+text = ""
+
+[node name="Hint" type="Label" parent="Root/Panel"]
+offset_left = 420.0
+offset_top = 78.0
+offset_right = 594.0
+offset_bottom = 96.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.78, 0.74, 0.64, 1)
+horizontal_alignment = 2
+text = ""
