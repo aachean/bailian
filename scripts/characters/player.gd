@@ -418,6 +418,12 @@ func _overlaps_enemy() -> bool:
 	return not get_world_2d().direct_space_state.intersect_shape(params, 1).is_empty()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	# ESC 回主菜单。关卡里的进度在进入时已经写了档，返回不丢进度
+	if event.is_action_pressed("ui_cancel") and state != State.DEAD:
+		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
+
+
 ## 命中时把双方一起冻住几帧。打击感主要来自这里，不是来自数值
 func _on_hit_landed(target: Node2D, _damage: int, _point: Vector2, _heavy: bool) -> void:
 	var frames := 0

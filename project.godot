@@ -12,13 +12,14 @@ config_version=5
 
 config/name="百炼"
 config/description="横版关卡制 ARPG：城镇整备 → 闯关打怪 → 打 Boss → 打造装备 → 变强 → 推进主线。"
-run/main_scene="res://scenes/stages/test_room.tscn"
+run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameSettings="*res://scripts/core/game_settings.gd"
+SaveManager="*res://scripts/core/save_manager.gd"
 AiBridge="*res://addons/ai_bridge/bridge.gd"
 
 [display]
