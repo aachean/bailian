@@ -31,6 +31,34 @@ offset_bottom = -5.0
 mouse_filter = 2
 color = Color(0.98, 0.98, 0.95, 1)
 
+[node name="WhirlFx" type="Node2D" parent="Visuals"]
+visible = false
+modulate = Color(1, 1, 1, 0)
+
+[node name="Blade1" type="ColorRect" parent="Visuals/WhirlFx"]
+offset_left = 34.0
+offset_top = -18.0
+offset_right = 66.0
+offset_bottom = -12.0
+mouse_filter = 2
+color = Color(0.65, 0.85, 1, 1)
+
+[node name="Blade2" type="ColorRect" parent="Visuals/WhirlFx"]
+offset_left = -66.0
+offset_top = 12.0
+offset_right = -34.0
+offset_bottom = 18.0
+mouse_filter = 2
+color = Color(0.55, 0.8, 1, 1)
+
+[node name="Blade3" type="ColorRect" parent="Visuals/WhirlFx"]
+offset_left = -3.0
+offset_top = -66.0
+offset_right = 3.0
+offset_bottom = -34.0
+mouse_filter = 2
+color = Color(0.45, 0.75, 1, 1)
+
 [node name="Blade" type="ColorRect" parent="Visuals"]
 modulate = Color(1, 1, 1, 0)
 offset_left = 12.0

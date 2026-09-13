@@ -14,6 +14,9 @@ extends CanvasLayer
 @onready var _bag_label: Label = $Bag/Count
 @onready var _panel: Panel = $CharPanel
 @onready var _panel_text: Label = $CharPanel/Text
+@onready var _skill_cd: ColorRect = $SkillBar/Cooldown
+@onready var _skill_icon: ColorRect = $SkillBar/Icon
+@onready var _skill_core: ColorRect = $SkillBar/IconCore
 
 
 func _ready() -> void:
@@ -48,6 +51,8 @@ func refresh() -> void:
 	_lv_label.text = "Lv.%d" % level
 	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), int(_player.get("shards"))]
 
+	refresh_skill_bar()
+
 	if _panel.visible:
 		var hp := 0 if h == null else h.hp
 		var max_hp := 0 if h == null else h.max_hp
@@ -60,6 +65,27 @@ func refresh() -> void:
 			tr("PANEL_EXP"), exp_pts,
 			tr("PANEL_SHARD"), tr("HUD_SHARD"), shards_of(),
 		]
+
+
+## 技能栏：冷却遮罩从满格缩到无（造梦西游式），蓝不足时图标变暗
+func refresh_skill_bar() -> void:
+	var skill = _player.get("skill")
+	if skill == null:
+		_skill_cd.visible = false
+		return
+	var cd := int(_player.get("skill_cooldown"))
+	var total: int = skill.total_frames() + skill.cooldown_frames
+	var mp := int(_player.get("mp"))
+	var need: int = skill.mp_cost
+	var no_mp: bool = mp < need
+	if cd > 0:
+		_skill_cd.visible = true
+		_skill_cd.scale.y = clampf(float(cd) / float(total), 0.05, 1.0)
+	else:
+		_skill_cd.visible = false
+	var dim := 0.45 if no_mp else 1.0
+	_skill_icon.modulate = Color(dim, dim, dim, 1.0)
+	_skill_core.modulate = Color(dim, dim, dim, 1.0)
 
 
 func shards_of() -> int:

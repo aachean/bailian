@@ -111,6 +111,8 @@ var _dodge_queued: bool = false
 var _dodge_dir: int = 1
 var _revive_t: float = 0.0
 var _hurt_flash: float = 0.0
+## 升级金光的标记（与受击红光共用衰减通道）
+var _level_flash := false
 
 var _gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity", 1200.0)
 var _coyote_timer: float = 0.0
@@ -155,6 +157,7 @@ func apply_saved(d: Dictionary) -> void:
 
 @onready var _visuals: Node2D = $Visuals
 @onready var _blade: ColorRect = $Visuals/Blade
+@onready var _whirl_fx: Node2D = $Visuals/WhirlFx
 @onready var _hitbox: Hitbox = $Hitbox
 @onready var _health: Health = $Health
 @onready var _shape_node: CollisionShape2D = $CollisionShape2D
@@ -204,13 +207,34 @@ func _exit_tree() -> void:
 	PlayerState.exp = exp_pts
 
 
-## 升级：血上限 +15、蓝上限 +10，血蓝全回满 —— 升级就该有仪式感
+## 升级：血上限 +15、蓝上限 +10，血蓝全回满，外加一圈金光和飘字 ——
+## 升级就该有仪式感，没反馈的成长等于没升级（用户实测反馈）
 func _on_level_up(new_level: int) -> void:
 	level = new_level
 	_health.max_hp = 100 + (level - 1) * 15
 	max_mp = 50 + (level - 1) * 10
 	_health.heal_full()
 	mp = max_mp
+	_level_up_fx()
+
+
+func _level_up_fx() -> void:
+	_hurt_flash = 1.0
+	_level_flash = true
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var lbl := Label.new()
+	lbl.z_index = 50
+	lbl.text = tr("UI_LEVELUP")
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
+	lbl.position = global_position + Vector2(-30, -70)
+	host.add_child(lbl)
+	var tw := lbl.create_tween()
+	tw.tween_property(lbl, "position:y", lbl.position.y - 30.0, 1.0)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 1.0)
+	tw.tween_callback(lbl.queue_free)
 
 
 func _update_hp_bar(_hp: int, _max_hp: int) -> void:
@@ -436,6 +460,17 @@ func _attack_process(delta: float) -> void:
 		_hitbox.deactivate()
 		_blade.modulate.a = 0.0
 
+	# 技能特效：旋风斩的判定窗口里三片剑光绕身旋转，前摇渐显、后摇渐隐。
+	# 没有这一层，玩家只看到蓝条掉了（用户实测反馈：没有技能效果）
+	if _current == skill:
+		var vis := t >= skill.startup_frames - 2 and t < skill.total_frames() - 4
+		_whirl_fx.visible = vis
+		if vis:
+			_whirl_fx.rotation += 0.42
+			_whirl_fx.scale = Vector2.ONE * (0.7 + 0.3 * clampf(float(t) / float(sk.active_to()), 0.0, 1.0))
+			_whirl_fx.modulate.a = 0.95 if sk.is_active_at(t) else 0.4
+			# 三片剑光在场景里已摆好 0°/120°/240° 方位，这里只转父节点
+
 	# 缓冲这次按键，而不是因为它「按早了」就丢掉
 	_latch_action_input()
 
@@ -513,6 +548,8 @@ func _latch_action_input() -> void:
 func _end_action() -> void:
 	_hitbox.deactivate()
 	_blade.modulate.a = 0.0
+	_whirl_fx.visible = false
+	_whirl_fx.modulate.a = 0.0
 	_health.invincible = false
 	_current = null
 	state = State.FREE
@@ -579,6 +616,7 @@ func apply_hitstop(frames: int) -> void:
 ## 硬直帧数比无敌窗口长，所以连招惩罚依然成立 —— 这是有意的。
 func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir: int) -> void:
 	hurts_taken += 1
+	_level_flash = false
 	if state == State.ATTACK or state == State.DODGE:
 		_end_action()
 	if state == State.DEAD:
@@ -613,7 +651,10 @@ func _update_hurt_flash(delta: float) -> void:
 		return
 	_hurt_flash = move_toward(_hurt_flash, 0.0, 6.0 * delta)
 	var f := _hurt_flash
-	_visuals.modulate = Color(1.0, 1.0 - 0.45 * f, 1.0 - 0.45 * f, 1.0)
+	if _level_flash:
+		_visuals.modulate = Color(1.0 + 0.3 * f, 1.0, 1.0 - 0.3 * f, 1.0)   # 升级闪金
+	else:
+		_visuals.modulate = Color(1.0, 1.0 - 0.45 * f, 1.0 - 0.45 * f, 1.0) # 受击闪红
 
 
 ## 调试用：把状态名打出来（回放字幕和日志都靠它）

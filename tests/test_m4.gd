@@ -34,6 +34,9 @@ func _ready() -> void:
 	await _t5_mp_regen()
 	await _t6_panel_toggles()
 	await _t7_growth_survives_snapshot()
+	await _t8_skill_bar_cooldown()
+	await _t9_whirl_fx_visible()
+	await _t10_level_up_feedback()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -202,3 +205,59 @@ func _t7_growth_survives_snapshot() -> void:
 	_check("7", "等级 / 经验 / 蓝进快照，读档原样回来",
 		lv == 6 and xp == 33 and mp == 21,
 		"Lv.%d（期望 6）　经验 %d（期望 33）　蓝 %d（期望 21）" % [lv, xp, mp])
+
+
+## 技能栏的冷却遮罩：释放后出现、随冷却缩回、冷却完消失 —— 造梦西游式
+func _t8_skill_bar_cooldown() -> void:
+	await _place(320.0)
+	_player.set("mp", int(_player.get("max_mp")))
+	var hud := _player.get_node("HUD")
+	var cd := hud.get_node("SkillBar/Cooldown") as ColorRect
+	_player.set("skill_cooldown", 0)   # #4 刚放过技能，冷却没走完会按不动
+	_press("skill")
+	await _pframes(6)
+	_release("skill")
+	var shown: bool = cd.visible
+	var ratio: float = cd.scale.y
+	# 等冷却走完（whirl 全程 32 帧 + 90 帧冷却）
+	await _pframes(140)
+	var gone: bool = not cd.visible
+	_check("8", "技能栏冷却遮罩：释放后出现、随冷却缩回、结束消失",
+		shown and ratio > 0.5 and gone,
+		"释放后遮罩=%s（scale.y=%.2f）　冷却走完消失=%s" % [str(shown), ratio, str(gone)])
+
+
+## 技能特效：判定窗口里剑光可见，结束后收起
+func _t9_whirl_fx_visible() -> void:
+	await _place(320.0)
+	_player.set("mp", int(_player.get("max_mp")))
+	var fx := _player.get_node("Visuals/WhirlFx") as Node2D
+	var was: bool = fx.visible
+	_press("skill")
+	await _pframes(14)               # 前摇 8 帧后进入判定 + 特效窗口
+	var during: bool = fx.visible and fx.modulate.a > 0.3
+	await _pframes(60)
+	var after: bool = fx.visible
+	_check("9", "旋风斩有技能效果：判定期间剑光旋转可见，结束收起",
+		(not was) and during and (not after),
+		"释放前=%s　判定期间=%s（alpha %.2f）　结束后=%s" % [
+			str(was), str(during), fx.modulate.a, str(after)])
+
+
+## 升级有反馈：金光标记 + 「升级！」飘字节点出现
+func _t10_level_up_feedback() -> void:
+	await _place(320.0)
+	var host := get_tree().current_scene
+	var labels_before := 0
+	for c in host.get_children():
+		if c is Label:
+			labels_before += 1
+	PlayerState.add_exp(999)
+	await _pframes(3)
+	var labels_after := 0
+	for c in host.get_children():
+		if c is Label and (c as Label).text == tr("UI_LEVELUP"):
+			labels_after += 1
+	_check("10", "升级有仪式感：金光 + 「升级！」飘字",
+		labels_after >= 1,
+		"「升级！」飘字节点 %d 个" % labels_after)

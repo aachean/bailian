@@ -92,6 +92,47 @@ offset_bottom = 23.0
 theme_override_font_sizes/font_size = 12
 text = "精铁 ×0"
 
+
+[node name="SkillBar" type="Panel" parent="."]
+offset_left = 292.0
+offset_top = 314.0
+offset_right = 348.0
+offset_bottom = 354.0
+mouse_filter = 2
+
+[node name="Icon" type="ColorRect" parent="SkillBar"]
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 41.0
+offset_bottom = 35.0
+mouse_filter = 2
+color = Color(0.16, 0.3, 0.42, 1)
+
+[node name="IconCore" type="ColorRect" parent="SkillBar"]
+offset_left = 13.0
+offset_top = 11.0
+offset_right = 33.0
+offset_bottom = 29.0
+mouse_filter = 2
+color = Color(0.45, 0.75, 0.95, 1)
+
+[node name="Cooldown" type="ColorRect" parent="SkillBar"]
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 41.0
+offset_bottom = 35.0
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.08, 0.75)
+
+[node name="Key" type="Label" parent="SkillBar"]
+offset_left = 26.0
+offset_top = 20.0
+offset_right = 42.0
+offset_bottom = 36.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+text = "L"
+
 [node name="CharPanel" type="Panel" parent="."]
 visible = false
 offset_left = 6.0
