@@ -39,10 +39,14 @@ func collect() -> Dictionary:
 	var player := get_node_or_null(PLAYER_PATH)
 	if player != null:
 		var h := player.get_node("Health") as Health
+		var sp: Vector2 = player.call("spawn_point")
 		out.player = {
 			"hp": h.hp,
 			"x": player.global_position.x,
 			"y": player.global_position.y,
+			# 复活点：踩过的 checkpoint 存在这里，读档后不会退回关卡开头
+			"spawn_x": sp.x,
+			"spawn_y": sp.y,
 			"shards": int(player.get("shards")),
 			"upgrade": int(player.get("upgrade_level")),
 			"level": int(player.get("level")),

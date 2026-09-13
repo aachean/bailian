@@ -1,0 +1,67 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="1_base"]
+[ext_resource type="Resource" path="res://data/enemies/brute.tres" id="2_data"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_brute_body"]
+size = Vector2(36, 52)
+
+[node name="Brute" instance=ExtResource("1_base")]
+data = ExtResource("2_data")
+
+[node name="CollisionShape2D" parent="." index="0"]
+shape = SubResource("RectangleShape2D_brute_body")
+
+[node name="Visuals" parent="." index="1"]
+
+[node name="Body" parent="Visuals" index="0"]
+offset_left = -18.0
+offset_top = -26.0
+offset_right = 18.0
+offset_bottom = 26.0
+color = Color(0.42, 0.3, 0.22, 1)
+
+[node name="Head" parent="Visuals" index="1"]
+offset_left = -10.0
+offset_top = -35.0
+offset_right = 10.0
+offset_bottom = -25.0
+color = Color(0.53, 0.39, 0.28, 1)
+
+[node name="Eye" parent="Visuals" index="2"]
+offset_left = 3.0
+offset_top = -32.0
+offset_right = 8.0
+offset_bottom = -27.0
+color = Color(1, 0.62, 0.22, 1)
+
+[node name="Swipe" parent="Visuals" index="3"]
+offset_left = 18.0
+offset_top = -14.0
+offset_right = 62.0
+offset_bottom = 12.0
+color = Color(0.72, 0.58, 0.42, 1)
+
+[node name="Flash" parent="Visuals" index="4"]
+offset_left = -18.0
+offset_top = -35.0
+offset_right = 18.0
+offset_bottom = 26.0
+
+[node name="HealthBar" parent="." index="2"]
+position = Vector2(0, -44)
+
+[node name="BG" parent="HealthBar" index="0"]
+offset_left = -22.0
+offset_top = -3.0
+offset_right = 22.0
+offset_bottom = 3.0
+
+[node name="Fill" parent="HealthBar" index="1"]
+offset_left = -21.0
+offset_top = -2.0
+offset_right = 21.0
+offset_bottom = 2.0
+
+[node name="Hitbox" parent="." index="3"]
+target_mask = 1

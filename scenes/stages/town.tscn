@@ -81,6 +81,7 @@ position = Vector2(900, 306)
 [node name="ExitPortal" parent="." instance=ExtResource("3_portal")]
 position = Vector2(1220, 290)
 target_scene = "res://scenes/stages/level_1.tscn"
+to_furthest = true
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(120, 280)

@@ -21,15 +21,21 @@ const SCENES := [
 	"res://scenes/enemies/dasher.tscn",
 	"res://scenes/enemies/spearman.tscn",
 	"res://scenes/enemies/boss.tscn",
+	"res://scenes/enemies/brute.tscn",
+	"res://scenes/enemies/caster.tscn",
+	"res://scenes/enemies/boss2.tscn",
 	"res://scenes/enemies/target_dummy.tscn",
 	"res://scenes/enemies/projectile.tscn",
 	"res://scenes/core/portal.tscn",
 	"res://scenes/core/anvil.tscn",
+	"res://scenes/core/checkpoint.tscn",
 	"res://scenes/core/npc.tscn",
 	"res://scenes/ui/dialogue_box.tscn",
 	"res://scenes/stages/test_room.tscn",
 	"res://scenes/stages/town.tscn",
 	"res://scenes/stages/level_1.tscn",
+	"res://scenes/stages/level_2.tscn",
+	"res://scenes/stages/level_3.tscn",
 ]
 
 var _pass := 0

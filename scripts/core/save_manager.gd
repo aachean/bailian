@@ -9,7 +9,7 @@ extends Node
 ## 快照的收集 / 恢复由关卡根节点（stage.gd）负责，这里只管序列化与槽位。
 
 const SECTION := "progress"
-const VERSION := 4
+const VERSION := 5
 const SLOT_COUNT := 3
 const LAST_SLOT_PATH := "user://last_slot.cfg"
 
@@ -47,6 +47,11 @@ func _remember_slot(slot: int) -> void:
 func start_new_game(slot: int, level_path: String) -> void:
 	current_slot = slot
 	_remember_slot(slot)
+	# 新游戏要从头走：先清掉「解锁到哪」。
+	# 必须单独清一次 —— write_progress 为了保住附加字段会先读旧档
+	var cfg := ConfigFile.new()
+	cfg.set_value(SECTION, "furthest", "")
+	cfg.save(slot_path(slot))
 	write_progress(level_path, {})
 
 
@@ -65,8 +70,12 @@ var _pending_restore := false
 
 ## 写进度。state 是关卡快照（结构由 stage.gd 决定，这里不解读）；
 ## 空字典 = 干净的新开局。写当前槽。
+##
+## **先 load 一次再写**：档里除了这几项还有附加字段（furthest 等），
+## 不读旧文件直接 save 会把它们整个抹掉。
 func write_progress(level_path: String, state: Dictionary = {}) -> void:
 	var cfg := ConfigFile.new()
+	cfg.load(slot_path(current_slot))
 	cfg.set_value(SECTION, "version", VERSION)
 	cfg.set_value(SECTION, "level", level_path)
 	cfg.set_value(SECTION, "state", state)
@@ -75,6 +84,29 @@ func write_progress(level_path: String, state: Dictionary = {}) -> void:
 	if err != OK:
 		push_warning("SaveManager: 存档失败 err=%d" % err)
 	_pending_restore = false
+
+
+# ── 解锁到哪（关卡推进）────────────────────────────────────────
+
+## 记下「已经打到哪一关」。门的封印解开时调用（portal._on_seal_broken）。
+## 不记这个的话，玩家回城一趟再出来，又得从第一关重走 —— 关卡一连上就立刻需要它
+func unlock_level(path: String) -> void:
+	if path.is_empty():
+		return
+	var cfg := ConfigFile.new()
+	cfg.load(slot_path(current_slot))
+	if str(cfg.get_value(SECTION, "furthest", "")) == path:
+		return                    # 没变化就不落盘，省得每帧都写
+	cfg.set_value(SECTION, "furthest", path)
+	cfg.save(slot_path(current_slot))
+
+
+## 已解锁的最远关卡路径。没解锁过返回空串，调用方回落到自己的默认目标
+func furthest_level() -> String:
+	var cfg := ConfigFile.new()
+	if cfg.load(slot_path(current_slot)) != OK:
+		return ""
+	return str(cfg.get_value(SECTION, "furthest", ""))
 
 
 ## 读当前槽的关卡路径。空串 = 没档 / 坏档，调用方走「新游戏」分支。

@@ -133,5 +133,10 @@ position = Vector2(1620, 288)
 [node name="Boss" parent="." instance=ExtResource("7_boss")]
 position = Vector2(1840, 280)
 
+[node name="Gate1" parent="." instance=ExtResource("3_portal")]
+position = Vector2(1890, 290)
+target_scene = "res://scenes/stages/level_2.tscn"
+locked_by = NodePath("../Boss")
+
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(150, 280)

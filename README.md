@@ -7,7 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇 Hub（**老铁匠 NPC 会给你第一把剑** + 铁砧 + 传送门进关卡）→ 3 屏关卡：相机跟随，三种小怪（游荡者 / 疾行者 / 掷矛手）+ Boss；**对话与主线**、升级加点、旋风斩、打怪掉装备（四部位词条 + 图标）、铁砧强化；存档记录离开时的血量位置、装备与背包、剧情进度 |
+| 现在能玩到 | 主菜单 → 城镇 Hub（**老铁匠 NPC 会给你第一把剑** + 铁砧 + 传送门）→ **三关连成一条路**：第一关（3 屏 · 磨刀石守卫）→ 第二关（4.5 屏 · 重锤兵 / 掷火者 · 石甲卫）→ 第三关（5 屏 · 绝顶）。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**关底 Boss 封着通往下一关的门**，中途有复活点，回城再出来直接送到你解锁到的最远那一关；存档记录离开时的血量位置、装备与背包、剧情进度 |
 
 ---
 
@@ -19,8 +19,12 @@
 **操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击 / **交谈**（连点三下是三段连招）　·　`K` 闪避　·　**`1`~`5` 放技能**（`L` 是 1 号格的别名）　·　`C` 角色面板　·　`B` 装备背包　·　`V` 技能面板　·　`Esc` 暂停菜单
 
 **存档**：3 个存档槽（`user://save_1..3.cfg`）。写档时机是暂停菜单里的「保存游戏」与回主菜单。
-当前记录：关卡进度、玩家血量位置、每只怪的血量位置、精铁与武器强化等级、
-等级与经验、**装备栏与背包**、**剧情进度标记**、**携带的技能**。
+当前记录：关卡进度与**解锁到哪**、玩家血量位置与**复活点**、每只怪的血量位置、
+精铁与武器强化等级、等级与经验、**装备栏与背包**、**剧情进度标记**、**携带的技能**。
+
+> 测试会动存档槽（`test_m2` 要靠擦掉槽位来测隔离），所以测试跑之前会把三个槽
+> 读进内存、跑完原样还回去（`tests/save_guard.gd`）。**没有这层保护的话，
+> 跑一次回归 = 抹一次你自己的进度。**
 
 ---
 
@@ -70,13 +74,14 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。后续增量各自一组：
 
 ```
-godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（16 个场景，缺节点即红）
+godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（24 个场景，缺节点即红）
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 传送门 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环（16 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框 / NPC / 主线推进（8 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m8.tscn    # 第 2、3 关 / 门封印 / 复活点（14 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -119,6 +124,28 @@ scripts/ui/skill_icon.gd     技能图标：每个技能一个手画形状 + 固
   第一版是 54×40，五格连起来横跨 286px（屏幕宽的 45%），把地面和怪都盖住了。
 - **头像必须是场景里那个人**：配色直接取 `player.tscn` 的 Visuals。
   头像和角色不像，玩家会当成两个东西。
+
+### 关卡推进落在哪
+
+```
+scenes/stages/level_1/2/3.tscn  三关连成一条路（3 屏 / 4.5 屏 / 5 屏）
+data/enemies/*.tres             5 种小怪 + 2 个 Boss —— 新怪全是数据，不改代码
+scripts/core/portal.gd          传送门：locked_by（被 Boss 封印）/ to_furthest（送到解锁到的最远那关）
+scripts/core/checkpoint.gd      中途复活点：踩过就把「死后回到哪」推过去
+scripts/core/save_manager.gd    unlock_level / furthest_level：把「解锁到哪」记进档
+```
+
+四条一眼看不出、但少一条就出问题的规矩：
+
+- **关底 Boss 不重生**（`revive_delay = 0`）。小怪 2 秒站起来是对的，
+  关底 Boss 重生的话「通关」这件事根本不成立。
+- **读档复现尸体不能重放掉落**。`_on_died()` 拆成 `_dead_pose()`（摆尸）+
+  「掉落 + 经验」，读档只走前半 —— 否则反复读档就能刷 Boss 掉落。
+- **封印要学会复查**：门的解锁不能只靠 `Health.died` 信号。读档是关卡根在自己
+  `_ready` 里把 Boss 摆成尸体的，信号早响过了，门会永远锁着。
+- **地形要在跳跃预算之内**：抬升 ≤ 60px（跳跃高度约 73）、断口 ≤ 90px
+  （跳跃距离约 113）。`test_m8 #14` 用**助跑跳实测**断口，算几何预算只是兜底 ——
+  瞬移过对岸只能证明那边有地面，证明不了玩家跳得到。
 
 ### 剧情落在哪
 

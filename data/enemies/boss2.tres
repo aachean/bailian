@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/boss2_smash.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"boss2"
+display_name = "石甲卫"
+max_hp = 300
+revive_delay = 0.0
+hurt_stun_frames = 5
+patrol_speed = 26.0
+chase_speed = 78.0
+patrol_range = 70.0
+aggro_range = 250.0
+deaggro_range = 420.0
+attack_range = 58.0
+attack_cooldown_frames = 85
+attack_skill = ExtResource("2_skill")
+exp_reward = 120
+drop_shards = 14
+drop_item_chance = 1.0
+drop_items = Array[String](["res://data/items/flame_blade.tres", "res://data/items/jade_talisman.tres", "res://data/items/iron_armor.tres", "res://data/items/iron_helm.tres"])

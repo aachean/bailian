@@ -191,10 +191,25 @@ func apply_saved(d: Dictionary) -> void:
 	_health.restore(int(d.get("hp", _health.max_hp)))
 	_hurt_flash = 0.0
 	_visuals.modulate = Color.WHITE
+	# 复活点也存进了快照 —— 不存的话读档后死一次，人回到关卡最开头，
+	# 中途的复活点（checkpoint.tscn）就白踩了。
+	# 必须放在下面那行**之前**：_spawn_point 正是位置的兜底默认值
+	_spawn_point = Vector2(float(d.get("spawn_x", _spawn_point.x)), float(d.get("spawn_y", _spawn_point.y)))
 	global_position = Vector2(float(d.get("x", _spawn_point.x)), float(d.get("y", _spawn_point.y)))
 	velocity = Vector2.ZERO
 	state = State.FREE
 	_state_frame = 0
+
+
+## 中途复活点用（checkpoint.tscn 调）：把「死后回到哪」推到当前位置。
+## 关卡越做越长之后，死在关底要重走整关 —— 那不叫难度
+func set_spawn_point(p: Vector2) -> void:
+	_spawn_point = p
+
+
+## 当前复活点。存档要存它，所以留一个读取口
+func spawn_point() -> Vector2:
+	return _spawn_point
 
 @onready var _visuals: Node2D = $Visuals
 @onready var _blade: ColorRect = $Visuals/Blade

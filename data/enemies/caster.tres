@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"caster"
+display_name = "掷火者"
+max_hp = 26
+revive_delay = 2.0
+hurt_stun_frames = 14
+patrol_speed = 26.0
+chase_speed = 46.0
+patrol_range = 50.0
+aggro_range = 250.0
+deaggro_range = 320.0
+attack_range = 40.0
+attack_cooldown_frames = 200
+exp_reward = 16
+drop_shards = 2
+attack_skill = null
+projectile_speed = 300.0
+projectile_damage = 11
+projectile_life = 1.4
+drop_item_chance = 0.22
+drop_items = Array[String](["res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres", "res://data/items/leather_cap.tres"])

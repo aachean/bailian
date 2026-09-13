@@ -8,21 +8,27 @@ extends Node
 ## 槽位之间互相污染、读了不存在的档、新游戏把别的槽抹掉。
 
 const MENU := preload("res://scenes/ui/main_menu.tscn")
+## 这个测试会 wipe 三个存档槽（测槽位隔离）—— 而 user:// 就是玩家真正在玩的
+## 那个目录。先备份，跑完还回去，否则跑一次回归就抹一次玩家的进度
+const SaveGuard := preload("res://tests/save_guard.gd")
 
 var _pass := 0
 var _fail := 0
+var _bak: Dictionary = {}
 
 
 func _ready() -> void:
 	await get_tree().process_frame
 	print("")
 	print("═══ 《百炼》M2 自动验收 ═══")
+	_bak = SaveGuard.backup()
 	await _t1_menu_buttons()
 	await _t2_continue_visibility()
 	await _t3_slots_isolated()
 	await _t4_language_button()
 	await _t5_world_snapshot_roundtrip()
 	await _t6_snapshot_survives_file()
+	SaveGuard.restore(_bak)          # 玩家原来的存档原样放回去
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -43,8 +49,10 @@ func _steps(n: int) -> void:
 		await get_tree().process_frame
 
 
+## 槽位编号是 1..SLOT_COUNT。原来写的是 `for s in 3`，那是 0/1/2 ——
+## 顺手把 3 号槽漏在外面没擦
 func _wipe_all_slots() -> void:
-	for s in 3:
+	for s in range(1, SaveManager.SLOT_COUNT + 1):
 		SaveManager.erase_slot(s)
 	PlayerState.shards = 0
 	PlayerState.upgrade_level = 0

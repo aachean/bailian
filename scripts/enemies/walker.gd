@@ -271,10 +271,30 @@ func apply_saved(d: Dictionary) -> void:
 	if hp <= 0:
 		health.hp = 0
 		health.is_dead = true
-		_on_died()
+		_dead_pose()          # 只摆尸，不掉落不给经验 —— 见 _dead_pose 的注释
 	else:
 		health.restore(hp)
 		_refresh_bar()
+
+
+func _on_died() -> void:
+	_dead_pose()
+	_drop_shards()
+	_drop_item()
+	PlayerState.add_exp(data.exp_reward)   # 击杀经验进玩家成长
+
+
+## 死亡该有的样子：进死亡态、透明掉、关掉碰撞与血条、起重生计时。
+##
+## 与「掉落 + 给经验」**分成两半**是刻意的：读档复现一具尸体时只能走这一半。
+## 走整个 _on_died 的话，每读一次档就重掉一次装备、重给一次经验 ——
+## Boss 用 revive_delay = 0 永不重生，玩家反复读档就能无限刷它的掉落。
+func _dead_pose() -> void:
+	_enter(State.DEAD)
+	_revive_t = data.revive_delay
+	_target_alpha = 0.0
+	set_collision_layer_value(2, false)
+	bar.visible = false
 
 
 func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: int) -> void:
@@ -287,17 +307,6 @@ func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: i
 	if ai_enabled and not health.is_dead:
 		_skill = null
 		_enter(State.HURT)          # 被打断：攻击 / 追击统统让位给硬直
-
-
-func _on_died() -> void:
-	_enter(State.DEAD)
-	_drop_shards()
-	_drop_item()
-	PlayerState.add_exp(data.exp_reward)   # 击杀经验进玩家成长
-	_revive_t = data.revive_delay
-	_target_alpha = 0.0
-	set_collision_layer_value(2, false)
-	bar.visible = false
 
 
 ## 死亡掉落精铁碎片。散在尸体周围，玩家走近自动吸附
