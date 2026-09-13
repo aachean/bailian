@@ -480,6 +480,20 @@ func _t14_item_icons() -> void:
 	await _pframes(2)
 	var switched: bool = weapon_icon.item() != null and weapon_icon.item().id == &"flame_blade"
 
+	# 角色面板（C）的装备行也用同一套图标
+	hud.get_node("CharPanel").visible = true
+	hud.call("refresh")
+	await _pframes(2)
+	var char_box := hud.get_node("CharPanel/EquipRows") as VBoxContainer
+	var char_weapon_icon := char_box.get_child(0).get_child(0) as ItemIcon
+	var char_helm_icon := char_box.get_child(1).get_child(0) as ItemIcon
+	var char_ok: bool = char_weapon_icon != null and char_weapon_icon.item() != null \
+		and char_weapon_icon.item().id == &"flame_blade" \
+		and char_helm_icon != null and char_helm_icon.item() != null \
+		and char_helm_icon.item().id == &"iron_helm"
+	var char_ids := "%s / %s" % [_id_of(char_weapon_icon), _id_of(char_helm_icon)]
+	hud.get_node("CharPanel").visible = false
+
 	_press("bag")
 	await _pframes(3)
 	_release("bag")
@@ -500,12 +514,13 @@ func _t14_item_icons() -> void:
 	drop.queue_free()
 	await _pframes(2)
 
-	_check("14", "装备有图标：槽位 / 背包行 / 地上掉落物三处一致，换装图标跟着换",
-		helm_ok and empty_slot_ok and empty_row_ok and switched and drop_ok and drop_size.x >= 18.0,
-		"头盔槽图标=%s（%s）　空武器槽有框=%s　空背包行藏图标=%s\n              换装后武器图标=%s（%s）　掉落物图标=%s（%s，%.0f×%.0f px）" % [
+	_check("14", "装备有图标：装备槽 / 背包行 / 角色面板 / 地上掉落物四处一致，换装跟着换",
+		helm_ok and empty_slot_ok and empty_row_ok and switched and char_ok and drop_ok \
+			and drop_size.x >= 18.0,
+		"头盔槽图标=%s（%s）　空武器槽有框=%s　空背包行藏图标=%s\n              换装后武器图标=%s（%s）　角色面板=%s（%s）　掉落物=%s（%s，%.0f×%.0f px）" % [
 			str(helm_ok), str(_id_of(helm_icon)), str(empty_slot_ok), str(empty_row_ok),
-			str(switched), str(_id_of(weapon_icon)), str(drop_ok), str(drop_id),
-			drop_size.x, drop_size.y])
+			str(switched), str(_id_of(weapon_icon)), str(char_ok), char_ids,
+			str(drop_ok), str(drop_id), drop_size.x, drop_size.y])
 
 
 ## 手里的刀跟着武器变 —— 装备变强必须看得见，光面板数字不够

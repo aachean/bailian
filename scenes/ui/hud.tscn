@@ -145,28 +145,28 @@ text = "L"
 visible = false
 offset_left = 6.0
 offset_top = 72.0
-offset_right = 232.0
-offset_bottom = 286.0
+offset_right = 242.0
+offset_bottom = 298.0
 mouse_filter = 2
 
 [node name="Border" type="ColorRect" parent="CharPanel"]
-offset_right = 226.0
-offset_bottom = 214.0
+offset_right = 236.0
+offset_bottom = 226.0
 mouse_filter = 2
 color = Color(0.47, 0.4, 0.26, 1)
 
 [node name="BG" type="ColorRect" parent="CharPanel"]
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 224.0
-offset_bottom = 212.0
+offset_right = 234.0
+offset_bottom = 224.0
 mouse_filter = 2
 color = Color(0.09, 0.09, 0.12, 0.97)
 
 [node name="TitleBar" type="ColorRect" parent="CharPanel"]
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 224.0
+offset_right = 234.0
 offset_bottom = 26.0
 mouse_filter = 2
 color = Color(0.3, 0.24, 0.16, 1)
@@ -174,7 +174,7 @@ color = Color(0.3, 0.24, 0.16, 1)
 [node name="Title" type="Label" parent="CharPanel"]
 offset_left = 10.0
 offset_top = 4.0
-offset_right = 216.0
+offset_right = 226.0
 offset_bottom = 24.0
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
@@ -183,11 +183,19 @@ text = "角色信息"
 [node name="Text" type="Label" parent="CharPanel"]
 offset_left = 12.0
 offset_top = 32.0
-offset_right = 222.0
-offset_bottom = 210.0
-theme_override_constants/line_spacing = -5
+offset_right = 232.0
+offset_bottom = 140.0
+theme_override_constants/line_spacing = -6
 theme_override_font_sizes/font_size = 11
 text = ""
+
+[node name="EquipRows" type="VBoxContainer" parent="CharPanel"]
+offset_left = 12.0
+offset_top = 146.0
+offset_right = 232.0
+offset_bottom = 218.0
+mouse_filter = 2
+theme_override_constants/separation = 0
 
 [node name="BagPanel" type="Panel" parent="."]
 visible = false

@@ -16,13 +16,15 @@ extends CanvasLayer
 const BAG_ROWS := 6              # 背包列表一屏几行，超出靠光标滚动
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
-const ROW_HEIGHT := 20.0         # 一行的高度：图标 16 + 上下各留 2
+const ROW_HEIGHT := 20.0         # 背包面板一行的高度：图标 16 + 上下各留 2
 const ICON_SIZE := 16.0
+const CHAR_ROW_HEIGHT := 18.0    # 角色面板一行（更挤：上面还有八行属性）
 
 var _bag_open := false
 var _cursor := 0                 # 全面板共用一个光标：0..3 是装备槽，之后是背包
 var _equip_rows: Array[HBoxContainer] = []
 var _bag_rows: Array[HBoxContainer] = []
+var _char_equip_rows: Array[HBoxContainer] = []
 ## 父节点是不是玩家。HUD 只在玩家身上工作 —— 被单独实例化（场景完整性检查器
 ## 就是这么干的）时不能崩，否则每一次校验都带一堆假报错
 var _has_player := false
@@ -35,6 +37,7 @@ var _has_player := false
 @onready var _bag_label: Label = $Bag/Count
 @onready var _panel: Panel = $CharPanel
 @onready var _panel_text: Label = $CharPanel/Text
+@onready var _char_equip_box: VBoxContainer = $CharPanel/EquipRows
 @onready var _skill_cd: ColorRect = $SkillBar/Cooldown
 @onready var _skill_icon: ColorRect = $SkillBar/Icon
 @onready var _skill_core: ColorRect = $SkillBar/IconCore
@@ -84,13 +87,15 @@ func _build_rows() -> void:
 		_equip_rows.append(_make_row(_equip_box))
 	for _i in BAG_ROWS:
 		_bag_rows.append(_make_row(_rows_box))
+	for _i in ItemData.SLOT_IDS.size():
+		_char_equip_rows.append(_make_row(_char_equip_box, CHAR_ROW_HEIGHT))
 
 
 ## 造一行：图标 + 文字。图标按部位画形状、按品质上色，与地上掉落物同一套
-func _make_row(parent: Node) -> HBoxContainer:
+func _make_row(parent: Node, row_height: float = ROW_HEIGHT) -> HBoxContainer:
 	var box := HBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
+	box.custom_minimum_size = Vector2(0.0, row_height)
 	box.add_theme_constant_override("separation", 3)
 
 	var icon := ItemIcon.new()
@@ -109,6 +114,22 @@ func _make_row(parent: Node) -> HBoxContainer:
 
 	parent.add_child(box)
 	return box
+
+
+## 填一行装备：图标 + 「槽位名　装备名　词条」。背包面板与角色面板共用 ——
+## 两处必须长得一样，否则「同一件装备在哪儿都是同一个样」这条就断了
+func _fill_equip_row(row: HBoxContainer, i: int, it: ItemData, mark: String) -> void:
+	var icon := _row_icon(row)
+	var lbl := _row_label(row)
+	icon.empty_frame = true          # 空槽画一个空框，不留白（空状态也要可见）
+	icon.set_item(it)
+	var slot_name: String = tr(String(ItemData.SLOT_KEYS[i]))
+	if it == null:
+		lbl.text = "%s%s　%s" % [mark, slot_name, tr("UI_BAG_EMPTY")]
+		lbl.modulate = Color(0.62, 0.6, 0.55, 1)
+	else:
+		lbl.text = "%s%s　%s　%s" % [mark, slot_name, _item_name(it), _stat_text(it)]
+		lbl.modulate = Color(0.9, 0.88, 0.84, 1)
 
 
 func _row_icon(row: HBoxContainer) -> ItemIcon:
@@ -198,21 +219,10 @@ func refresh_bag() -> void:
 	# 上半：四个装备槽 —— 每行 [图标][槽位名　装备名　词条]
 	var eq := PlayerState.equipped_list()
 	for i in ItemData.SLOT_IDS.size():
-		var row := _equip_rows[i]
-		var icon := _row_icon(row)
-		var lbl := _row_label(row)
 		var sel := _cursor == i
-		var mark := CURSOR_MARK if sel else INDENT
-		var slot_name: String = tr(String(ItemData.SLOT_KEYS[i]))
-		var it := eq[i] as ItemData
-		icon.empty_frame = true          # 空槽画一个空框，不留白（空状态也要可见）
-		icon.set_item(it)
-		if it == null:
-			lbl.text = "%s%s　%s" % [mark, slot_name, tr("UI_BAG_EMPTY")]
-			lbl.modulate = dim
-		else:
-			lbl.text = "%s%s　%s　%s" % [mark, slot_name, _item_name(it), _stat_text(it)]
-			lbl.modulate = Color(1, 1, 1, 1) if sel else normal
+		_fill_equip_row(_equip_rows[i], i, eq[i] as ItemData, CURSOR_MARK if sel else INDENT)
+		if sel:
+			_row_label(_equip_rows[i]).modulate = Color(1, 1, 1, 1)
 
 	# 下半：背包列表（一屏 BAG_ROWS 行，随光标滚动）
 	var bag := PlayerState.bag
@@ -326,13 +336,10 @@ func refresh_char_panel(h: Health) -> void:
 		"%s ×%d" % [tr("HUD_SHARD"), shards_of()],
 		"%s Lv.%d" % [tr("PANEL_WEAPON"), int(_player.get("upgrade_level"))],
 	]
-	for i in ItemData.SLOT_IDS.size():
-		var it := PlayerState.item_at(ItemData.SLOT_IDS[i])
-		lines.append("%s %s" % [
-			tr(String(ItemData.SLOT_KEYS[i])),
-			tr("UI_BAG_EMPTY") if it == null else ("%s　%s" % [_item_name(it), _stat_text(it)]),
-		])
 	_panel_text.text = "\n".join(lines)
+	# 装备四行带图标 —— 与背包面板同一个填法、同一套图标、同一个品质色
+	for i in ItemData.SLOT_IDS.size():
+		_fill_equip_row(_char_equip_rows[i], i, PlayerState.item_at(ItemData.SLOT_IDS[i]), "")
 
 
 ## 技能栏：冷却遮罩从满格缩到无（造梦西游式），蓝不足时图标变暗
