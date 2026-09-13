@@ -72,7 +72,8 @@ func _refresh_slot_buttons() -> void:
 			_slot_btns[i].disabled = false
 
 
-## 槽位按钮上的摘要：空的写「空」，有档写玩家最关心的三样
+## 槽位按钮上的摘要：空的写「空」，有档写玩家最关心的三样。
+## 注意占位符与参数要一一对上 —— 少一个参数整串格式化失败（实测翻过车）
 func _slot_text(slot: int, index: int) -> String:
 	var info := SaveManager.read_slot_info(slot)
 	if info.is_empty():
@@ -81,8 +82,10 @@ func _slot_text(slot: int, index: int) -> String:
 	var player := st.get("player", {}) as Dictionary
 	var shards := int(player.get("shards", 0))
 	var upgrade := int(player.get("upgrade", 0))
-	var level := str(info.get("level", "")).get_file().get_basename()
-	return "%d. %s　%s ×%d　Lv.%d" % [index, tr("UI_LEVEL_" + level.to_upper()), shards, upgrade]
+	var level_file := str(info.get("level", "")).get_file().get_basename()
+	var place := tr("UI_LEVEL_" + level_file.to_upper())
+	return "%d. %s　%s ×%d　%s Lv.%d" % [
+		index, place, tr("HUD_SHARD"), shards, tr("HUD_WEAPON"), upgrade]
 
 
 # ── 按钮动作 ───────────────────────────────────────────────────

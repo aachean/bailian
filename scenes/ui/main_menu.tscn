@@ -64,13 +64,21 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 0
 
+[node name="BG" type="ColorRect" parent="Slots"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.09, 0.09, 0.11, 1)
+
 [node name="Title" type="Label" parent="Slots"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 30.0
-offset_bottom = 58.0
-theme_override_font_sizes/font_size = 18
+offset_top = 34.0
+offset_bottom = 66.0
+theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 text = "选择存档位"
 
@@ -81,28 +89,28 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -170.0
-offset_top = -70.0
-offset_right = 170.0
-offset_bottom = 80.0
-theme_override_constants/separation = 10
+offset_left = -200.0
+offset_top = -100.0
+offset_right = 200.0
+offset_bottom = 120.0
+theme_override_constants/separation = 14
 
 [node name="Slot1" type="Button" parent="Slots/Box"]
-custom_minimum_size = Vector2(340, 30)
+custom_minimum_size = Vector2(400, 44)
 layout_mode = 2
 text = "1."
 
 [node name="Slot2" type="Button" parent="Slots/Box"]
-custom_minimum_size = Vector2(340, 30)
+custom_minimum_size = Vector2(400, 44)
 layout_mode = 2
 text = "2."
 
 [node name="Slot3" type="Button" parent="Slots/Box"]
-custom_minimum_size = Vector2(340, 30)
+custom_minimum_size = Vector2(400, 44)
 layout_mode = 2
 text = "3."
 
 [node name="Back" type="Button" parent="Slots/Box"]
-custom_minimum_size = Vector2(340, 28)
+custom_minimum_size = Vector2(400, 32)
 layout_mode = 2
 text = "返回"

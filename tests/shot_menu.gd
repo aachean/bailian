@@ -1,5 +1,5 @@
 extends Node
-## 主菜单截图：确认菜单文字渲染正常（字体缺字不报错，只能看图）。
+## 主菜单截图：默认视图 + 读档面板各一张（字体缺字 / 布局只能看图）。
 ##     godot --path <项目根> res://tests/shot_menu.tscn
 
 func _ready() -> void:
@@ -7,8 +7,16 @@ func _ready() -> void:
 	add_child(menu)
 	for i in 10:
 		await get_tree().process_frame
+	await _shot("menu")
+	menu.call("_on_load")
+	for i in 10:
+		await get_tree().process_frame
+	await _shot("menu_slots")
+	get_tree().quit()
+
+
+func _shot(name: String) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://build/shots"))
-	print("err=%d" % img.save_png("res://build/shots/menu.png"))
-	get_tree().quit()
+	print("%s err=%d" % [name, img.save_png("res://build/shots/%s.png" % name)])
