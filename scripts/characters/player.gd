@@ -593,16 +593,6 @@ func _overlaps_enemy() -> bool:
 	return not get_world_2d().direct_space_state.intersect_shape(params, 1).is_empty()
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	# Esc 回主菜单。走之前把整个世界拍成快照写进存档 ——
-	# 「继续游戏」要回到离开那一刻：你的血、怪的血、谁站在哪，一样都不能变。
-	if event.is_action_pressed("ui_cancel") and state != State.DEAD:
-		var level := get_tree().current_scene
-		if level != null and level.has_method("collect"):
-			SaveManager.write_progress(level.scene_file_path, level.call("collect"))
-		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
-
-
 ## 命中时把双方一起冻住几帧。打击感主要来自这里，不是来自数值
 func _on_hit_landed(target: Node2D, _damage: int, _point: Vector2, _heavy: bool) -> void:
 	var frames := 0

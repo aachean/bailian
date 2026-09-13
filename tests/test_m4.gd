@@ -38,6 +38,7 @@ func _ready() -> void:
 	await _t9_whirl_fx_visible()
 	await _t10_level_up_feedback()
 	await _t11_exp_bar_moves_on_kill()
+	await _t12_pause_menu_saves()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -71,6 +72,12 @@ func _release(action: String) -> void:
 	ev.action = action
 	ev.pressed = false
 	Input.parse_input_event(ev)
+
+
+## 暂停菜单保存走的是 current_scene——测试环境下就是本测试根。
+## 转发给测试房间；真实游戏里对应挂 stage.gd 的关卡，同一契约。
+func collect() -> Dictionary:
+	return _room.collect()
 
 
 func _place(x: float) -> void:
@@ -285,3 +292,44 @@ func _t11_exp_bar_moves_on_kill() -> void:
 		PlayerState.exp > ps_before and after > before,
 		"存档层经验 %d → %d　经验条 %.2f → %.2f" % [
 			ps_before, PlayerState.exp, before, after])
+
+
+## 暂停菜单：Esc 打开（真暂停）→ 保存写档 → Esc 关闭恢复
+func _t12_pause_menu_saves() -> void:
+	_place(320.0)
+	var pm := _player.get_node("PauseMenu")
+	var root := pm.get_node("Root") as Control
+	var save_btn := root.get_node("Panel/Box/Save") as Button
+	var h: Health = _player.get_node("Health")
+
+	# 弄一个可辨识的状态再保存
+	h.take_damage(20, Vector2.ZERO, false, 1)
+	_player.global_position = Vector2(410.0, 288.0)
+	_player.velocity = Vector2.ZERO   # 清掉击退速度，不然保存的是滑行中的位置
+	await _pframes(20)               # 等击退滑行完全衰减，否则保存的是滑行中的位置
+
+	_press("ui_cancel")
+	await _pframes(4)
+	_release("ui_cancel")
+	await _pframes(2)
+	var opened: bool = root.visible and get_tree().paused
+
+	save_btn.pressed.emit()
+	await _pframes(2)
+	var slot_state := SaveManager.read_state()
+	var saved_player := slot_state.get("player", {}) as Dictionary
+	var saved_ok: bool = int(saved_player.get("hp", -1)) == h.hp \
+		and absf(float(saved_player.get("x", 0)) - 410.0) < 12.0
+
+	_press("ui_cancel")
+	await _pframes(4)
+	_release("ui_cancel")
+	await _pframes(2)
+	var closed: bool = (not root.visible) and (not get_tree().paused)
+
+	_check("12", "Esc 暂停菜单：打开即暂停、保存写当前快照、关闭即恢复",
+		opened and saved_ok and closed,
+		"打开+暂停=%s　保存的快照正确=%s（血 %s @x %s）　关闭+恢复=%s" % [
+			str(opened), str(saved_ok),
+			str(saved_player.get("hp")), str(saved_player.get("x")), str(closed)])
+	get_tree().paused = false          # 测试安全网：绝不能带着暂停退出
