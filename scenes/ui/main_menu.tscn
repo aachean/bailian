@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
 
@@ -13,8 +13,8 @@ script = ExtResource("1_menu")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 48.0
-offset_bottom = 104.0
+offset_top = 40.0
+offset_bottom = 96.0
 theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
 text = "百炼"
@@ -24,7 +24,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 96.0
+offset_top = 88.0
 mouse_filter = 2
 
 [node name="Box" type="VBoxContainer" parent="Panel"]
@@ -32,21 +32,77 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Start" type="Button" parent="Panel/Box"]
-custom_minimum_size = Vector2(180, 30)
+custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "开始游戏"
 
 [node name="Continue" type="Button" parent="Panel/Box"]
-custom_minimum_size = Vector2(180, 30)
+custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "继续游戏"
 
+[node name="Load" type="Button" parent="Panel/Box"]
+custom_minimum_size = Vector2(180, 28)
+layout_mode = 2
+text = "读取存档"
+
 [node name="Language" type="Button" parent="Panel/Box"]
-custom_minimum_size = Vector2(180, 30)
+custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "语言：中文"
 
 [node name="Quit" type="Button" parent="Panel/Box"]
-custom_minimum_size = Vector2(180, 30)
+custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "退出"
+
+[node name="Slots" type="Panel" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 0
+
+[node name="Title" type="Label" parent="Slots"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 30.0
+offset_bottom = 58.0
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+text = "选择存档位"
+
+[node name="Box" type="VBoxContainer" parent="Slots"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = -70.0
+offset_right = 170.0
+offset_bottom = 80.0
+theme_override_constants/separation = 10
+
+[node name="Slot1" type="Button" parent="Slots/Box"]
+custom_minimum_size = Vector2(340, 30)
+layout_mode = 2
+text = "1."
+
+[node name="Slot2" type="Button" parent="Slots/Box"]
+custom_minimum_size = Vector2(340, 30)
+layout_mode = 2
+text = "2."
+
+[node name="Slot3" type="Button" parent="Slots/Box"]
+custom_minimum_size = Vector2(340, 30)
+layout_mode = 2
+text = "3."
+
+[node name="Back" type="Button" parent="Slots/Box"]
+custom_minimum_size = Vector2(340, 28)
+layout_mode = 2
+text = "返回"

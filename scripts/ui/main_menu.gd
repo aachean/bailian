@@ -1,61 +1,134 @@
 extends Control
-## 主菜单：开始 / 继续 / 语言 / 退出。
+## 主菜单：开始 / 继续 / 读取存档 / 语言 / 退出 + 存档槽位面板。
 ##
-## 「开始」进关卡并写档；「继续」只在有档时出现，读档进关卡。
-## 语言按钮循环切换已支持的语言 —— GameSettings 落地时用户等的那半句
-## 「设置里可以选不同语言」，从这一版开始成立（设置界面本身仍归 M2 的极简 UI 收尾）。
+## 存档模型（用户验收定的）：3 个槽位。「开始游戏」先选槽（选中有档的槽 = 覆盖），
+## 「读取存档」列槽挑一个进；「继续游戏」直接回最近一次玩的槽。
+## 进度档记：哪个场景 + 离开时的世界快照 + 玩家数据（碎片 / 强化）。
 
-## 现在的流程起点：城镇。从这里经传送门进入关卡（增量 3 起）
+## 流程起点：城镇。从这里经传送门进入关卡
 const LEVEL_PATH := "res://scenes/stages/town.tscn"
+
+## 槽位面板模式：start = 选槽开新游戏（可覆盖），load = 选槽读档
+enum SlotMode { START, LOAD }
+
+var _slot_mode: int = SlotMode.START
 
 @onready var _start_btn: Button = $Panel/Box/Start
 @onready var _continue_btn: Button = $Panel/Box/Continue
+@onready var _load_btn: Button = $Panel/Box/Load
 @onready var _lang_btn: Button = $Panel/Box/Language
 @onready var _quit_btn: Button = $Panel/Box/Quit
 @onready var _title: Label = $Title
+@onready var _slots: Panel = $Slots
+@onready var _slots_title: Label = $Slots/Title
+@onready var _slot_btns: Array[Button] = [$Slots/Box/Slot1, $Slots/Box/Slot2, $Slots/Box/Slot3]
+@onready var _back_btn: Button = $Slots/Box/Back
 
 
 func _ready() -> void:
 	_start_btn.pressed.connect(_on_start)
 	_continue_btn.pressed.connect(_on_continue)
+	_load_btn.pressed.connect(_on_load)
 	_lang_btn.pressed.connect(_on_language)
 	_quit_btn.pressed.connect(_on_quit)
+	_back_btn.pressed.connect(_close_slots)
+	for i in _slot_btns.size():
+		var idx := i + 1
+		_slot_btns[i].pressed.connect(_on_slot.bind(idx))
 	if not GameSettings.language_changed.is_connected(_refresh_texts):
 		GameSettings.language_changed.connect(_refresh_texts)
+	_slots.visible = false
 	_refresh_texts()
 	_refresh_continue()
 
 
 ## 参数是 language_changed 带的语言码，这里用不上但必须留 ——
 ## Godot 连信号按参数个数严格匹配，少了会「连上但调用报错、界面静默不刷新」。
-## 这个坑在 hint.gd 已经踩过一次，别有第三次。
+## 这个坑在 hint.gd 和这里各踩过，别有第三次。
 func _refresh_texts(_locale: String = "") -> void:
 	_title.text = tr("UI_MENU_TITLE")
 	_start_btn.text = tr("UI_MENU_START")
 	_continue_btn.text = tr("UI_MENU_CONTINUE")
+	_load_btn.text = tr("UI_MENU_LOAD")
 	_quit_btn.text = tr("UI_MENU_QUIT")
-	# 语言按钮显示「当前语言」，点一下切到下一个 —— 就地循环，不用列表
 	_lang_btn.text = "%s：%s" % [tr("UI_MENU_LANGUAGE"), GameSettings.SUPPORTED[GameSettings.language]]
+	_slots_title.text = tr("UI_SLOTS_TITLE_NEW") if _slot_mode == SlotMode.START else tr("UI_SLOTS_TITLE_LOAD")
+	_refresh_continue()
+	_refresh_slot_buttons()
 
 
 func _refresh_continue() -> void:
-	_continue_btn.visible = SaveManager.has_save()
+	var last := SaveManager.last_slot()
+	_continue_btn.visible = last > 0 and SaveManager.slot_exists(last)
 
+
+func _refresh_slot_buttons() -> void:
+	for i in _slot_btns.size():
+		var slot := i + 1
+		_slot_btns[i].text = _slot_text(slot, i + 1)
+		if _slot_mode == SlotMode.LOAD:
+			_slot_btns[i].disabled = not SaveManager.slot_exists(slot)
+		else:
+			_slot_btns[i].disabled = false
+
+
+## 槽位按钮上的摘要：空的写「空」，有档写玩家最关心的三样
+func _slot_text(slot: int, index: int) -> String:
+	var info := SaveManager.read_slot_info(slot)
+	if info.is_empty():
+		return "%d. %s" % [index, tr("UI_SLOT_EMPTY")]
+	var st := info.get("state", {}) as Dictionary
+	var player := st.get("player", {}) as Dictionary
+	var shards := int(player.get("shards", 0))
+	var upgrade := int(player.get("upgrade", 0))
+	var level := str(info.get("level", "")).get_file().get_basename()
+	return "%d. %s　%s ×%d　Lv.%d" % [index, tr("UI_LEVEL_" + level.to_upper()), shards, upgrade]
+
+
+# ── 按钮动作 ───────────────────────────────────────────────────
 
 func _on_start() -> void:
-	PlayerState.reset_for_new_game()
-	SaveManager.request_new_game(LEVEL_PATH)
-	get_tree().change_scene_to_file(LEVEL_PATH)
+	_slot_mode = SlotMode.START
+	_slots.visible = true
+	_refresh_texts()
+
+
+func _on_load() -> void:
+	_slot_mode = SlotMode.LOAD
+	_slots.visible = true
+	_refresh_texts()
+
+
+func _close_slots() -> void:
+	_slots.visible = false
+
+
+func _on_slot(slot: int) -> void:
+	if _slot_mode == SlotMode.START:
+		PlayerState.reset_for_new_game()
+		SaveManager.start_new_game(slot, LEVEL_PATH)
+		get_tree().change_scene_to_file(LEVEL_PATH)
+	else:
+		_enter_slot(slot)
 
 
 func _on_continue() -> void:
-	var level := SaveManager.read_progress()
+	var last := SaveManager.last_slot()
+	if last > 0 and SaveManager.slot_exists(last):
+		_enter_slot(last)
+
+
+## 从槽位进入：场景 + 快照 + 玩家数据，三样都从档里来
+func _enter_slot(slot: int) -> void:
+	var level := SaveManager.read_progress(slot)
 	if level.is_empty() or not ResourceLoader.exists(level):
-		# 档指向的场景已经不存在了（改版删场景）：当作没档，回新游戏
-		SaveManager.erase_save()
-		_refresh_continue()
+		SaveManager.erase_slot(slot)
+		_refresh_texts()
 		return
-	SaveManager.request_continue()
+	SaveManager.load_game(slot)
+	var st := SaveManager.read_state(slot)
+	if st.has("player"):
+		PlayerState.load_from(st.player)
 	get_tree().change_scene_to_file(level)
 
 
@@ -63,7 +136,6 @@ func _on_language() -> void:
 	var codes := GameSettings.SUPPORTED.keys()
 	var i := codes.find(GameSettings.language)
 	GameSettings.set_language(str(codes[(i + 1) % codes.size()]))
-	# language_changed 信号会带回 _refresh_texts，按钮文案自己换
 
 
 func _on_quit() -> void:

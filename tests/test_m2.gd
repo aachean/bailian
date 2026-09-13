@@ -1,12 +1,11 @@
 extends Node
-## 《百炼》M2 自动验收 —— 增量 2：主菜单 / 存档底座 / 语言入口
+## 《百炼》M2 自动验收 —— 主菜单 / 槽位存档 / 语言入口
 ##
 ## 跑法（无头）：
 ##     godot --headless --fixed-fps 60 --path <项目根> res://tests/test_m2.tscn
 ##
-## 战斗 / 移动的 33 条在 tests/test_m1.tscn，这里只管增量 2 的新东西。
-## 场景切换本身（按开始 → 进关卡）是引擎一行调用，且会把本测试场景换掉，
-## 无头环境测不了 —— 那条走人工验收，其余全部机器兜底。
+## 存档模型（用户验收定的）：3 槽位 + 最近槽「继续」。这里的断言盯三种翻车：
+## 槽位之间互相污染、读了不存在的档、新游戏把别的槽抹掉。
 
 const MENU := preload("res://scenes/ui/main_menu.tscn")
 
@@ -17,10 +16,10 @@ var _fail := 0
 func _ready() -> void:
 	await get_tree().process_frame
 	print("")
-	print("═══ 《百炼》M2 增量 2 自动验收 ═══")
+	print("═══ 《百炼》M2 自动验收 ═══")
 	await _t1_menu_buttons()
 	await _t2_continue_visibility()
-	await _t3_save_roundtrip()
+	await _t3_slots_isolated()
 	await _t4_language_button()
 	await _t5_world_snapshot_roundtrip()
 	await _t6_snapshot_survives_file()
@@ -44,64 +43,93 @@ func _steps(n: int) -> void:
 		await get_tree().process_frame
 
 
-## 菜单能摆出来，四个按钮都在，文案是真话不是 key
+func _wipe_all_slots() -> void:
+	for s in 3:
+		SaveManager.erase_slot(s)
+	PlayerState.shards = 0
+	PlayerState.upgrade_level = 0
+
+
+## 菜单能摆出来：标题 + 五个按钮，文案是真话不是 key
 func _t1_menu_buttons() -> void:
 	var menu := MENU.instantiate()
 	add_child(menu)
 	await _steps(3)
 
 	var missing := PackedStringArray()
-	for node_path in ["Panel/Box/Start", "Panel/Box/Continue", "Panel/Box/Language", "Panel/Box/Quit"]:
+	for node_path in ["Panel/Box/Start", "Panel/Box/Continue", "Panel/Box/Load",
+			"Panel/Box/Language", "Panel/Box/Quit", "Slots/Box/Slot1", "Slots/Box/Slot3"]:
 		if menu.get_node_or_null(node_path) == null:
 			missing.append(node_path)
 	var title := (menu.get_node("Title") as Label).text
 	var start_text := (menu.get_node("Panel/Box/Start") as Button).text
 	var ok := missing.is_empty() and not title.is_empty() and title != "UI_MENU_TITLE" \
 		and not start_text.is_empty() and start_text != "UI_MENU_START"
-	_check("1", "主菜单摆得出来：标题 + 四个按钮，文案随语言",
+	_check("1", "主菜单摆得出来：标题 + 五个按钮 + 三个存档位",
 		ok,
 		"标题=\"%s\" 开始=\"%s\" 缺节点 %d 个" % [title, start_text, missing.size()])
 	menu.queue_free()
 	await _steps(2)
 
 
-## 「继续」只在有档时出现 —— 这是存档系统在菜单上唯一可感知的开关
+## 「继续」只在有进度时出现；读档列表里空槽置灰、有档可选
 func _t2_continue_visibility() -> void:
+	_wipe_all_slots()
 	var menu := MENU.instantiate()
 	add_child(menu)
 	await _steps(2)
 	var cont := menu.get_node("Panel/Box/Continue") as Button
+	var slot2 := menu.get_node("Slots/Box/Slot2") as Button
 
-	# 清档 → 继续隐藏；写档 → 继续出现
-	SaveManager.erase_save()
-	menu._refresh_continue()
+	# 全空：继续隐藏
+	menu._refresh_texts()
 	await _steps(2)
-	var hidden_without_save: bool = not cont.visible
+	var cont_hidden: bool = not cont.visible
 
-	SaveManager.write_progress("res://scenes/stages/test_room.tscn")
-	menu._refresh_continue()
+	# 在槽 2 开档：继续出现（回最近槽），读档列表里槽 2 可选、槽 1 仍置灰
+	SaveManager.start_new_game(2, "res://scenes/stages/town.tscn")
+	menu._refresh_texts()
 	await _steps(2)
-	var shown_with_save: bool = cont.visible
+	var cont_shown: bool = cont.visible
+	menu._slot_mode = menu.SlotMode.LOAD
+	menu._refresh_texts()
+	var load_mode_ok: bool = (not slot2.disabled) \
+		and (menu.get_node("Slots/Box/Slot1") as Button).disabled
+	menu._slot_mode = menu.SlotMode.START
+	menu._refresh_texts()
 
-	_check("2", "「继续」按钮只在有存档时出现",
-		hidden_without_save and shown_with_save,
-		"无档隐藏=%s　有档显示=%s" % [str(hidden_without_save), str(shown_with_save)])
+	_check("2", "「继续」回最近槽；读档列表空槽置灰",
+		cont_hidden and cont_shown and load_mode_ok,
+		"无进度隐藏=%s　有进度显示=%s　读档模式槽2可选/槽1置灰=%s" % [
+			str(cont_hidden), str(cont_shown), str(load_mode_ok)])
 	menu.queue_free()
 	await _steps(2)
 
 
-## 存档写读往返；读不存在的档返回空串而不是崩
-func _t3_save_roundtrip() -> void:
-	SaveManager.erase_save()
-	var empty: String = SaveManager.read_progress()
+## 槽位隔离：三个槽各写各的，读写往返互不污染；新开槽不抹别的槽
+func _t3_slots_isolated() -> void:
+	_wipe_all_slots()
+	SaveManager.start_new_game(1, "res://scenes/stages/town.tscn")
+	SaveManager.write_progress("res://scenes/stages/level_1.tscn",
+		{"player": {"hp": 50, "shards": 9, "upgrade": 2}, "enemies": []})
 
-	SaveManager.write_progress("res://scenes/stages/test_room.tscn")
-	var back := SaveManager.read_progress()
-	var has := SaveManager.has_save()
+	SaveManager.start_new_game(3, "res://scenes/stages/town.tscn")
+	SaveManager.write_progress("res://scenes/stages/town.tscn",
+		{"player": {"hp": 100, "shards": 1, "upgrade": 0}, "enemies": []})
 
-	_check("3", "存档写读往返一致，无档时读出空串",
-		empty.is_empty() and has and back == "res://scenes/stages/test_room.tscn",
-		"无档读出=\"%s\"　has_save=%s　读回=\"%s\"" % [empty, str(has), back])
+	var s1 := SaveManager.read_state(1)
+	var s3 := SaveManager.read_state(3)
+	var s2_empty: bool = SaveManager.read_progress(2).is_empty()
+	var s1_player := (s1.get("player", {}) as Dictionary)
+	var s3_player := (s3.get("player", {}) as Dictionary)
+	var isolated: bool = int(s1_player.get("shards", -1)) == 9 \
+		and int(s3_player.get("shards", -1)) == 1 and s2_empty
+
+	_check("3", "三个存档位互不干扰，新开一槽不抹别的槽",
+		isolated and s2_empty,
+		"槽1 铁=%s Lv=%s　槽2 无档=%s　槽3 铁=%s" % [
+			str(s1_player.get("shards")), str(s1_player.get("upgrade")),
+			str(s2_empty), str(s3_player.get("shards"))])
 
 
 ## 语言按钮：点一下切到下一个语言，按钮文案跟着换，再点能绕回来
@@ -134,8 +162,6 @@ func _t4_language_button() -> void:
 
 
 ## 世界快照往返：这是「继续游戏 = 回到离开那一刻」的核心。
-## 玩家血量/位置、每只怪的血量/位置，collect 之后再 apply 回来必须一致。
-## 用户验收原话：「我打了怪一点血量，继续游戏时小怪血量应该和之前一样。」
 func _t5_world_snapshot_roundtrip() -> void:
 	var room := (load("res://scenes/stages/test_room.tscn") as PackedScene).instantiate()
 	add_child(room)
@@ -147,7 +173,6 @@ func _t5_world_snapshot_roundtrip() -> void:
 	var player_h: Health = player.get_node("Health")
 	var walker_h: Health = walker.get_node("Health")
 
-	# 制造「离开时」的状态：玩家掉血挪位、怪掉血挪位
 	player_h.take_damage(13, Vector2.ZERO, false, 1)
 	player.global_position = Vector2(410.0, 288.0)
 	walker_h.take_damage(11, Vector2.ZERO, false, 1)
@@ -158,14 +183,12 @@ func _t5_world_snapshot_roundtrip() -> void:
 	var want_player := {"hp": player_h.hp, "x": player.global_position.x, "y": player.global_position.y}
 	var want_walker_hp: int = walker_h.hp
 
-	# 把现场搅乱：全员满血回原位 —— 模拟「关卡重开」
 	player_h.restore(player_h.max_hp)
 	player.global_position = Vector2(320.0, 280.0)
 	walker_h.restore(walker_h.max_hp)
 	walker.global_position = Vector2(46.0, 288.0)
 	await get_tree().physics_frame
 
-	# 应用快照 —— 一切该回到「离开时」
 	room.call("_apply_state", snap)
 	await get_tree().physics_frame
 
@@ -188,6 +211,7 @@ func _t5_world_snapshot_roundtrip() -> void:
 func _t6_snapshot_survives_file() -> void:
 	var snap := {"player": {"hp": 66, "x": 123.0, "y": 288.0}, "enemies": [
 		{"node": "Walker", "hp": 19, "x": 200.0, "y": 288.0}]}
+	SaveManager.start_new_game(2, "res://scenes/stages/test_room.tscn")
 	SaveManager.write_progress("res://scenes/stages/test_room.tscn", snap)
 	var back := SaveManager.read_state()
 
