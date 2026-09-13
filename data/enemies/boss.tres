@@ -18,4 +18,5 @@ deaggro_range = 320.0
 attack_range = 46.0
 attack_cooldown_frames = 70
 attack_skill = ExtResource("2_skill")
+exp_reward = 60
 drop_shards = 10

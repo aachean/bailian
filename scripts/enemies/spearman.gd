@@ -195,6 +195,7 @@ func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: i
 func _on_died() -> void:
 	_enter(State.DEAD)
 	_drop_shards()
+	PlayerState.add_exp(data.exp_reward)   # 击杀经验进玩家成长
 	_revive_t = data.revive_delay
 	_target_alpha = 0.0
 	set_collision_layer_value(2, false)

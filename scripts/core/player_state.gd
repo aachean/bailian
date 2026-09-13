@@ -1,26 +1,52 @@
 extends Node
-## 玩家的跨场景持久数据（autoload）。
+## 玩家成长数据（autoload）：等级 / 经验 / 蓝量上限这些「属于玩家」的东西。
 ##
-## 碎片、强化等级这类「属于玩家、不属于关卡」的数据**不能**存在玩家节点上：
-## 每次切场景玩家节点整个重建，存在它身上的东西就没了 ——
-## 用户实测「回到安全区碎片全没了」就是这么丢的。
-## 玩家节点在 _ready 从这里取、_exit_tree 写回；这里的数据跨场景、随快照进存档。
-##
-## HP 不在这里：安全区回城自动满血（回城即治疗，原型阶段的简单约定）。
+## 与 PlayerState 合并过考虑——但它已经叫 PlayerState，等级经验就住在同一家：
+## 本文件实际承担 shards / upgrade / level / exp 四样跨场景数据。
+## 升级逻辑也在这（纯数据 + 信号），玩家节点只负责听信号改血条和蓝上限。
+
+## 升级时发。玩家听了加血上限 / 蓝上限并回满
+signal level_up(new_level: int)
+
+## 升到下一级需要的经验：线性增长，原型期手感友好
+func exp_needed(level: int) -> int:
+	return 20 + (level - 1) * 15
+
 
 var shards: int = 0
 var upgrade_level: int = 0
+
+var level: int = 1
+var exp: int = 0
 
 
 func reset_for_new_game() -> void:
 	shards = 0
 	upgrade_level = 0
+	level = 1
+	exp = 0
 
 
 func load_from(d: Dictionary) -> void:
 	shards = int(d.get("shards", shards))
 	upgrade_level = int(d.get("upgrade", upgrade_level))
+	level = int(d.get("level", level))
+	exp = int(d.get("exp", exp))
 
 
 func save_to() -> Dictionary:
-	return {"shards": shards, "upgrade": upgrade_level}
+	return {"shards": shards, "upgrade": upgrade_level, "level": level, "exp": exp}
+
+
+## 加经验，够数就升级（可连升）。返回升了几级
+func add_exp(amount: int) -> int:
+	if amount <= 0:
+		return 0
+	exp += amount
+	var ups := 0
+	while exp >= exp_needed(level):
+		exp -= exp_needed(level)
+		level += 1
+		ups += 1
+		level_up.emit(level)
+	return ups

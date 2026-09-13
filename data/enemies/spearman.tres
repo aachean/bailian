@@ -16,6 +16,7 @@ aggro_range = 220.0
 deaggro_range = 320.0
 attack_range = 40.0
 attack_cooldown_frames = 90
+exp_reward = 12
 drop_shards = 2
 attack_skill = null
 projectile_speed = 260.0

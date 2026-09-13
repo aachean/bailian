@@ -8,39 +8,77 @@ script = ExtResource("1_hud")
 [node name="Status" type="Panel" parent="."]
 offset_left = 6.0
 offset_top = 6.0
-offset_right = 136.0
-offset_bottom = 52.0
+offset_right = 150.0
+offset_bottom = 66.0
 mouse_filter = 2
 
 [node name="HPBG" type="ColorRect" parent="Status"]
 offset_left = 8.0
-offset_top = 8.0
-offset_right = 122.0
-offset_bottom = 18.0
+offset_top = 7.0
+offset_right = 136.0
+offset_bottom = 16.0
+mouse_filter = 2
+color = Color(0.11, 0.1, 0.1, 0.85)
+
+[node name="MPBG" type="ColorRect" parent="Status"]
+offset_left = 8.0
+offset_top = 22.0
+offset_right = 136.0
+offset_bottom = 31.0
 mouse_filter = 2
 color = Color(0.11, 0.1, 0.1, 0.85)
 
 [node name="HPBar" type="Node2D" parent="Status"]
-position = Vector2(8, 13)
+position = Vector2(8, 11.5)
 
 [node name="Fill" type="ColorRect" parent="Status/HPBar"]
 offset_left = 0.0
-offset_top = -5.0
-offset_right = 114.0
-offset_bottom = 5.0
+offset_top = -4.5
+offset_right = 128.0
+offset_bottom = 4.5
 mouse_filter = 2
 color = Color(0.78, 0.26, 0.22, 1)
 
+[node name="MPBar" type="Node2D" parent="Status"]
+position = Vector2(8, 26.5)
+
+[node name="Fill" type="ColorRect" parent="Status/MPBar"]
+offset_left = 0.0
+offset_top = -4.5
+offset_right = 128.0
+offset_bottom = 4.5
+mouse_filter = 2
+color = Color(0.3, 0.5, 0.85, 1)
+
+[node name="ExpBG" type="ColorRect" parent="Status"]
+offset_left = 8.0
+offset_top = 36.0
+offset_right = 136.0
+offset_bottom = 41.0
+mouse_filter = 2
+color = Color(0.11, 0.1, 0.1, 0.85)
+
+[node name="ExpBar" type="Node2D" parent="Status"]
+position = Vector2(8, 38.5)
+
+[node name="Fill" type="ColorRect" parent="Status/ExpBar"]
+offset_left = 0.0
+offset_top = -2.5
+offset_right = 128.0
+offset_bottom = 2.5
+mouse_filter = 2
+color = Color(0.85, 0.75, 0.35, 1)
+
 [node name="Level" type="Label" parent="Status"]
 offset_left = 8.0
-offset_top = 24.0
-offset_right = 122.0
-offset_bottom = 42.0
+offset_top = 44.0
+offset_right = 136.0
+offset_bottom = 60.0
 theme_override_font_sizes/font_size = 11
-text = "武器 Lv.0"
+text = "Lv.1"
 
 [node name="Bag" type="Panel" parent="."]
-offset_left = 528.0
+offset_left = 520.0
 offset_top = 6.0
 offset_right = 634.0
 offset_bottom = 34.0
@@ -49,7 +87,23 @@ mouse_filter = 2
 [node name="Count" type="Label" parent="Bag"]
 offset_left = 8.0
 offset_top = 5.0
-offset_right = 98.0
+offset_right = 106.0
 offset_bottom = 23.0
 theme_override_font_sizes/font_size = 12
 text = "精铁 ×0"
+
+[node name="CharPanel" type="Panel" parent="."]
+visible = false
+offset_left = 6.0
+offset_top = 72.0
+offset_right = 200.0
+offset_bottom = 230.0
+mouse_filter = 2
+
+[node name="Text" type="Label" parent="CharPanel"]
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 188.0
+offset_bottom = 150.0
+theme_override_font_sizes/font_size = 11
+text = ""

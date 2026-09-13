@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"whirl"
+display_name = "旋风斩"
+kind = 0
+startup_frames = 8
+active_frames = 8
+recovery_frames = 16
+damage = 14
+damage_variance = 0.15
+knockback = 120.0
+hitstop_frames = 5
+heavy = true
+chainable = false
+hitbox_size = Vector2(96, 52)
+hitbox_offset = Vector2(6, 0)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 90
+mp_cost = 30

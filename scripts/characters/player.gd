@@ -30,6 +30,11 @@ const COMBO_PATHS := [
 	"res://data/skills/attack_3.tres",
 ]
 const DODGE_PATH := "res://data/skills/dodge.tres"
+const SKILL_PATH := "res://data/skills/whirl.tres"
+
+## 技能（旋风斩）：耗蓝、独立冷却。放别的技能 = 换一张 SkillData
+var skill: SkillData = null
+var skill_cooldown: int = 0
 
 @export_group("移动")
 ## 最大水平速度（像素/秒）
@@ -81,6 +86,7 @@ var state: int = State.FREE
 var attack_index: int = -1
 ## 累计出招次数。用来断言「连按三次真的打了三段」而不是一次
 var attacks_started: int = 0
+var casts_started: int = 0
 var dodges_started: int = 0
 ## 闪避冷却剩余帧数
 var dodge_cooldown: int = 0
@@ -90,6 +96,12 @@ var deaths: int = 0
 ## 精铁碎片（强化素材）与武器强化等级 —— 进存档，随快照恢复
 var shards: int = 0
 var upgrade_level: int = 0
+## 等级 / 经验跨场景住在 PlayerState；蓝量是场景内资源（回城满蓝）
+var level: int = 1
+var exp_pts: int = 0
+var mp: int = 50
+var max_mp: int = 50
+var _mp_regen_tick := 0
 
 var _state_frame: int = 0
 var _hitstop: int = 0
@@ -124,8 +136,15 @@ func apply_saved(d: Dictionary) -> void:
 	_health.restore(int(d.get("hp", _health.max_hp)))
 	shards = int(d.get("shards", shards))
 	upgrade_level = int(d.get("upgrade", upgrade_level))
+	level = int(d.get("level", level))
+	exp_pts = int(d.get("exp", exp_pts))
+	mp = int(d.get("mp", max_mp))
 	PlayerState.shards = shards
 	PlayerState.upgrade_level = upgrade_level
+	PlayerState.level = level
+	PlayerState.exp = exp_pts
+	max_mp = 50 + (level - 1) * 10
+	_health.max_hp = 100 + (level - 1) * 15
 	_apply_upgrade()
 	_hurt_flash = 0.0
 	_visuals.modulate = Color.WHITE
@@ -152,16 +171,27 @@ func _ready() -> void:
 				push_error("[player] 连招数据加载失败: %s" % p)
 	if dodge_skill == null:
 		dodge_skill = load(DODGE_PATH) as SkillData
+	if skill == null:
+		skill = load(SKILL_PATH) as SkillData
 	_body_mask = collision_mask
 	_hitbox.hit_landed.connect(_on_hit_landed)
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
 	_health.revived.connect(_on_revived)
 	_health.hp_changed.connect(_update_hp_bar)
-	# 碎片 / 强化等级是「属于玩家」的数据，住在 PlayerState（autoload）里 ——
+	# 碎片 / 强化 / 等级经验是「属于玩家」的数据，住在 PlayerState（autoload）里 ——
 	# 切场景会重建玩家节点，存在节点上的东西会丢（实测丢过）
 	shards = PlayerState.shards
 	upgrade_level = PlayerState.upgrade_level
+	level = PlayerState.level
+	exp_pts = PlayerState.exp
+	# 回城即治疗：进场景满血满蓝；等级越高蓝上限越高
+	max_mp = 50 + (level - 1) * 10
+	mp = max_mp
+	_health.max_hp = 100 + (level - 1) * 15
+	_health.hp = _health.max_hp
+	if not PlayerState.level_up.is_connected(_on_level_up):
+		PlayerState.level_up.connect(_on_level_up)
 	_apply_upgrade()
 	_spawn_point = global_position
 
@@ -170,19 +200,32 @@ func _exit_tree() -> void:
 	# 离开场写回：下一次进任何场景，碎片和等级都还在
 	PlayerState.shards = shards
 	PlayerState.upgrade_level = upgrade_level
+	PlayerState.level = level
+	PlayerState.exp = exp_pts
+
+
+## 升级：血上限 +15、蓝上限 +10，血蓝全回满 —— 升级就该有仪式感
+func _on_level_up(new_level: int) -> void:
+	level = new_level
+	_health.max_hp = 100 + (level - 1) * 15
+	max_mp = 50 + (level - 1) * 10
+	_health.heal_full()
+	mp = max_mp
 
 
 func _update_hp_bar(_hp: int, _max_hp: int) -> void:
 	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
 
 
-## 武器强化：每级 +20% 伤害。改的是 Hitbox 的伤害倍率，
-## 技能表（招式本身）不动 —— 强化的是人，不是招
+## 武器强化每级 +20%；角色等级每级 +5%（与强化叠加）
+## 改的是 Hitbox 的伤害倍率，技能表（招式本身）不动 —— 强化的是人，不是招
 const UPGRADE_STEP := 0.2
+const LEVEL_ATK_STEP := 0.05
 
 
 func _apply_upgrade() -> void:
-	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level)
+	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level) \
+		+ LEVEL_ATK_STEP * float(level - 1)
 	var hud := get_node_or_null("HUD")
 	if hud != null and hud.has_method("refresh"):
 		hud.call("refresh")
@@ -209,6 +252,14 @@ func _physics_process(delta: float) -> void:
 
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
+	if skill_cooldown > 0:
+		skill_cooldown -= 1
+
+	# 蓝量自然恢复：每半秒回 1 点。站着不动也有，鼓励随时交技能
+	_mp_regen_tick += 1
+	if _mp_regen_tick >= 30:
+		_mp_regen_tick = 0
+		mp = mini(mp + 1, max_mp)
 
 	# 掉出世界 = 死。走同一条死亡重生流程，不然被挤下边缘就无限下落。
 	if state != State.DEAD and global_position.y > FALL_KILL_Y:
@@ -269,6 +320,9 @@ func _free_process(delta: float) -> void:
 
 
 func _try_start_action() -> void:
+	if Input.is_action_just_pressed("skill") and can_cast():
+		_start_cast()
+		return
 	if Input.is_action_just_pressed("dodge") and can_dodge():
 		_start_dodge()
 		return
@@ -277,6 +331,27 @@ func _try_start_action() -> void:
 			return
 		if not attack_combo.is_empty():
 			_start_attack(0)
+
+
+## 技能（旋风斩）：耗蓝、有冷却、要求地面。与普攻共用 ATTACK 状态机 ——
+## 它们本质是同一件事：「前摇 → 判定 → 后摇」，只是数值和按键不同
+func can_cast() -> bool:
+	return skill != null and skill_cooldown <= 0 and mp >= skill.mp_cost and is_on_floor()
+
+
+func _start_cast() -> void:
+	mp -= skill.mp_cost
+	_current = skill
+	state = State.ATTACK
+	_state_frame = 0
+	attack_index = -1
+	_attack_queued = false
+	_dodge_queued = false
+	_jump_buffer_timer = 0.0
+	_hitbox.deactivate()
+	velocity.x = skill.lunge_speed * float(_facing)
+	casts_started += 1
+	skill_cooldown = skill.total_frames() + skill.cooldown_frames
 
 
 func _apply_gravity(delta: float) -> void:
@@ -545,6 +620,8 @@ func _update_hurt_flash(delta: float) -> void:
 func state_name() -> String:
 	match state:
 		State.ATTACK:
+			if _current != null and _current == skill:
+				return "SKILL"
 			return "ATTACK%d" % (attack_index + 1)
 		State.DODGE:
 			return "DODGE"

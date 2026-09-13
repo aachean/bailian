@@ -18,3 +18,4 @@ deaggro_range = 280.0
 attack_range = 30.0
 attack_cooldown_frames = 36
 attack_skill = ExtResource("2_skill")
+exp_reward = 10

@@ -45,6 +45,9 @@ func collect() -> Dictionary:
 			"y": player.global_position.y,
 			"shards": int(player.get("shards")),
 			"upgrade": int(player.get("upgrade_level")),
+			"level": int(player.get("level")),
+			"exp": int(player.get("exp_pts")),
+			"mp": int(player.get("mp")),
 		}
 	var enemies: Array = []
 	for e in get_tree().get_nodes_in_group("enemy"):

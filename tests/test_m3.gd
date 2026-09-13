@@ -83,6 +83,13 @@ func _release(action: String) -> void:
 	Input.parse_input_event(ev)
 
 
+func _make_action(action: String) -> InputEventAction:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	return ev
+
+
 ## 城镇完整链路：从出生点一路向右，必须能走到出口传送门。
 ## 「装饰物把通道堵死」这种 bug 只有真的走一遍才抓得到 ——
 ## 用户实测：房子碰撞体比视觉大，把唯一的路堵死，整局没法往后玩。
@@ -412,14 +419,19 @@ func _t12_hud_shows_player_state() -> void:
 		return
 
 	player.set("shards", 4)
-	player.set("upgrade_level", 2)
 	hud.call("refresh")
 	await _pframes(2)
 	var bag: String = (hud.get_node("Bag/Count") as Label).text
 	var lv: String = (hud.get_node("Status/Level") as Label).text
+	# 开角色面板：武器强化等级现在住在面板里（HUD 等级位显示角色等级）
+	hud.call("_unhandled_input", _make_action("panel"))
+	await _pframes(2)
+	var panel_text: String = (hud.get_node("CharPanel/Text") as Label).text
+	hud.call("_unhandled_input", _make_action("panel"))
+	await _pframes(2)
 	town.queue_free()
 	await _pframes(2)
 
-	_check("12", "左上状态栏 / 右上背包显示碎片与武器等级",
-		bag.contains("4") and lv.contains("2"),
-		"背包「%s」　状态「%s」" % [bag, lv])
+	_check("12", "左上状态栏 / 右上背包 / 角色面板各显其职",
+		bag.contains("4") and lv.begins_with("Lv.") and panel_text.contains("精铁"),
+		"背包「%s」　状态「%s」　面板含精铁行=%s" % [bag, lv, str(panel_text.contains("精铁"))])

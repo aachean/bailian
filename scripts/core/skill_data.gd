@@ -60,6 +60,10 @@ enum Kind { ATTACK, DODGE }
 ## 技能结束后再过多少帧才能再次使用
 @export var cooldown_frames: int = 0
 
+@export_group("消耗")
+## 释放消耗的蓝量。0 = 免费（普攻 / 闪避都是 0）
+@export var mp_cost: int = 0
+
 
 ## 这个技能从按下到彻底结束一共多少帧
 func total_frames() -> int:
