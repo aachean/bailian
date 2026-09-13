@@ -325,7 +325,8 @@ func _physics_process(delta: float) -> void:
 func _hurt_process(delta: float) -> void:
 	_apply_gravity(delta)
 	_state_frame += 1
-	velocity.x = move_toward(velocity.x, 0.0, max_speed * 3.0 * delta)
+	# 击退衰减要在硬直内走完：否则回到 FREE 后残余速度会把朝向又翻过去
+	velocity.x = move_toward(velocity.x, 0.0, max_speed * 6.0 * delta)
 	if _state_frame >= hurt_stun_frames:
 		_end_action()
 
@@ -424,6 +425,12 @@ func _update_horizontal(delta: float) -> void:
 
 
 func _update_facing() -> void:
+	# HURT / DEAD 期间朝向锁定。击退的速度指向「远离攻击者」的一侧，
+	# 如果照常按速度翻朝向，挨打后会变成背对敌人 —— 反打方向全反（用户实测）。
+	# 造梦西游的规则：挨打后面向打你的人，正好准备还手。
+	if state == State.HURT or state == State.DEAD:
+		_visuals.scale.x = float(_facing)
+		return
 	# 只在真正有横向速度时更新朝向。
 	# 这样"停下来"的那一刻会保留上一次的朝向，而不是弹回默认的右侧。
 	if not is_zero_approx(velocity.x):
@@ -626,6 +633,8 @@ func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir:
 	_state_frame = 0
 	var sign_dir := 1 if dir > 0 else (-1 if dir < 0 else -_facing)
 	velocity.x = hurt_knockback * float(sign_dir)
+	# 面朝打你的人（不是背对他）：击退往反方向推，但脸要转回来准备还手
+	_facing = -sign_dir
 	_hurt_flash = 1.0
 
 

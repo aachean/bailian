@@ -18,7 +18,7 @@ const RECOIL_DAMP := 30.0
 const RECOIL_KICK := 420.0
 
 ## 蓄力帧数：从面向玩家到矛出手。玩家靠这几帧反应
-const AIM_FRAMES := 22
+const AIM_FRAMES := 30
 
 @export_group("数值")
 @export var data: EnemyData
@@ -118,7 +118,9 @@ func _player() -> Node2D:
 
 func _patrol() -> void:
 	var player := _player()
-	if player != null and _dist(player) <= data.aggro_range:
+	# 冷却没好不许进瞄准 —— 不设防的话扔完下一帧又 AIM，
+	# 实际射速 = 蓄力 30 帧（0.5 秒一支矛），冷却字段完全失效（用户实测「射速快」）
+	if player != null and _dist(player) <= data.aggro_range and _cooldown <= 0:
 		_enter(State.AIM)
 		return
 	var lo := _home_x - data.patrol_range * 0.5

@@ -39,6 +39,9 @@ func _ready() -> void:
 	await _t10_level_up_feedback()
 	await _t11_exp_bar_moves_on_kill()
 	await _t12_pause_menu_saves()
+	await _t13_face_attacker_on_hit()
+	await _t14_hit_interrupts_attack()
+	await _t15_spearman_fire_rate()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -333,3 +336,75 @@ func _t12_pause_menu_saves() -> void:
 			str(opened), str(saved_ok),
 			str(saved_player.get("hp")), str(saved_player.get("x")), str(closed)])
 	get_tree().paused = false          # 测试安全网：绝不能带着暂停退出
+
+
+## 挨打后面朝攻击者 —— 不再背对敌人。击退把人往反方向推，
+## 朝向却必须转回来（造梦西游式），否则反打方向全反（用户实测）
+func _t13_face_attacker_on_hit() -> void:
+	await _place(320.0)
+	_press("move_right")
+	await _pframes(3)
+	_release("move_right")
+	await _pframes(2)
+	var f0: int = _player.get("_facing")
+	# 从右侧被打：攻击方向向左（dir=-1）→ 击退向左、脸转向右
+	_player.get_node("Health").take_damage(5, Vector2.ZERO, false, -1)
+	await _pframes(2)
+	var hurt: bool = int(_player.state) == 3
+	var f1: int = _player.get("_facing")
+	await _pframes(10)                 # 击退还在滑行，朝向必须锁定
+	var f2: int = _player.get("_facing")
+	_check("13", "挨打后面朝攻击者，击退滑行中朝向锁定",
+		hurt and f0 == 1 and f1 == 1 and f2 == 1,
+		"初始 %d → 受击 %d → 滑行 %d（攻击者在右，应为 1）　硬直=%s" % [
+			f0, f1, f2, str(hurt)])
+	await _pframes(20)
+
+
+## 挨打必须打断普攻（造梦西游式）：出招中挨打 → 硬直、按键无效
+func _t14_hit_interrupts_attack() -> void:
+	await _place(320.0)
+	var h: Health = _player.get_node("Health")
+	h.restore(h.max_hp)
+	_press("attack")
+	await _pframes(3)
+	_release("attack")
+	var attacking: bool = int(_player.state) == 1
+	h.take_damage(5, Vector2.ZERO, false, 1)
+	await _pframes(2)
+	var hurt: bool = int(_player.state) == 3
+	var a0: int = _player.attacks_started
+	_press("attack")
+	await _pframes(3)
+	_release("attack")
+	var no_attack: bool = _player.attacks_started == a0
+	_check("14", "出招中挨打会被打断进硬直，硬直里按 J 无效",
+		attacking and hurt and no_attack,
+		"出招中=%s　被击进硬直=%s　硬直里没出招=%s" % [
+			str(attacking), str(hurt), str(no_attack)])
+	await _pframes(20)
+
+
+## 掷矛手射速受冷却约束：修前冷却字段失效，实际 0.37 秒一支矛
+func _t15_spearman_fire_rate() -> void:
+	await _place(320.0)
+	var spear := (load("res://scenes/enemies/spearman.tscn") as PackedScene).instantiate()
+	_room.add_child(spear)
+	spear.global_position = Vector2(160.0, 288.0)
+	spear.ai_enabled = true
+	await _pframes(2)
+	var t1 := -1
+	var t2 := -1
+	for i in 700:
+		await get_tree().physics_frame
+		if t1 < 0 and int(spear.throws_started) >= 1:
+			t1 = i
+		if t2 < 0 and int(spear.throws_started) >= 2:
+			t2 = i
+			break
+	var gap: int = (t2 - t1) if (t1 >= 0 and t2 >= 0) else -1
+	spear.queue_free()
+	await _pframes(2)
+	_check("15", "掷矛手射速有节奏：两支矛间隔 ≥ 140 帧（冷却+蓄力 ≈ 3 秒）",
+		gap >= 140,
+		"第一支 f=%d　第二支 f=%d　间隔 %d 帧（期望 ≥140）" % [t1, t2, gap])
