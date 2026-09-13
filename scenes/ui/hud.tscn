@@ -74,20 +74,28 @@ theme_override_font_sizes/font_size = 12
 text = "精铁 ×0"
 
 [node name="ExpBar" type="Node2D" parent="."]
-position = Vector2(0, 357)
+position = Vector2(0, 352)
+
+[node name="Border" type="ColorRect" parent="ExpBar"]
+offset_left = 0.0
+offset_top = -6.0
+offset_right = 640.0
+offset_bottom = 6.0
+mouse_filter = 2
+color = Color(0.47, 0.4, 0.26, 1)
 
 [node name="BG" type="ColorRect" parent="ExpBar"]
-offset_left = 0.0
-offset_top = -3.0
-offset_right = 640.0
-offset_bottom = 3.0
+offset_left = 2.0
+offset_top = -4.0
+offset_right = 638.0
+offset_bottom = 4.0
 mouse_filter = 2
-color = Color(0.05, 0.05, 0.07, 0.9)
+color = Color(0.16, 0.15, 0.2, 1)
 
 [node name="Fill" type="ColorRect" parent="ExpBar"]
-offset_left = 0.0
+offset_left = 2.0
 offset_top = -3.0
-offset_right = 640.0
+offset_right = 638.0
 offset_bottom = 3.0
 mouse_filter = 2
 color = Color(0.62, 0.8, 0.35, 1)
