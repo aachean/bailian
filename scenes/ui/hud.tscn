@@ -19,52 +19,82 @@ script = ExtResource("2_portrait")
 offset_left = 72.0
 offset_top = 6.0
 offset_right = 216.0
-offset_bottom = 66.0
+offset_bottom = 72.0
 mouse_filter = 2
 
 [node name="HPBG" type="ColorRect" parent="Status"]
 offset_left = 8.0
-offset_top = 7.0
+offset_top = 6.0
 offset_right = 136.0
-offset_bottom = 16.0
+offset_bottom = 18.0
 mouse_filter = 2
 color = Color(0.11, 0.1, 0.1, 0.85)
 
 [node name="MPBG" type="ColorRect" parent="Status"]
 offset_left = 8.0
-offset_top = 22.0
+offset_top = 26.0
 offset_right = 136.0
-offset_bottom = 31.0
+offset_bottom = 38.0
 mouse_filter = 2
 color = Color(0.11, 0.1, 0.1, 0.85)
 
 [node name="HPBar" type="Node2D" parent="Status"]
-position = Vector2(8, 11.5)
+position = Vector2(8, 12)
 
 [node name="Fill" type="ColorRect" parent="Status/HPBar"]
 offset_left = 0.0
-offset_top = -4.5
+offset_top = -6.0
 offset_right = 128.0
-offset_bottom = 4.5
+offset_bottom = 6.0
 mouse_filter = 2
 color = Color(0.78, 0.26, 0.22, 1)
 
 [node name="MPBar" type="Node2D" parent="Status"]
-position = Vector2(8, 26.5)
+position = Vector2(8, 32)
 
 [node name="Fill" type="ColorRect" parent="Status/MPBar"]
 offset_left = 0.0
-offset_top = -4.5
+offset_top = -6.0
 offset_right = 128.0
-offset_bottom = 4.5
+offset_bottom = 6.0
 mouse_filter = 2
 color = Color(0.3, 0.5, 0.85, 1)
 
+[node name="HPText" type="Label" parent="Status"]
+offset_left = 8.0
+offset_top = 3.0
+offset_right = 136.0
+offset_bottom = 21.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(1, 1, 1, 0.95)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MPText" type="Label" parent="Status"]
+offset_left = 8.0
+offset_top = 23.0
+offset_right = 136.0
+offset_bottom = 41.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(1, 1, 1, 0.95)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="Level" type="Label" parent="Status"]
 offset_left = 8.0
-offset_top = 44.0
+offset_top = 46.0
 offset_right = 136.0
-offset_bottom = 60.0
+offset_bottom = 64.0
 theme_override_font_sizes/font_size = 11
 text = "Lv.1"
 

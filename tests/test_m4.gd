@@ -43,6 +43,7 @@ func _ready() -> void:
 	await _t14_hit_interrupts_attack()
 	await _t15_spearman_fire_rate()
 	await _t16_portrait_exp_ring()
+	await _t17_hp_mp_numbers()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -453,3 +454,38 @@ func _t16_portrait_exp_ring() -> void:
 		"头像控件=%s（%.0f×%.0f px）　底部旧条已移除=%s\n              经验环 0→%.2f　半管→%.2f（期望 %.2f）　满→%.2f" % [
 			str(is_ring), box.x, box.y, str(old_gone),
 			r0, rh, float(half) / float(needed), r1])
+
+
+## 血条蓝条上要有数值。**条只表达比例**，说不清「还剩多少、够不够挨这一下」——
+## 打 Boss 的时候玩家要的是数字
+func _t17_hp_mp_numbers() -> void:
+	await _place(320.0)
+	var hud := _player.get_node("HUD")
+	var hp_text := hud.get_node_or_null("Status/HPText") as Label
+	var mp_text := hud.get_node_or_null("Status/MPText") as Label
+	if hp_text == null or mp_text == null:
+		_check("17", "血条蓝条上写出「当前 / 上限」，并且随变化当场更新", false,
+			"找不到 Status/HPText 或 Status/MPText")
+		return
+	var h := _player.get_node("Health") as Health
+	h.heal_full()
+	_player.set("mp", int(_player.get("max_mp")))
+	await _pframes(3)
+	var hp_before := hp_text.text
+	var mp_before := mp_text.text
+	h.take_damage(30, Vector2.ZERO, false, 0)
+	_player.set("mp", int(_player.get("max_mp")) - 20)
+	await _pframes(3)
+	var hp_after := hp_text.text
+	var mp_after := mp_text.text
+	# 蓝会自然回复，所以读同一个瞬间的 mp 去比，别用「刚设进去的值」
+	var mp_now := int(_player.get("mp"))
+	var max_hp := h.max_hp
+	var max_mp := int(_player.get("max_mp"))
+	var hp_ok: bool = hp_before == "%d / %d" % [max_hp, max_hp] \
+		and hp_after == "%d / %d" % [h.hp, max_hp] and hp_after != hp_before
+	var mp_ok: bool = mp_before == "%d / %d" % [max_mp, max_mp] \
+		and mp_after == "%d / %d" % [mp_now, max_mp] and mp_after != mp_before
+	_check("17", "血条蓝条上写出「当前 / 上限」，并且随变化当场更新",
+		hp_ok and mp_ok,
+		"血 %s → %s　蓝 %s → %s" % [hp_before, hp_after, mp_before, mp_after])

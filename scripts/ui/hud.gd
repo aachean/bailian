@@ -39,6 +39,10 @@ var _has_player := false
 @onready var _player: Node = get_parent()
 @onready var _hp_fill: ColorRect = $Status/HPBar/Fill
 @onready var _mp_fill: ColorRect = $Status/MPBar/Fill
+## 血条蓝条上的数值。**条本身说不清"还剩多少够不够挨这一下"** ——
+## 玩家要的是数字，条只是"一眼看出比例"。两者缺一不可
+@onready var _hp_text: Label = $Status/HPText
+@onready var _mp_text: Label = $Status/MPText
 ## 经验条从「屏幕最底边的全屏细条」改成「角色头像外圈的环」——
 ## 底部那条永远在视野边缘，战斗中没人会去读它
 @onready var _portrait: PortraitRing = $Portrait
@@ -511,7 +515,9 @@ func refresh() -> void:
 
 	if h != null:
 		_hp_fill.scale.x = clampf(h.ratio(), 0.0, 1.0)
+		_hp_text.text = "%d / %d" % [h.hp, h.max_hp]
 	_mp_fill.scale.x = 0.0 if max_mp <= 0 else clampf(float(mp) / float(max_mp), 0.0, 1.0)
+	_mp_text.text = "%d / %d" % [mp, max_mp]
 	_portrait.set_exp(float(exp_pts) / float(needed))
 	_lv_label.text = "Lv.%d" % level
 	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), int(_player.get("shards"))]
