@@ -73,7 +73,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（16 个场景，缺节点即红）
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 传送门 / 新怪（12 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击（15 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环（16 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框 / NPC / 主线推进（8 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
@@ -101,6 +101,24 @@ scripts/ui/hud.gd          B 键装备背包（打开即暂停）+ C 键角色�
 以及角色攻击时的光刃上**形状与颜色完全一致** —— 换了一件装备，四个地方一起变。
 面板每行是代码建的 `[ItemIcon][Label]`；收文本做断言走 `hud.panel_texts()`，
 布局怎么改都不用动断言。
+
+### HUD 落在哪
+
+```
+scripts/ui/portrait_ring.gd  圆形角色头像 + 外层环形经验条（程序化自绘，不引贴图）
+scripts/ui/hud.gd            血条蓝条等级 / 精铁计数 / 5 格技能栏 / 三个面板
+scripts/ui/item_icon.gd      装备图标：形状 = 部位，颜色 = 品质
+scripts/ui/skill_icon.gd     技能图标：每个技能一个手画形状 + 固定配色
+```
+
+三条写进设计规范的硬约束（改之前先看 `docs/design-conventions.md`）：
+
+- **经验条是头像外圈的环，不是底部全屏细条** —— 底部那条永远在视野边缘，
+  战斗中没人会把视线挪过去读它。省下来的一整条底部空间还给场景。
+- **技能栏贴屏幕底边，单格 ≤ 40×30、横向 ≤ 240px**。
+  第一版是 54×40，五格连起来横跨 286px（屏幕宽的 45%），把地面和怪都盖住了。
+- **头像必须是场景里那个人**：配色直接取 `player.tscn` 的 Visuals。
+  头像和角色不像，玩家会当成两个东西。
 
 ### 剧情落在哪
 

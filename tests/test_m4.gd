@@ -42,6 +42,7 @@ func _ready() -> void:
 	await _t13_face_attacker_on_hit()
 	await _t14_hit_interrupts_attack()
 	await _t15_spearman_fire_rate()
+	await _t16_portrait_exp_ring()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -277,6 +278,7 @@ func _t10_level_up_feedback() -> void:
 
 ## 经验条当场涨 —— HUD 读的是玩家节点的 exp_pts，杀怪加的是 PlayerState.exp，
 ## 两者不同步的话条就只会在切场景后跳起来（用户实测）
+## 经验条已从「屏幕最底边的全屏细条」改成「角色头像外圈的环」，读的是同一条数据
 func _t11_exp_bar_moves_on_kill() -> void:
 	_place(500.0)
 	var walker_h: Health = _walker.get_node("Health")
@@ -284,17 +286,17 @@ func _t11_exp_bar_moves_on_kill() -> void:
 	_walker.global_position = Vector2(480.0, 288.0)
 	await _pframes(2)
 	var hud := _player.get_node("HUD")
-	var fill := hud.get_node("ExpBar/Fill") as ColorRect
-	var before: float = fill.scale.x
+	var ring := hud.get_node("Portrait") as PortraitRing
+	var before: float = ring.exp_ratio()
 	var ps_before: int = PlayerState.exp
 
 	walker_h.take_damage(9999, Vector2.ZERO, true, 1)
 	await _pframes(3)
-	var after: float = fill.scale.x
+	var after: float = ring.exp_ratio()
 
-	_check("11", "打怪后经验条当场涨绿（玩家节点与存档层同步）",
+	_check("11", "打怪后头像上的经验环当场涨（玩家节点与存档层同步）",
 		PlayerState.exp > ps_before and after > before,
-		"存档层经验 %d → %d　经验条 %.2f → %.2f" % [
+		"存档层经验 %d → %d　经验环 %.3f → %.3f（整圈 = 1.0）" % [
 			ps_before, PlayerState.exp, before, after])
 
 
@@ -409,3 +411,45 @@ func _t15_spearman_fire_rate() -> void:
 	_check("15", "掷矛手射速有节奏：两支矛间隔 ≥ 140 帧（冷却+蓄力 ≈ 3 秒）",
 		gap >= 140,
 		"第一支 f=%d　第二支 f=%d　间隔 %d 帧（期望 ≥140）" % [t1, t2, gap])
+
+
+## 头像 + 环形经验条：取代了原来贴着屏幕最底边的全屏经验条。
+## 环的读数必须**严格等于** exp/needed —— 只是个「会涨的装饰」就等于进度条在骗人。
+##
+## 这条测不到的部分（要写清楚，不然以后会误以为这里已经覆盖了）：
+## 头像画得对不对 —— 斗笠盖没盖住脸、形状有没有超出内圆画成方角、
+## 环形经验弧的起止角度对不对 —— 全是自绘像素，断言看不见，只能靠截图。
+func _t16_portrait_exp_ring() -> void:
+	await _place(320.0)
+	var hud := _player.get_node("HUD")
+	var ring := hud.get_node_or_null("Portrait")
+	if ring == null:
+		_check("16", "头像圆形 + 经验环读数等于 exp/needed；底部全屏经验条已移除",
+			false, "找不到 HUD/Portrait 节点")
+		return
+
+	var is_ring: bool = ring is PortraitRing
+	var box := (ring as Control).size
+	# 旧的底部全屏经验条必须已经不存在 —— 留着它等于两处都在显示经验，
+	# 而且底部那条会把刚还回去的一整条视野重新占掉
+	var old_gone: bool = hud.get_node_or_null("ExpBar") == null
+
+	var level := int(_player.get("level"))
+	var needed: int = PlayerState.exp_needed(level)
+	var half: int = needed / 2
+	_player.set("exp_pts", 0)
+	await _pframes(2)
+	var r0: float = (ring as PortraitRing).exp_ratio()
+	_player.set("exp_pts", half)
+	await _pframes(2)
+	var rh: float = (ring as PortraitRing).exp_ratio()
+	_player.set("exp_pts", needed)
+	await _pframes(2)
+	var r1: float = (ring as PortraitRing).exp_ratio()
+
+	_check("16", "头像圆形 + 经验环读数等于 exp/needed；底部全屏经验条已移除",
+		is_ring and old_gone and absf(r0) < 0.02 \
+			and absf(rh - float(half) / float(needed)) < 0.02 and absf(r1 - 1.0) < 0.02,
+		"头像控件=%s（%.0f×%.0f px）　底部旧条已移除=%s\n              经验环 0→%.2f　半管→%.2f（期望 %.2f）　满→%.2f" % [
+			str(is_ring), box.x, box.y, str(old_gone),
+			r0, rh, float(half) / float(needed), r1])

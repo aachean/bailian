@@ -39,7 +39,9 @@ var _has_player := false
 @onready var _player: Node = get_parent()
 @onready var _hp_fill: ColorRect = $Status/HPBar/Fill
 @onready var _mp_fill: ColorRect = $Status/MPBar/Fill
-@onready var _exp_fill: ColorRect = $ExpBar/Fill
+## 经验条从「屏幕最底边的全屏细条」改成「角色头像外圈的环」——
+## 底部那条永远在视野边缘，战斗中没人会去读它
+@onready var _portrait: PortraitRing = $Portrait
 @onready var _lv_label: Label = $Status/Level
 @onready var _bag_label: Label = $Bag/Count
 @onready var _panel: Panel = $CharPanel
@@ -154,24 +156,30 @@ func _fill_equip_row(row: HBoxContainer, i: int, it: ItemData, mark: String) -> 
 
 ## 技能栏：5 个格子，同样由代码建。每格 = 图标 + 冷却遮罩 + 键位角标。
 ## 格子的名字（Cell1..Cell5）被断言用着，改名字要连着改 tests/test_m4
+##
+## ── 尺寸为什么这么小 ──────────────────────────────────────
+## 一版是 54×40，五个格子连起来横跨 286px（640 宽屏幕的 45%），
+## 压在左下角把地面和怪都盖住了。收到 40×30 之后横向只占 212px（33%），
+## 高度也矮了一截 —— 底部本来就该是场景，不是面板。
 func _build_skill_bar() -> void:
 	for i in PlayerState.SKILL_SLOT_COUNT:
 		var cell := Panel.new()
 		cell.name = "Cell%d" % (i + 1)
-		cell.custom_minimum_size = Vector2(54.0, 40.0)
+		cell.custom_minimum_size = Vector2(40.0, 30.0)
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# 代码建的 Panel 默认是主题那套浅灰底，和 HUD 其他面板格格不入 ——
-		# 手上一块深底 + 暗金边，风格才连得上
+		# 手上一块深底 + 暗金边，风格才连得上。底色比面板更透一点：
+		# 它压在场景上，太实会挡住地面的地形
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.11, 0.11, 0.14, 0.92)
+		sb.bg_color = Color(0.11, 0.11, 0.14, 0.86)
 		sb.border_color = Color(0.4, 0.35, 0.26, 1.0)
 		sb.set_border_width_all(1)
 		cell.add_theme_stylebox_override("panel", sb)
 
 		var icon := SkillIcon.new()
 		icon.name = "Icon"
-		icon.position = Vector2(6.0, 4.0)
-		icon.size = Vector2(42.0, 26.0)
+		icon.position = Vector2(5.0, 3.0)
+		icon.size = Vector2(30.0, 20.0)
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(icon)
 
@@ -180,18 +188,18 @@ func _build_skill_bar() -> void:
 		var cd := ColorRect.new()
 		cd.name = "Cooldown"
 		cd.color = Color(0.05, 0.05, 0.08, 0.75)
-		cd.position = Vector2(6.0, 4.0)
-		cd.size = Vector2(42.0, 26.0)
+		cd.position = Vector2(5.0, 3.0)
+		cd.size = Vector2(30.0, 20.0)
 		cd.visible = false
 		cd.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(cd)
 
 		var key := Label.new()
 		key.name = "Key"
-		key.position = Vector2(32.0, 23.0)
-		key.size = Vector2(20.0, 16.0)
+		key.position = Vector2(24.0, 16.0)
+		key.size = Vector2(14.0, 12.0)
 		key.text = "%d" % (i + 1)
-		key.add_theme_font_size_override("font_size", 11)
+		key.add_theme_font_size_override("font_size", 9)
 		key.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 		key.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(key)
@@ -504,7 +512,7 @@ func refresh() -> void:
 	if h != null:
 		_hp_fill.scale.x = clampf(h.ratio(), 0.0, 1.0)
 	_mp_fill.scale.x = 0.0 if max_mp <= 0 else clampf(float(mp) / float(max_mp), 0.0, 1.0)
-	_exp_fill.scale.x = clampf(float(exp_pts) / float(needed), 0.0, 1.0)
+	_portrait.set_exp(float(exp_pts) / float(needed))
 	_lv_label.text = "Lv.%d" % level
 	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), int(_player.get("shards"))]
 

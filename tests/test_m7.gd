@@ -473,12 +473,24 @@ func _t14_skill_bar_shows_five() -> void:
 	await _pframes(120)
 	var cd_gone: bool = not cd1.visible
 
-	_check("14", "技能栏 5 格：图标跟着携带的技能，用过的槽有冷却遮罩",
+	# 技能栏压在左下角，横着占太宽就盖住地面和怪（用户实测反馈「挡视野」）。
+	# 卡死上限：单格 ≤ 40×30、整条 ≤ 240px（屏幕宽 640 的 37.5%）、底边不出屏。
+	# 注意不能用 get_viewport_rect()：那是 CanvasItem 的方法，本测试 extends Node
+	# 拿不到它（解析期报错 → 脚本整个不加载 → 场景没人 quit，引擎会一直空转）
+	var cell_size: Vector2 = (bar.get_child(0) as Control).size
+	var bar_w: float = bar.size.x
+	var bar_bottom: float = bar.position.y + bar.size.y
+	var vp := get_viewport().get_visible_rect().size
+	var slim: bool = cell_size.x <= 40.0 and cell_size.y <= 30.0 \
+		and bar_w <= 240.0 and bar_bottom <= vp.y
+
+	_check("14", "技能栏 5 格：图标跟着携带的技能，用过的槽有冷却遮罩，且够小不挡视野",
 		cells == 5 and icon1 != null and icon1.skill_id != &"" \
-			and icon2 != null and icon2.skill_id != &"" and cd_shown and cd_gone,
-		"格子 %d 个　1 号格图标 %s　2 号格图标 %s　冷却遮罩出现=%s 消失=%s" % [
+			and icon2 != null and icon2.skill_id != &"" and cd_shown and cd_gone and slim,
+		"格子 %d 个　1 号格图标 %s　2 号格图标 %s　冷却遮罩出现=%s 消失=%s\n              单格 %.0f×%.0f（≤40×30）　整条宽 %.0f（≤240）　底边 %.0f（屏高 %.0f）" % [
 			cells, str(icon1.skill_id), str(icon2.skill_id),
-			str(cd_shown), str(cd_gone)])
+			str(cd_shown), str(cd_gone),
+			cell_size.x, cell_size.y, bar_w, bar_bottom, vp.y])
 
 
 ## 技能面板上的文字不能出现翻译 key 本身
