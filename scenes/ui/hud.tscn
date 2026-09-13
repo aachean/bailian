@@ -101,45 +101,13 @@ offset_bottom = 3.0
 mouse_filter = 2
 color = Color(0.62, 0.8, 0.35, 1)
 
-[node name="SkillBar" type="Panel" parent="."]
+[node name="SkillBar" type="HBoxContainer" parent="."]
 offset_left = 8.0
 offset_top = 302.0
-offset_right = 64.0
+offset_right = 304.0
 offset_bottom = 342.0
 mouse_filter = 2
-
-[node name="Icon" type="ColorRect" parent="SkillBar"]
-offset_left = 5.0
-offset_top = 5.0
-offset_right = 41.0
-offset_bottom = 35.0
-mouse_filter = 2
-color = Color(0.16, 0.3, 0.42, 1)
-
-[node name="IconCore" type="ColorRect" parent="SkillBar"]
-offset_left = 13.0
-offset_top = 11.0
-offset_right = 33.0
-offset_bottom = 29.0
-mouse_filter = 2
-color = Color(0.45, 0.75, 0.95, 1)
-
-[node name="Cooldown" type="ColorRect" parent="SkillBar"]
-offset_left = 5.0
-offset_top = 5.0
-offset_right = 41.0
-offset_bottom = 35.0
-mouse_filter = 2
-color = Color(0.05, 0.05, 0.08, 0.75)
-
-[node name="Key" type="Label" parent="SkillBar"]
-offset_left = 26.0
-offset_top = 20.0
-offset_right = 42.0
-offset_bottom = 36.0
-theme_override_font_sizes/font_size = 11
-theme_override_colors/font_color = Color(1, 1, 1, 0.9)
-text = "L"
+theme_override_constants/separation = 4
 
 [node name="CharPanel" type="Panel" parent="."]
 visible = false
@@ -265,6 +233,78 @@ offset_left = 10.0
 offset_top = 244.0
 offset_right = 236.0
 offset_bottom = 262.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.78, 0.74, 0.64, 1)
+text = ""
+
+[node name="SkillPanel" type="Panel" parent="."]
+visible = false
+offset_left = 384.0
+offset_top = 40.0
+offset_right = 628.0
+offset_bottom = 268.0
+mouse_filter = 2
+
+[node name="Border" type="ColorRect" parent="SkillPanel"]
+offset_right = 244.0
+offset_bottom = 228.0
+mouse_filter = 2
+color = Color(0.47, 0.4, 0.26, 1)
+
+[node name="BG" type="ColorRect" parent="SkillPanel"]
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 242.0
+offset_bottom = 226.0
+mouse_filter = 2
+color = Color(0.09, 0.09, 0.12, 0.97)
+
+[node name="TitleBar" type="ColorRect" parent="SkillPanel"]
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 242.0
+offset_bottom = 26.0
+mouse_filter = 2
+color = Color(0.3, 0.24, 0.16, 1)
+
+[node name="Title" type="Label" parent="SkillPanel"]
+offset_left = 10.0
+offset_top = 4.0
+offset_right = 234.0
+offset_bottom = 24.0
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
+text = "技能"
+
+[node name="Rows" type="VBoxContainer" parent="SkillPanel"]
+offset_left = 10.0
+offset_top = 32.0
+offset_right = 236.0
+offset_bottom = 172.0
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Divider" type="ColorRect" parent="SkillPanel"]
+offset_left = 10.0
+offset_top = 176.0
+offset_right = 234.0
+offset_bottom = 178.0
+mouse_filter = 2
+color = Color(0.4, 0.35, 0.25, 1)
+
+[node name="Status" type="Label" parent="SkillPanel"]
+offset_left = 12.0
+offset_top = 182.0
+offset_right = 234.0
+offset_bottom = 200.0
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="Hint" type="Label" parent="SkillPanel"]
+offset_left = 12.0
+offset_top = 204.0
+offset_right = 234.0
+offset_bottom = 222.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.78, 0.74, 0.64, 1)
 text = ""

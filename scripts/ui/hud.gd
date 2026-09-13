@@ -25,6 +25,13 @@ var _cursor := 0                 # 全面板共用一个光标：0..3 是装备�
 var _equip_rows: Array[HBoxContainer] = []
 var _bag_rows: Array[HBoxContainer] = []
 var _char_equip_rows: Array[HBoxContainer] = []
+## 技能栏的 5 个格子（代码建的 Panel，里面是图标 / 冷却遮罩 / 键位角标）
+var _skill_cells: Array = []
+
+var _skill_open := false
+var _skill_cursor := 0
+## 技能面板的行（每个技能一行：图标 + 名字 + 装在哪个槽）
+var _skill_rows: Array = []
 ## 父节点是不是玩家。HUD 只在玩家身上工作 —— 被单独实例化（场景完整性检查器
 ## 就是这么干的）时不能崩，否则每一次校验都带一堆假报错
 var _has_player := false
@@ -38,21 +45,27 @@ var _has_player := false
 @onready var _panel: Panel = $CharPanel
 @onready var _panel_text: Label = $CharPanel/Text
 @onready var _char_equip_box: VBoxContainer = $CharPanel/EquipRows
-@onready var _skill_cd: ColorRect = $SkillBar/Cooldown
-@onready var _skill_icon: ColorRect = $SkillBar/Icon
-@onready var _skill_core: ColorRect = $SkillBar/IconCore
+@onready var _skill_bar: HBoxContainer = $SkillBar
 @onready var _bag_panel: Panel = $BagPanel
 @onready var _bag_title: Label = $BagPanel/Title
 @onready var _equip_box: VBoxContainer = $BagPanel/EquipRows
 @onready var _rows_box: VBoxContainer = $BagPanel/Rows
 @onready var _bag_hint: Label = $BagPanel/Hint
+@onready var _skill_panel: Panel = $SkillPanel
+@onready var _skill_title: Label = $SkillPanel/Title
+@onready var _skill_box: VBoxContainer = $SkillPanel/Rows
+@onready var _skill_status: Label = $SkillPanel/Status
+@onready var _skill_hint: Label = $SkillPanel/Hint
 
 
 func _ready() -> void:
 	_has_player = _player != null and _player.is_in_group("player")
 	_panel.visible = false
 	_bag_panel.visible = false
+	_skill_panel.visible = false
 	_build_rows()
+	_build_skill_bar()
+	_build_skill_panel()
 	refresh()
 
 
@@ -68,11 +81,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("bag"):
 		toggle_bag()
 		return
-	# 背包打开时才接管方向键 / J —— 平时它们该归战斗
-	if not _bag_open:
+	if event.is_action_pressed("skill_panel"):
+		toggle_skill_panel()
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
-		_bag_key((event as InputEventKey).keycode)
+	# 面板打开时才接管方向键 / J —— 平时它们该归战斗
+	if _bag_open:
+		if event is InputEventKey and event.pressed and not event.echo:
+			_bag_key((event as InputEventKey).keycode)
+		return
+	if _skill_open:
+		if event is InputEventKey and event.pressed and not event.echo:
+			_skill_key((event as InputEventKey).keycode)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -91,14 +110,15 @@ func _build_rows() -> void:
 		_char_equip_rows.append(_make_row(_char_equip_box, CHAR_ROW_HEIGHT))
 
 
-## 造一行：图标 + 文字。图标按部位画形状、按品质上色，与地上掉落物同一套
-func _make_row(parent: Node, row_height: float = ROW_HEIGHT) -> HBoxContainer:
+## 造一行：图标 + 文字。图标按部位画形状、按品质上色，与地上掉落物同一套。
+## as_skill = true 时用技能图标（技能面板的行）
+func _make_row(parent: Node, row_height: float = ROW_HEIGHT, as_skill: bool = false) -> HBoxContainer:
 	var box := HBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.custom_minimum_size = Vector2(0.0, row_height)
 	box.add_theme_constant_override("separation", 3)
 
-	var icon := ItemIcon.new()
+	var icon: Control = SkillIcon.new() if as_skill else ItemIcon.new()
 	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -132,12 +152,64 @@ func _fill_equip_row(row: HBoxContainer, i: int, it: ItemData, mark: String) -> 
 		lbl.modulate = Color(0.9, 0.88, 0.84, 1)
 
 
+## 技能栏：5 个格子，同样由代码建。每格 = 图标 + 冷却遮罩 + 键位角标。
+## 格子的名字（Cell1..Cell5）被断言用着，改名字要连着改 tests/test_m4
+func _build_skill_bar() -> void:
+	for i in PlayerState.SKILL_SLOT_COUNT:
+		var cell := Panel.new()
+		cell.name = "Cell%d" % (i + 1)
+		cell.custom_minimum_size = Vector2(54.0, 40.0)
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# 代码建的 Panel 默认是主题那套浅灰底，和 HUD 其他面板格格不入 ——
+		# 手上一块深底 + 暗金边，风格才连得上
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.11, 0.11, 0.14, 0.92)
+		sb.border_color = Color(0.4, 0.35, 0.26, 1.0)
+		sb.set_border_width_all(1)
+		cell.add_theme_stylebox_override("panel", sb)
+
+		var icon := SkillIcon.new()
+		icon.name = "Icon"
+		icon.position = Vector2(6.0, 4.0)
+		icon.size = Vector2(42.0, 26.0)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(icon)
+
+		# 冷却遮罩：顶边固定、底边上升（造梦西游式）。ColorRect 的 pivot 默认在左上，
+		# 所以缩 scale.y 就是「从满格缩到无」
+		var cd := ColorRect.new()
+		cd.name = "Cooldown"
+		cd.color = Color(0.05, 0.05, 0.08, 0.75)
+		cd.position = Vector2(6.0, 4.0)
+		cd.size = Vector2(42.0, 26.0)
+		cd.visible = false
+		cd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(cd)
+
+		var key := Label.new()
+		key.name = "Key"
+		key.position = Vector2(32.0, 23.0)
+		key.size = Vector2(20.0, 16.0)
+		key.text = "%d" % (i + 1)
+		key.add_theme_font_size_override("font_size", 11)
+		key.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+		key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(key)
+
+		_skill_bar.add_child(cell)
+		_skill_cells.append(cell)
+
+
 func _row_icon(row: HBoxContainer) -> ItemIcon:
 	return row.get_child(0) as ItemIcon
 
 
 func _row_label(row: HBoxContainer) -> Label:
 	return row.get_child(1) as Label
+
+
+func _row_skill_icon(row: HBoxContainer) -> SkillIcon:
+	return row.get_child(0) as SkillIcon
 
 
 ## 面板上全部文字（给断言用：漏翻的 key 会在这些文本里露出来）
@@ -162,12 +234,139 @@ func toggle_bag() -> void:
 	# 暂停菜单或对话框开着时不叠背包：几个界面都要抢 Esc / B / J，叠起来只会互相打架
 	if not _bag_open and (_pause_menu_open() or _dialogue_open()):
 		return
+	if not _bag_open and _skill_open:
+		toggle_skill_panel()            # 背包和技能面板同类，开的那个让位
 	_bag_open = not _bag_open
 	_bag_panel.visible = _bag_open
 	get_tree().paused = _bag_open
 	if _bag_open:
 		_clamp_cursor()
 	refresh()
+
+
+func is_skill_panel_open() -> bool:
+	return _skill_open
+
+
+## 技能面板（V）：列技能池，把想带的装进 5 个槽。
+## 与背包面板同一套机制：打开即暂停、操作类界面、共用一个光标
+func toggle_skill_panel() -> void:
+	if not _skill_open and (_pause_menu_open() or _dialogue_open()):
+		return
+	if not _skill_open and _bag_open:
+		toggle_bag()
+	_skill_open = not _skill_open
+	_skill_panel.visible = _skill_open
+	get_tree().paused = _skill_open
+	if _skill_open:
+		_skill_cursor = clampi(_skill_cursor, 0, maxi(_pool().size() - 1, 0))
+	refresh()
+
+
+func _pool() -> Array:
+	if not _has_player or _player == null or not is_instance_valid(_player):
+		return []
+	return _player.call("skill_pool_paths")
+
+
+func _skill_key(code: int) -> void:
+	var n := _pool().size()
+	match code:
+		KEY_UP, KEY_W:
+			_skill_cursor = clampi(_skill_cursor - 1, 0, maxi(n - 1, 0))
+			refresh()
+		KEY_DOWN, KEY_S:
+			_skill_cursor = clampi(_skill_cursor + 1, 0, maxi(n - 1, 0))
+			refresh()
+		KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			_toggle_skill_at_cursor()
+		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
+			_assign_skill_to_slot(code - KEY_1)
+		KEY_0:
+			_unequip_skill_at_cursor()
+
+
+## J：没带就装进第一个空槽；已经带着就摘下来
+func _toggle_skill_at_cursor() -> void:
+	var pool := _pool()
+	if _skill_cursor < 0 or _skill_cursor >= pool.size():
+		return
+	var path := str(pool[_skill_cursor])
+	if PlayerState.carries(path):
+		PlayerState.clear_skill_slot_by_path(path)
+	else:
+		var free := PlayerState.skill_slots.find("")
+		if free < 0:
+			return                      # 5 格满了：先按 0 摘一个，否则不给装
+		PlayerState.set_skill_slot(free, path)
+	refresh()
+
+
+## 数字键：把光标那一个装到指定的槽（覆盖原来那格的内容）
+func _assign_skill_to_slot(slot: int) -> void:
+	var pool := _pool()
+	if _skill_cursor < 0 or _skill_cursor >= pool.size():
+		return
+	var path := str(pool[_skill_cursor])
+	if not _player.call("is_skill_unlocked", path):
+		return                          # 没解锁的技能不许带
+	PlayerState.set_skill_slot(slot, path)
+	refresh()
+
+
+func _unequip_skill_at_cursor() -> void:
+	var pool := _pool()
+	if _skill_cursor < 0 or _skill_cursor >= pool.size():
+		return
+	PlayerState.clear_skill_slot_by_path(str(pool[_skill_cursor]))
+	refresh()
+
+
+## 技能面板：一行一个技能 —— [图标][名字][装在几号槽]
+func refresh_skill_panel() -> void:
+	if not _skill_open:
+		return
+	_skill_title.text = tr("UI_SKILL_TITLE")
+	_skill_hint.text = tr("UI_SKILL_HINT")
+	var pool := _pool()
+	var carrying := 0
+	for i in PlayerState.skill_slots.size():
+		if str(PlayerState.skill_slots[i]) != "":
+			carrying += 1
+	_skill_status.text = "%s %d/%d" % [tr("UI_SKILL_CARRY"), carrying, PlayerState.SKILL_SLOT_COUNT]
+
+	for i in _skill_rows.size():
+		var row: HBoxContainer = _skill_rows[i]
+		var icon := _row_skill_icon(row)
+		var lbl := _row_label(row)
+		if i >= pool.size():
+			icon.visible = false
+			lbl.text = ""
+			continue
+		var path := str(pool[i])
+		var sk := load(path) as SkillData
+		var unlocked: bool = bool(_player.call("is_skill_unlocked", path))
+		var slot := PlayerState.skill_slots.find(path)
+		var sel := i == _skill_cursor
+		icon.visible = true
+		icon.set_skill(sk)
+		icon.dim = not unlocked
+		var slot_txt := ("[%d]" % (slot + 1)) if slot >= 0 else ""
+		var name := tr(sk.name_key) if sk != null else "?"
+		if not unlocked:
+			lbl.text = "%s%s  %s" % [
+				CURSOR_MARK if sel else INDENT, tr("UI_SKILL_LOCKED"), name]
+			lbl.modulate = Color(0.5, 0.48, 0.45, 1)
+		else:
+			lbl.text = "%s%s  %s" % [CURSOR_MARK if sel else INDENT, name, slot_txt]
+			lbl.modulate = Color(1, 1, 1, 1) if sel else Color(0.88, 0.86, 0.82, 1)
+
+
+## 技能面板的行由代码建（技能池有几个就建几行）
+func _build_skill_panel() -> void:
+	var n: int = _pool().size()
+	for _i in n:
+		_skill_rows.append(_make_row(_skill_box, CHAR_ROW_HEIGHT, true))
 
 
 func _bag_key(code: int) -> void:
@@ -315,6 +514,8 @@ func refresh() -> void:
 		refresh_char_panel(h)
 	if _bag_open:
 		refresh_bag()
+	if _skill_open:
+		refresh_skill_panel()
 
 
 ## 角色面板：造梦西游式属性表，一行一项。数值全部来自「当前生效值」，
@@ -347,25 +548,31 @@ func refresh_char_panel(h: Health) -> void:
 		_fill_equip_row(_char_equip_rows[i], i, PlayerState.item_at(ItemData.SLOT_IDS[i]), "")
 
 
-## 技能栏：冷却遮罩从满格缩到无（造梦西游式），蓝不足时图标变暗
+## 技能栏：5 格各显各的技能。冷却遮罩从满格缩到无（造梦西游式），
+## 蓝不够或空槽时图标变暗 —— 「现在放不出来」要一眼看得出，不弹提示
 func refresh_skill_bar() -> void:
-	var skill = _player.get("skill")
-	if skill == null:
-		_skill_cd.visible = false
-		return
-	var cd := int(_player.get("skill_cooldown"))
-	var total: int = skill.total_frames() + skill.cooldown_frames
+	var slots: int = PlayerState.SKILL_SLOT_COUNT
 	var mp := int(_player.get("mp"))
-	var need: int = skill.mp_cost
-	var no_mp: bool = mp < need
-	if cd > 0:
-		_skill_cd.visible = true
-		_skill_cd.scale.y = clampf(float(cd) / float(total), 0.05, 1.0)
-	else:
-		_skill_cd.visible = false
-	var dim := 0.45 if no_mp else 1.0
-	_skill_icon.modulate = Color(dim, dim, dim, 1.0)
-	_skill_core.modulate = Color(dim, dim, dim, 1.0)
+	var lefts: Array = _player.get("skill_cooldowns")
+	for i in slots:
+		if i >= _skill_cells.size():
+			break
+		var cell: Panel = _skill_cells[i]
+		var icon := cell.get_node_or_null("Icon") as SkillIcon
+		var cd := cell.get_node_or_null("Cooldown") as ColorRect
+		if icon == null or cd == null:
+			continue
+		var sk := _player.call("skill_in_slot", i) as SkillData
+		icon.set_skill(sk)
+		var usable := sk != null and mp >= sk.mp_cost
+		icon.dim = not usable
+		var left := int(lefts[i]) if i < lefts.size() else 0
+		if left > 0 and sk != null:
+			cd.visible = true
+			var total: int = sk.total_frames() + sk.cooldown_frames
+			cd.scale.y = clampf(float(left) / float(maxi(total, 1)), 0.05, 1.0)
+		else:
+			cd.visible = false
 
 
 func shards_of() -> int:

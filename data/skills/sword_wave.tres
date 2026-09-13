@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+[ext_resource type="PackedScene" path="res://scenes/skills/sword_wave.tscn" id="2_wave"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"sword_wave"
+display_name = "剑气斩"
+name_key = &"SKILL_WAVE"
+kind = 0
+startup_frames = 9
+active_frames = 2
+recovery_frames = 16
+damage = 8
+damage_variance = 0.1
+knockback = 60.0
+hitstop_frames = 3
+heavy = false
+chainable = false
+hitbox_size = Vector2(40, 40)
+hitbox_offset = Vector2(26, -2)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+cooldown_frames = 110
+mp_cost = 32
+unlock_level = 4
+projectile_scene = ExtResource("2_wave")
+projectile_speed = 460.0
+projectile_life = 1.0

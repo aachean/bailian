@@ -86,6 +86,17 @@ func heal_full() -> void:
 	hp_changed.emit(hp, max_hp)
 
 
+## 治疗指定点数（不超过上限）。技能「调息」用。返回实际回了多少
+func heal(amount: int) -> int:
+	if amount <= 0 or is_dead:
+		return 0
+	var before := hp
+	hp = mini(hp + amount, max_hp)
+	if hp != before:
+		hp_changed.emit(hp, max_hp)
+	return hp - before
+
+
 ## 恢复到指定血量（读档用）。与 take_damage 不同：不发 damaged、不触发死亡，
 ## 只把血量和状态摆到位 —— 「继续游戏」时世界该是离开时的样子。
 func restore(value: int) -> void:

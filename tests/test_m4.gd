@@ -223,7 +223,7 @@ func _t8_skill_bar_cooldown() -> void:
 	await _place(320.0)
 	_player.set("mp", int(_player.get("max_mp")))
 	var hud := _player.get_node("HUD")
-	var cd := hud.get_node("SkillBar/Cooldown") as ColorRect
+	var cd := hud.get_node("SkillBar/Cell1/Cooldown") as ColorRect
 	_player.set("skill_cooldown", 0)   # #4 刚放过技能，冷却没走完会按不动
 	_press("skill")
 	await _pframes(6)

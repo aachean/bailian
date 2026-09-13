@@ -16,11 +16,11 @@
 1. 用 Godot 4.7.x 打开本目录下的 `project.godot`
 2. 按 `F5` —— 进主菜单：开始游戏 / 继续游戏（有存档时）/ 语言切换 / 退出
 
-**操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击 / **交谈**（连点三下是三段连招）　·　`K` 闪避（可打断自己的攻击）　·　`L` 旋风斩　·　`C` 角色面板　·　`B` 装备背包　·　`Esc` 暂停菜单
+**操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击 / **交谈**（连点三下是三段连招）　·　`K` 闪避　·　**`1`~`5` 放技能**（`L` 是 1 号格的别名）　·　`C` 角色面板　·　`B` 装备背包　·　`V` 技能面板　·　`Esc` 暂停菜单
 
 **存档**：3 个存档槽（`user://save_1..3.cfg`）。写档时机是暂停菜单里的「保存游戏」与回主菜单。
 当前记录：关卡进度、玩家血量位置、每只怪的血量位置、精铁与武器强化等级、
-等级与经验、**装备栏与背包**、**剧情进度标记**。
+等级与经验、**装备栏与背包**、**剧情进度标记**、**携带的技能**。
 
 ---
 
@@ -76,6 +76,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框 / NPC / 主线推进（8 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -114,6 +115,23 @@ scripts/core/player_state.gd   flags：主线进度标记，进存档
 **加一段剧情 = 加一个 `.tres` + 往 `data/i18n/ui.csv` 加几行**，不改代码。
 「聊过没有」存在 `PlayerState.flags` 里而不是 NPC 身上 ——
 切场景会重建 NPC，存在节点上的状态会丢（碎片那轮踩过这个坑）。
+
+### 技能落在哪
+
+```
+data/skills/*.tres         技能表（含普攻 / 闪避 / 敌人招式），7 个玩家技能在里面
+scripts/core/skill_data.gd SkillData：时序（按帧）+ 数值 + 效果字段
+                            （heal_amount / guard_reduction / projectile_scene）
+scripts/characters/player.gd   SKILL_PATHS 技能池；5 个槽位各带独立冷却；
+                              _start_cast(slot) 走与普攻同一条「前摇→判定→后摇」
+scripts/ui/skill_icon.gd   程序化技能图标（形状按技能 id）
+scripts/ui/hud.gd          SkillBar 5 格 + V 键技能面板
+scripts/core/player_state.gd  skill_slots（5 个槽的真相）+ skills_changed 信号
+```
+
+**加一个技能 = 加一个 `.tres` + `SKILL_PATHS` 加一行 + 往 csv 加名字 + 在
+`skill_icon.gd` 里画个形状。** 解锁靠 `unlock_level`，升级时自动补进空槽；
+槽满了换哪个由玩家在技能面板里决定（`docs/adr/0007`）。
 
 ### 断言纪律（别破）
 

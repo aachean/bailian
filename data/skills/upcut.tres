@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"upcut"
+display_name = "上撩斩"
+name_key = &"SKILL_UPCUT"
+kind = 0
+startup_frames = 6
+active_frames = 5
+recovery_frames = 14
+damage = 18
+damage_variance = 0.12
+knockback = 110.0
+hitstop_frames = 5
+heavy = false
+chainable = true
+hitbox_size = Vector2(46, 62)
+hitbox_offset = Vector2(22, -30)
+lunge_speed = 60.0
+lunge_decay_frames = 8
+cooldown_frames = 100
+mp_cost = 26
+unlock_level = 8

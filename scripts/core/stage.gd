@@ -52,6 +52,7 @@ func collect() -> Dictionary:
 			# 这里只是把它抄进快照，读档时由 player.apply_saved 抄回去
 			"equipped": PlayerState.equipped.duplicate(),
 			"bag": PlayerState.bag.duplicate(),
+			"skill_slots": PlayerState.skill_slots.duplicate(),
 		}
 	var enemies: Array = []
 	for e in get_tree().get_nodes_in_group("enemy"):

@@ -64,6 +64,23 @@ enum Kind { ATTACK, DODGE }
 ## 释放消耗的蓝量。0 = 免费（普攻 / 闪避都是 0）
 @export var mp_cost: int = 0
 
+@export_group("技能树（M3-4）")
+## 解锁等级。角色等级到了，这个技能才进技能池
+@export var unlock_level: int = 1
+## 名字的翻译 key。界面一律 tr(name_key)，display_name 只是数据里给自己看的注
+@export var name_key: StringName = &""
+
+@export_group("效果（M3-4）")
+## 施放时回血多少点（0 = 不回）。调息用
+@export var heal_amount: int = 0
+## 施放期间额外减伤（0.6 = 少挨 60%）。铁壁用。
+## 与装备减伤**取较大值，不叠加** —— 叠上去很容易变成免伤
+@export var guard_reduction: float = 0.0
+## 判定帧发射的投射物场景（剑气斩用）。空 = 不发射
+@export var projectile_scene: PackedScene = null
+@export var projectile_speed: float = 420.0
+@export var projectile_life: float = 1.1
+
 
 ## 这个技能从按下到彻底结束一共多少帧
 func total_frames() -> int:

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"quake"
+display_name = "崩山击"
+name_key = &"SKILL_QUAKE"
+kind = 0
+startup_frames = 16
+active_frames = 6
+recovery_frames = 24
+damage = 30
+damage_variance = 0.15
+knockback = 180.0
+hitstop_frames = 8
+heavy = true
+chainable = false
+hitbox_size = Vector2(120, 86)
+hitbox_offset = Vector2(18, 6)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+cooldown_frames = 170
+mp_cost = 45
+unlock_level = 5

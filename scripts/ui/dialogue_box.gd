@@ -15,6 +15,17 @@ signal finished(data: DialogueData)
 ## 打字机速度：每帧显几个字（换算成 60fps 基准，所以和物理帧率无关）
 const CHARS_PER_FRAME := 0.8
 
+## 对话时把镜头往下放多少像素。
+##
+## ── 为什么需要这个 ────────────────────────────────────────────
+## 角色站在地面上（屏幕高度约 84% 处），底部通栏对话框正好压在它身上 ——
+## 说话时看不见说话的人，观感很差。镜头往下放一截，角色就被"推"到画面上半部，
+## 对话框下方正好空出来。
+##
+## 代价是多露出地面以下一条空白。单屏 640×360 里这是没法两全的事，
+## 取"看得见人"比"不留空白"重要。
+const CAMERA_LIFT := 130.0
+
 var _data: DialogueData = null
 var _index := 0
 var _progress := 0.0
@@ -22,6 +33,8 @@ var _open := false
 ## 对话期间把 HUD 收起来 —— 技能栏正好在左下角，跟对话框抢同一块地方；
 ## 剧情过场也不该让血条和经验条挤在旁边（造梦西游对话时 HUD 也是淡出的）
 var _hud: CanvasLayer = null
+var _cam: Camera2D = null
+var _saved_limit_bottom := 0
 
 @onready var _root: Control = $Root
 @onready var _speaker: Label = $Root/Panel/Speaker
@@ -33,6 +46,7 @@ func _ready() -> void:
 	add_to_group("dialogue_box")
 	_root.visible = false
 	_hud = get_parent().get_node_or_null("HUD")
+	_cam = get_parent().get_node_or_null("Camera") as Camera2D
 
 
 func is_open() -> bool:
@@ -50,10 +64,27 @@ func open(data: DialogueData) -> void:
 	_root.visible = true
 	if _hud != null:
 		_hud.visible = false
+	_set_camera_lift(true)
 	get_tree().paused = true
 	_speaker.text = tr(data.speaker_key)
 	_hint.text = tr("UI_DLG_HINT")
 	_show_line()
+
+
+## 镜头抬高：临时放开相机下边界，让它能往下看一截。
+## 关卡根节点把相机夹在场景尺寸里（stage.gd 的 bounds），单屏场景下
+## 上下都动不了 —— 所以这里是把限制【临时】放宽，不是改相机位置。
+## 放开的同时立刻重置平滑，否则镜头会当着玩家的面慢慢滑下去
+func _set_camera_lift(on: bool) -> void:
+	if _cam == null:
+		return
+	if on:
+		_saved_limit_bottom = _cam.limit_bottom
+		var view_h := int(get_viewport().get_visible_rect().size.y)
+		_cam.limit_bottom = maxi(_cam.limit_bottom, _cam.limit_top + view_h + int(CAMERA_LIFT))
+		_cam.reset_smoothing()
+	else:
+		_cam.limit_bottom = _saved_limit_bottom
 
 
 func _process(delta: float) -> void:
@@ -89,6 +120,7 @@ func _close() -> void:
 	_root.visible = false
 	if _hud != null:
 		_hud.visible = true
+	_set_camera_lift(false)
 	get_tree().paused = false
 	_data = null
 	_reward(d)

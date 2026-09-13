@@ -53,6 +53,7 @@ func _physics_process(_delta: float) -> void:
 	var open := _dialogue_open()
 	if _was_open and not open:
 		_lock = 8                     # 8 帧 ≈ 0.13 秒，玩家感觉不到，够吃掉残留的按键
+		_refresh()                    # 聊完了，把「按 J 交谈」放回来
 	_was_open = open
 
 	if _lock > 0 or open or _player == null or dialogue == null:
@@ -73,6 +74,9 @@ func _talk() -> void:
 	# 手动记上「它是开着的」：对话期间 NPC 被暂停，_physics_process 不跑，
 	# 边沿检测拿不到「开着」这个状态，关闭那一帧就锁不住，对话会自己弹回来
 	_was_open = true
+	# 人已经在说话了，头上还顶着「按 J 交谈」很怪（这一刻起 NPC 就被暂停，
+	# 没机会自己刷新，所以在这儿手动收起来）
+	_hint_label.text = ""
 
 
 ## 对话开着时不吃 J —— 不然按 J 翻页会顺手又开一段

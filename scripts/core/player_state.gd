@@ -52,6 +52,18 @@ var bag: Array = []
 ## 存档里存的是普通字符串键，没进过历史的 flag 直接不存在 —— 老存档天然兼容。
 var flags: Dictionary = {}
 
+## 能同时携带的技能数（人物技能栏就 5 格）
+const SKILL_SLOT_COUNT := 5
+
+## 携带的技能：5 个槽，存 SkillData 的资源路径，空串 = 空槽。
+## 为什么技能要「解锁了还得挑着带」：技能池会一直长（现在 7 个），
+## 但玩家的手只有那么几个键。让玩家在「带哪几个」上做选择，
+## 是技能从「收集品」变成「build」的那一步。
+var skill_slots: Array = ["", "", "", "", ""]
+
+## 携带的技能变了（装上 / 卸下 / 自动补位）—— 玩家节点听了重建技能表
+signal skills_changed
+
 ## 词条聚合缓存。装备一变就重算，免得 HUD 每帧去 load 一遍所有装备资源
 var _bonus: Dictionary = {"atk": 0.0, "hp": 0, "def": 0.0}
 
@@ -64,8 +76,10 @@ func reset_for_new_game() -> void:
 	equipped.clear()
 	bag.clear()
 	flags.clear()
+	skill_slots = _empty_slots()
 	_recalc_bonus()
 	equipment_changed.emit()
+	skills_changed.emit()
 
 
 func load_from(d: Dictionary) -> void:
@@ -76,8 +90,13 @@ func load_from(d: Dictionary) -> void:
 	equipped = (d.get("equipped", {}) as Dictionary).duplicate()
 	bag = (d.get("bag", []) as Array).duplicate()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
+	var slots := (d.get("skill_slots", []) as Array)
+	skill_slots = _empty_slots()
+	for i in mini(slots.size(), SKILL_SLOT_COUNT):
+		skill_slots[i] = str(slots[i])
 	_recalc_bonus()
 	equipment_changed.emit()
+	skills_changed.emit()
 
 
 func save_to() -> Dictionary:
@@ -89,7 +108,15 @@ func save_to() -> Dictionary:
 		"equipped": equipped.duplicate(),
 		"bag": bag.duplicate(),
 		"flags": flags.duplicate(),
+		"skill_slots": skill_slots.duplicate(),
 	}
+
+
+func _empty_slots() -> Array:
+	var out: Array = []
+	for _i in SKILL_SLOT_COUNT:
+		out.append("")
+	return out
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────
@@ -102,6 +129,67 @@ func set_flag(name: StringName) -> void:
 
 func has_flag(name: StringName) -> bool:
 	return name != &"" and flags.has(String(name))
+
+
+# ── 技能栏 ─────────────────────────────────────────────────────
+
+## 取某个槽位的技能（空槽返回 null）
+func skill_at(i: int) -> SkillData:
+	if i < 0 or i >= skill_slots.size():
+		return null
+	var p := str(skill_slots[i])
+	return load(p) as SkillData if not p.is_empty() else null
+
+
+func skill_paths() -> Array:
+	return skill_slots.duplicate()
+
+
+func carries(path: String) -> bool:
+	return skill_slots.has(path)
+
+
+## 把技能装进指定槽位。同一个技能已经在别的槽里的话先摘掉 ——
+## 不然会出现「同一个技能占两格、按两个键放同一招」这种明显是 bug 的配置
+func set_skill_slot(i: int, path: String) -> void:
+	if i < 0 or i >= SKILL_SLOT_COUNT:
+		return
+	var idx := skill_slots.find(path)
+	if idx >= 0 and idx != i:
+		skill_slots[idx] = ""
+	skill_slots[i] = path
+	skills_changed.emit()
+
+
+func clear_skill_slot(i: int) -> void:
+	if i < 0 or i >= SKILL_SLOT_COUNT:
+		return
+	skill_slots[i] = ""
+	skills_changed.emit()
+
+
+func clear_skill_slot_by_path(path: String) -> void:
+	var idx := skill_slots.find(path)
+	if idx >= 0:
+		clear_skill_slot(idx)
+
+
+## 自动补位：把「已解锁但没带着」的技能依次填进空槽。
+## 只在有空槽时填 —— 槽满了以后换哪个，是玩家的决定，不是系统的
+func auto_fill_slots(available: Array) -> bool:
+	var changed := false
+	for path in available:
+		var p := str(path)
+		if p.is_empty() or carries(p):
+			continue
+		var empty := skill_slots.find("")
+		if empty < 0:
+			break
+		skill_slots[empty] = p
+		changed = true
+	if changed:
+		skills_changed.emit()
+	return changed
 
 
 # ── 装备栏操作 ─────────────────────────────────────────────────

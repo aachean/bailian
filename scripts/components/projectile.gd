@@ -14,6 +14,11 @@ var velocity := Vector2.ZERO
 var damage := 5
 var life := 1.6
 var source: Node2D = null        # 投掷者（命中判定时排除它自己）
+## 打谁（碰撞层位掩码）。敌方投射物（掷矛）打 player=1，玩家的剑气打 enemy=2
+var target_mask: int = 1
+## 伤害倍率。玩家发射的剑气用它带上装备加成 —— 与 Hitbox.damage_scale 同一个意思：
+## 加成属于「这个人」，不属于「这一招」
+var damage_scale: float = 1.0
 
 var _hit_done := false
 
@@ -40,7 +45,7 @@ func _physics_process(delta: float) -> void:
 	shape.radius = RADIUS
 	params.shape = shape
 	params.transform = Transform2D(0.0, global_position)
-	params.collision_mask = 1                 # player 层
+	params.collision_mask = target_mask
 	params.collide_with_bodies = true
 	params.collide_with_areas = false
 	if is_instance_valid(source) and source is CollisionObject2D:
@@ -56,7 +61,8 @@ func _physics_process(delta: float) -> void:
 			continue
 		var point := global_position
 		var dir := 1 if velocity.x >= 0.0 else -1
-		h.take_damage(damage, point, false, dir)
+		var dmg := int(round(float(damage) * damage_scale))
+		h.take_damage(dmg, point, false, dir)
 		_hit_done = true
 		queue_free()
 		return

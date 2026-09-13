@@ -6,6 +6,7 @@
 script = ExtResource("1_skill")
 id = &"whirl"
 display_name = "旋风斩"
+name_key = &"SKILL_WHIRL"
 kind = 0
 startup_frames = 8
 active_frames = 8
@@ -24,3 +25,4 @@ invincible_from = 0
 invincible_to = 0
 cooldown_frames = 90
 mp_cost = 30
+unlock_level = 1

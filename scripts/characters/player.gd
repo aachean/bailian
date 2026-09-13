@@ -30,11 +30,38 @@ const COMBO_PATHS := [
 	"res://data/skills/attack_3.tres",
 ]
 const DODGE_PATH := "res://data/skills/dodge.tres"
-const SKILL_PATH := "res://data/skills/whirl.tres"
 
-## 技能（旋风斩）：耗蓝、独立冷却。放别的技能 = 换一张 SkillData
-var skill: SkillData = null
-var skill_cooldown: int = 0
+## 技能池：按解锁等级排。加一个技能 = 加一个 .tres + 这里加一行。
+## 顺序同时决定了三件事：技能面板里的显示顺序、升级时自动补位的顺序、
+## 以及「解锁了但没带」的判定基准
+const SKILL_PATHS := [
+	"res://data/skills/whirl.tres",       # 旋风斩 Lv1
+	"res://data/skills/thrust.tres",      # 突刺斩 Lv2
+	"res://data/skills/ironwall.tres",    # 铁壁 Lv3
+	"res://data/skills/sword_wave.tres",  # 剑气斩 Lv4
+	"res://data/skills/quake.tres",       # 崩山击 Lv5
+	"res://data/skills/breathe.tres",     # 调息 Lv6
+	"res://data/skills/upcut.tres",       # 上撩斩 Lv8
+]
+
+## 携带的 5 个技能（槽位 → SkillData，空槽 null）。真相在 PlayerState.skill_slots
+var skills: Array[SkillData] = []
+## 每个槽独立的冷却（帧）。技能多了以后必须各算各的 ——
+## 共用一个冷却的话，五连放完要等五个冷却，等于只有一个技能
+var skill_cooldowns: Array = [0, 0, 0, 0, 0]
+
+## 槽 0 的技能与冷却。这是 M3-1 就存在的旧接口（那会儿只有一个技能），
+## 留着是因为 anvil / HUD / test_m4 都在用它 —— 语义仍然成立：第一格
+var skill: SkillData:
+	get:
+		return skills[0] if skills.size() > 0 else null
+
+var skill_cooldown: int:
+	get:
+		return int(skill_cooldowns[0]) if skill_cooldowns.size() > 0 else 0
+	set(value):
+		if skill_cooldowns.size() > 0:
+			skill_cooldowns[0] = value
 
 @export_group("移动")
 ## 最大水平速度（像素/秒）
@@ -113,6 +140,11 @@ var _revive_t: float = 0.0
 var _hurt_flash: float = 0.0
 ## 升级金光的标记（与受击红光共用衰减通道）
 var _level_flash := false
+## 装备给的减伤基线。铁壁这类技能出招期间会临时改用更大的减伤，
+## 动作结束要恢复到这条基线（不然格挡一次，全身减伤永久变了）
+var _base_reduction: float = 0.0
+## 本次出招的投射物有没有发过（判定窗口跨 4 帧，只该发一道剑气）
+var _projectile_fired := false
 
 var _gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity", 1200.0)
 var _coyote_timer: float = 0.0
@@ -147,6 +179,10 @@ func apply_saved(d: Dictionary) -> void:
 	# 装备栏 / 背包也在快照里，先摆回 PlayerState 再算属性
 	if d.has("equipped") or d.has("bag"):
 		PlayerState.set_equipment(d.get("equipped", {}) as Dictionary, d.get("bag", []) as Array)
+	# 携带的技能同理
+	if d.has("skill_slots"):
+		PlayerState.skill_slots = (d.get("skill_slots", []) as Array).duplicate()
+		PlayerState.skills_changed.emit()
 	max_mp = 50 + (level - 1) * 10
 	# 装备栏住在 PlayerState（存档恢复时已一并回填），这里按它重算上限与倍率。
 	# 血量必须在这之后再摆 —— _set_max_hp 会动 hp，
@@ -179,8 +215,6 @@ func _ready() -> void:
 				push_error("[player] 连招数据加载失败: %s" % p)
 	if dodge_skill == null:
 		dodge_skill = load(DODGE_PATH) as SkillData
-	if skill == null:
-		skill = load(SKILL_PATH) as SkillData
 	_body_mask = collision_mask
 	_hitbox.hit_landed.connect(_on_hit_landed)
 	_health.damaged.connect(_on_damaged)
@@ -202,11 +236,59 @@ func _ready() -> void:
 		PlayerState.exp_changed.connect(_on_exp_changed)
 	if not PlayerState.equipment_changed.is_connected(_on_equipment_changed):
 		PlayerState.equipment_changed.connect(_on_equipment_changed)
+	if not PlayerState.skills_changed.is_connected(_on_skills_changed):
+		PlayerState.skills_changed.connect(_on_skills_changed)
+	# 技能：先按当前等级把「已解锁但没带」的技能补进空槽，再读进节点
+	_sync_skill_slots()
+	_rebuild_skills()
 	# 先按「等级 + 强化 + 装备」算全属性，再满血 —— 顺序反了的话
 	# 装备加的生命上限会被 heal_full 用旧上限截掉
 	_apply_upgrade()
 	_health.heal_full()
 	_spawn_point = global_position
+
+
+## 把节点上的技能表按 PlayerState 的槽位重建
+func _rebuild_skills() -> void:
+	skills.clear()
+	for i in PlayerState.SKILL_SLOT_COUNT:
+		skills.append(PlayerState.skill_at(i))
+	while skill_cooldowns.size() < PlayerState.SKILL_SLOT_COUNT:
+		skill_cooldowns.append(0)
+
+
+func _on_skills_changed() -> void:
+	_rebuild_skills()
+	var hud := get_node_or_null("HUD")
+	if hud != null and hud.has_method("refresh"):
+		hud.call("refresh")
+
+
+## 按等级算「哪些技能已解锁」，把没带的补进空槽。
+## 补位只填空槽 —— 槽满了换哪个是玩家的决定，系统不替他做主
+func _sync_skill_slots() -> void:
+	PlayerState.auto_fill_slots(unlocked_skill_paths())
+
+
+## 当前等级下已解锁的技能资源路径（按 SKILL_PATHS 的顺序）
+func unlocked_skill_paths() -> Array:
+	var out: Array = []
+	for p in SKILL_PATHS:
+		var sk := load(p) as SkillData
+		if sk != null and level >= sk.unlock_level:
+			out.append(p)
+	return out
+
+
+## 整个技能池的路径（技能面板按这个顺序列）
+func skill_pool_paths() -> Array:
+	return SKILL_PATHS.duplicate()
+
+
+## 某个技能是否已解锁（技能面板用它把未解锁的画灰）
+func is_skill_unlocked(p: String) -> bool:
+	var sk := load(p) as SkillData
+	return sk != null and level >= sk.unlock_level
 
 
 func _exit_tree() -> void:
@@ -231,6 +313,8 @@ func _on_exp_changed(new_exp: int) -> void:
 func _on_level_up(new_level: int) -> void:
 	level = new_level
 	max_mp = 50 + (level - 1) * 10
+	# 升级可能解锁新技能：有空槽就自动补进去（槽满了不动，换哪个由玩家决定）
+	_sync_skill_slots()
 	# 血上限、攻击倍率、减伤统一由 _apply_upgrade 重算（含装备词条），
 	# 再回满 —— 升级是「上限涨了并且当场补满」，不是「上限涨了血条变短」
 	_apply_upgrade()
@@ -282,7 +366,8 @@ func _apply_upgrade() -> void:
 	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level) \
 		+ LEVEL_ATK_STEP * float(level - 1) + float(bonus.get("atk", 0.0))
 	_set_max_hp(100 + (level - 1) * 15 + int(bonus.get("hp", 0)))
-	_health.damage_reduction = float(bonus.get("def", 0.0))
+	_base_reduction = float(bonus.get("def", 0.0))
+	_health.damage_reduction = _base_reduction
 	_refresh_blade()
 	_refresh_hud()
 
@@ -344,6 +429,24 @@ func _item_pickup_fx(item: ItemData) -> void:
 	tw.tween_callback(lbl.queue_free)
 
 
+## 回血时头顶飘一个绿字 —— 放了技能但屏幕上什么都没发生，玩家不会知道血回来了
+func _heal_fx(amount: int) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var lbl := Label.new()
+	lbl.z_index = 50
+	lbl.text = "+%d" % amount
+	lbl.add_theme_font_size_override("font_size", 13)
+	lbl.add_theme_color_override("font_color", Color(0.45, 0.95, 0.45))
+	lbl.position = global_position + Vector2(-14, -58)
+	host.add_child(lbl)
+	var tw := lbl.create_tween()
+	tw.tween_property(lbl, "position:y", lbl.position.y - 26.0, 0.8)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(lbl.queue_free)
+
+
 func _refresh_hud() -> void:
 	var hud := get_node_or_null("HUD")
 	if hud != null and hud.has_method("refresh"):
@@ -369,8 +472,10 @@ func _physics_process(delta: float) -> void:
 
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
-	if skill_cooldown > 0:
-		skill_cooldown -= 1
+	# 五个槽各算各的冷却
+	for i in skill_cooldowns.size():
+		if int(skill_cooldowns[i]) > 0:
+			skill_cooldowns[i] = int(skill_cooldowns[i]) - 1
 
 	# 蓝量自然恢复：每半秒回 1 点。站着不动也有，鼓励随时交技能
 	_mp_regen_tick += 1
@@ -438,8 +543,13 @@ func _free_process(delta: float) -> void:
 
 
 func _try_start_action() -> void:
-	if Input.is_action_just_pressed("skill") and can_cast():
-		_start_cast()
+	# 五个技能键：数字 1~5 直接放对应槽位；L 是 1 号槽的别名（M3-1 的旧习惯）
+	for i in PlayerState.SKILL_SLOT_COUNT:
+		if Input.is_action_just_pressed("skill_%d" % (i + 1)) and can_cast(i):
+			_start_cast(i)
+			return
+	if Input.is_action_just_pressed("skill") and can_cast(0):
+		_start_cast(0)
 		return
 	if Input.is_action_just_pressed("dodge") and can_dodge():
 		_start_dodge()
@@ -451,25 +561,42 @@ func _try_start_action() -> void:
 			_start_attack(0)
 
 
-## 技能（旋风斩）：耗蓝、有冷却、要求地面。与普攻共用 ATTACK 状态机 ——
-## 它们本质是同一件事：「前摇 → 判定 → 后摇」，只是数值和按键不同
-func can_cast() -> bool:
-	return skill != null and skill_cooldown <= 0 and mp >= skill.mp_cost and is_on_floor()
+## 某个槽位的技能现在能不能放：有技能、不在冷却、蓝够、站在地上。
+## 不传参数 = 槽 0（M3-1 的旧接口，anvil / test_m4 在调）
+func can_cast(slot: int = 0) -> bool:
+	var sk := skill_in_slot(slot)
+	return sk != null and int(skill_cooldowns[slot]) <= 0 \
+		and mp >= sk.mp_cost and is_on_floor()
 
 
-func _start_cast() -> void:
-	mp -= skill.mp_cost
-	_current = skill
-	state = State.ATTACK
+func skill_in_slot(slot: int) -> SkillData:
+	if slot < 0 or slot >= skills.size():
+		return null
+	return skills[slot]
+
+
+## 放技能：扣蓝、进 ATTACK 状态机（与普攻同一套「前摇→判定→后摇」）、
+## 并且执行这一招的额外效果（回血 / 格挡减伤 / 发射剑气）
+func _start_cast(slot: int) -> void:
+	var sk := skill_in_slot(slot)
+	if sk == null:
+		return
+	mp -= sk.mp_cost
+	_current = sk
 	_state_frame = 0
 	attack_index = -1
 	_attack_queued = false
 	_dodge_queued = false
 	_jump_buffer_timer = 0.0
 	_hitbox.deactivate()
-	velocity.x = skill.lunge_speed * float(_facing)
+	velocity.x = sk.lunge_speed * float(_facing)
 	casts_started += 1
-	skill_cooldown = skill.total_frames() + skill.cooldown_frames
+	_projectile_fired = false
+	skill_cooldowns[slot] = sk.total_frames() + sk.cooldown_frames
+	if sk.heal_amount > 0:
+		_health.heal(sk.heal_amount)
+		_heal_fx(sk.heal_amount)
+	state = State.ATTACK
 
 
 func _apply_gravity(delta: float) -> void:
@@ -551,19 +678,27 @@ func _attack_process(delta: float) -> void:
 	var sk := _current
 
 	_health.invincible = sk.is_invincible_at(t)
+	# 铁壁这类技能在出招期间额外减伤。与装备减伤【取较大值】，不是相加 ——
+	# 叠加很容易堆成免伤，那挨打就没有代价了（同 Health 的 60% 上限精神）
+	if sk.guard_reduction > 0.0:
+		_health.damage_reduction = maxf(_base_reduction, sk.guard_reduction)
 	velocity.x = sk.lunge_speed * sk.lunge_factor(t) * float(_facing)
 
 	if sk.is_active_at(t):
 		_hitbox.activate(sk, self, _facing)
 		_blade.modulate.a = 1.0
+		# 剑气这类技能在判定窗口的第一帧甩出投射物（窗口有 4 帧，只该发一道）
+		if not _projectile_fired and sk.projectile_scene != null:
+			_projectile_fired = true
+			_fire_projectile(sk)
 	else:
 		_hitbox.deactivate()
 		_blade.modulate.a = 0.0
 
 	# 技能特效：旋风斩的判定窗口里三片剑光绕身旋转，前摇渐显、后摇渐隐。
 	# 没有这一层，玩家只看到蓝条掉了（用户实测反馈：没有技能效果）
-	if _current == skill:
-		var vis := t >= skill.startup_frames - 2 and t < skill.total_frames() - 4
+	if sk.id == &"whirl":
+		var vis := t >= sk.startup_frames - 2 and t < sk.total_frames() - 4
 		_whirl_fx.visible = vis
 		if vis:
 			_whirl_fx.rotation += 0.42
@@ -579,15 +714,41 @@ func _attack_process(delta: float) -> void:
 		_start_dodge()
 		return
 
-	# 衔接窗口：判定结束之后、动作结束之前，且这一段允许被取消
+	# 衔接窗口：判定结束之后、动作结束之前，且这一段允许被取消。
+	# 只有普攻接普攻 —— 技能不参与连招，不然连按会串成一串
 	var last := sk.total_frames() - 1
-	if sk.chainable and t >= sk.active_to() and t < last \
+	if sk.chainable and attack_index >= 0 and t >= sk.active_to() and t < last \
 			and _attack_queued and attack_index + 1 < attack_combo.size():
 		_start_attack(attack_index + 1)
 		return
 
 	if t >= last:
 		_end_action()
+
+
+## 这一招是不是「技能」（而不是普攻）。回放字幕与状态名要区分它们
+func _is_skill(sk: SkillData) -> bool:
+	return sk != null and skills.has(sk)
+
+
+## 甩出投射物（剑气）。伤害沿用技能自己的 damage，倍率带上装备与强化 ——
+## 与近战判定同一条管线（Hitbox.damage_scale），不另算一套
+func _fire_projectile(sk: SkillData) -> void:
+	if sk.projectile_scene == null:
+		return
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var node := sk.projectile_scene.instantiate() as Node2D
+	if node == null:
+		return
+	node.set("damage_scale", _hitbox.damage_scale)
+	node.set("target_mask", 2)          # 打敌人层
+	host.add_child(node)
+	node.global_position = global_position + Vector2(18.0 * float(_facing), -4.0)
+	if node.has_method("setup"):
+		node.call("setup", node.global_position, Vector2(float(_facing), 0.0),
+			sk.projectile_speed, sk.damage, sk.projectile_life, self)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -651,6 +812,8 @@ func _end_action() -> void:
 	_whirl_fx.visible = false
 	_whirl_fx.modulate.a = 0.0
 	_health.invincible = false
+	_health.damage_reduction = _base_reduction   # 格挡类技能的临时减伤在这里收回去
+	_projectile_fired = false
 	_current = null
 	state = State.FREE
 	_state_frame = 0
@@ -753,7 +916,7 @@ func _update_hurt_flash(delta: float) -> void:
 func state_name() -> String:
 	match state:
 		State.ATTACK:
-			if _current != null and _current == skill:
+			if _is_skill(_current):
 				return "SKILL"
 			return "ATTACK%d" % (attack_index + 1)
 		State.DODGE:
