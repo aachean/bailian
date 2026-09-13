@@ -69,8 +69,9 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。M2 起另有两组：
 
 ```
-godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn   # 菜单 / 存档 / 语言（6 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn   # 相机 / 传送门 / 新怪（5 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn   # 菜单 / 槽位存档 / 语言（6 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn   # 相机 / 传送门 / 新怪（12 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn   # 等级 / 蓝量 / 技能（7 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
