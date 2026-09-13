@@ -124,6 +124,8 @@ func apply_saved(d: Dictionary) -> void:
 	_health.restore(int(d.get("hp", _health.max_hp)))
 	shards = int(d.get("shards", shards))
 	upgrade_level = int(d.get("upgrade", upgrade_level))
+	PlayerState.shards = shards
+	PlayerState.upgrade_level = upgrade_level
 	_apply_upgrade()
 	_hurt_flash = 0.0
 	_visuals.modulate = Color.WHITE
@@ -156,8 +158,18 @@ func _ready() -> void:
 	_health.died.connect(_on_died)
 	_health.revived.connect(_on_revived)
 	_health.hp_changed.connect(_update_hp_bar)
+	# 碎片 / 强化等级是「属于玩家」的数据，住在 PlayerState（autoload）里 ——
+	# 切场景会重建玩家节点，存在节点上的东西会丢（实测丢过）
+	shards = PlayerState.shards
+	upgrade_level = PlayerState.upgrade_level
 	_apply_upgrade()
 	_spawn_point = global_position
+
+
+func _exit_tree() -> void:
+	# 离开场写回：下一次进任何场景，碎片和等级都还在
+	PlayerState.shards = shards
+	PlayerState.upgrade_level = upgrade_level
 
 
 func _update_hp_bar(_hp: int, _max_hp: int) -> void:
@@ -171,11 +183,18 @@ const UPGRADE_STEP := 0.2
 
 func _apply_upgrade() -> void:
 	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level)
+	var hud := get_node_or_null("HUD")
+	if hud != null and hud.has_method("refresh"):
+		hud.call("refresh")
 
 
 ## 拾取碎片（Pickup 组件调）。满 3 块可去城镇铁砧强化一次
 func collect_shard() -> void:
 	shards += 1
+	PlayerState.shards = shards
+	var hud := get_node_or_null("HUD")
+	if hud != null and hud.has_method("refresh"):
+		hud.call("refresh")
 
 
 func _physics_process(delta: float) -> void:

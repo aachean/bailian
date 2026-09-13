@@ -43,6 +43,7 @@ func _refresh_continue() -> void:
 
 
 func _on_start() -> void:
+	PlayerState.reset_for_new_game()
 	SaveManager.request_new_game(LEVEL_PATH)
 	get_tree().change_scene_to_file(LEVEL_PATH)
 

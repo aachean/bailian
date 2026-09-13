@@ -46,6 +46,8 @@ func _ready() -> void:
 	await _t8_drop_and_pickup()
 	await _t9_anvil_upgrade()
 	await _t10_upgrade_survives_snapshot()
+	await _t11_shards_survive_scene_change()
+	await _t12_hud_shows_player_state()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -358,3 +360,66 @@ func _t10_upgrade_survives_snapshot() -> void:
 	_check("10", "碎片与强化等级进快照，继续游戏原样回来",
 		shards == 7 and lvl == 2 and is_equal_approx(scale, 1.4),
 		"碎片 %d（期望 7）　等级 %d（期望 2）　倍率 %.2f（期望 1.40）" % [shards, lvl, scale])
+
+
+## 碎片跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。
+## 根因：碎片存在玩家节点上，切场景玩家整个重建。现在住在 PlayerState（autoload），
+## 玩家 _exit_tree 写回、_ready 读出。这条测试模拟完整的「城镇 → 关卡」重建。
+func _t11_shards_survive_scene_change() -> void:
+	PlayerState.shards = 0
+	PlayerState.upgrade_level = 0
+
+	var town := TOWN.instantiate()
+	add_child(town)
+	await _pframes(3)
+	var town_player := town.get_node("Player")
+	town_player.set("shards", 5)
+	town_player.set("upgrade_level", 1)
+	town.queue_free()               # 触发 _exit_tree 写回 PlayerState
+	await _pframes(3)
+
+	var wrote_back: bool = PlayerState.shards == 5 and PlayerState.upgrade_level == 1
+
+	var level := LEVEL1.instantiate()
+	add_child(level)
+	await _pframes(3)
+	var level_player := level.get_node("Player")
+	var carried: bool = int(level_player.get("shards")) == 5 \
+		and int(level_player.get("upgrade_level")) == 1
+	var scale: float = (level_player.get_node("Hitbox") as Hitbox).damage_scale
+	level.queue_free()
+	await _pframes(2)
+
+	_check("11", "关卡里捡的碎片，回城镇还在（跨场景不丢）",
+		wrote_back and carried and is_equal_approx(scale, 1.2),
+		"写回 autoload=%s　新场景带过来=%s　强化倍率 %.2f（期望 1.20）" % [
+			str(wrote_back), str(carried), scale])
+	PlayerState.shards = 0
+	PlayerState.upgrade_level = 0
+
+
+## HUD：左上角色状态、右上背包，数字跟玩家走
+func _t12_hud_shows_player_state() -> void:
+	var town := TOWN.instantiate()
+	add_child(town)
+	await _pframes(3)
+	var player := town.get_node("Player")
+	var hud := player.get_node_or_null("HUD")
+	if hud == null:
+		_check("12", "HUD 显示玩家状态", false, "玩家下找不到 HUD")
+		town.queue_free()
+		await _pframes(2)
+		return
+
+	player.set("shards", 4)
+	player.set("upgrade_level", 2)
+	hud.call("refresh")
+	await _pframes(2)
+	var bag: String = (hud.get_node("Bag/Count") as Label).text
+	var lv: String = (hud.get_node("Status/Level") as Label).text
+	town.queue_free()
+	await _pframes(2)
+
+	_check("12", "左上状态栏 / 右上背包显示碎片与武器等级",
+		bag.contains("4") and lv.contains("2"),
+		"背包「%s」　状态「%s」" % [bag, lv])

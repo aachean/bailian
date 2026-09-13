@@ -74,9 +74,9 @@ position = Vector2(200, 280)
 
 [node name="Hint" type="Label" parent="."]
 offset_left = 8.0
-offset_top = 6.0
+offset_top = 300.0
 offset_right = 600.0
-offset_bottom = 96.0
+offset_bottom = 358.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 12
 script = ExtResource("3_hint")

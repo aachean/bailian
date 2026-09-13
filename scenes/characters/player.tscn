@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/characters/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/components/hitbox.gd" id="2_hitbox"]
 [ext_resource type="Script" path="res://scripts/components/health.gd" id="3_health"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(24, 32)
@@ -72,3 +73,5 @@ shape = SubResource("RectangleShape2D_body")
 [node name="Camera" type="Camera2D" parent="."]
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0
+
+[node name="HUD" parent="." instance=ExtResource("4_hud")]
