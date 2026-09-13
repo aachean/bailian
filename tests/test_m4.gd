@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _t8_skill_bar_cooldown()
 	await _t9_whirl_fx_visible()
 	await _t10_level_up_feedback()
+	await _t11_exp_bar_moves_on_kill()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -261,3 +262,26 @@ func _t10_level_up_feedback() -> void:
 	_check("10", "升级有仪式感：金光 + 「升级！」飘字",
 		labels_after >= 1,
 		"「升级！」飘字节点 %d 个" % labels_after)
+
+
+## 经验条当场涨 —— HUD 读的是玩家节点的 exp_pts，杀怪加的是 PlayerState.exp，
+## 两者不同步的话条就只会在切场景后跳起来（用户实测）
+func _t11_exp_bar_moves_on_kill() -> void:
+	_place(500.0)
+	var walker_h: Health = _walker.get_node("Health")
+	walker_h.heal_full()
+	_walker.global_position = Vector2(480.0, 288.0)
+	await _pframes(2)
+	var hud := _player.get_node("HUD")
+	var fill := hud.get_node("ExpBar/Fill") as ColorRect
+	var before: float = fill.scale.x
+	var ps_before: int = PlayerState.exp
+
+	walker_h.take_damage(9999, Vector2.ZERO, true, 1)
+	await _pframes(3)
+	var after: float = fill.scale.x
+
+	_check("11", "打怪后经验条当场涨绿（玩家节点与存档层同步）",
+		PlayerState.exp > ps_before and after > before,
+		"存档层经验 %d → %d　经验条 %.2f → %.2f" % [
+			ps_before, PlayerState.exp, before, after])

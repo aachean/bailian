@@ -195,6 +195,8 @@ func _ready() -> void:
 	_health.hp = _health.max_hp
 	if not PlayerState.level_up.is_connected(_on_level_up):
 		PlayerState.level_up.connect(_on_level_up)
+	if not PlayerState.exp_changed.is_connected(_on_exp_changed):
+		PlayerState.exp_changed.connect(_on_exp_changed)
 	_apply_upgrade()
 	_spawn_point = global_position
 
@@ -205,6 +207,14 @@ func _exit_tree() -> void:
 	PlayerState.upgrade_level = upgrade_level
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
+
+
+## 击杀经验落到场景内玩家头上：同步字段并让 HUD 的经验条当场涨
+func _on_exp_changed(new_exp: int) -> void:
+	exp_pts = new_exp
+	var hud := get_node_or_null("HUD")
+	if hud != null and hud.has_method("refresh"):
+		hud.call("refresh")
 
 
 ## 升级：血上限 +15、蓝上限 +10，血蓝全回满，外加一圈金光和飘字 ——

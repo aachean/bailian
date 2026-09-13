@@ -8,6 +8,10 @@ extends Node
 ## 升级时发。玩家听了加血上限 / 蓝上限并回满
 signal level_up(new_level: int)
 
+## 经验变化时发（包括没升级的零散经验）—— 场景里的玩家节点听它同步，
+## 否则 HUD 上的经验条只会在切场景后「突然」跳起来（实测反馈）
+signal exp_changed(new_exp: int)
+
 ## 升到下一级需要的经验：线性增长，原型期手感友好
 func exp_needed(level: int) -> int:
 	return 20 + (level - 1) * 15
@@ -49,4 +53,5 @@ func add_exp(amount: int) -> int:
 		level += 1
 		ups += 1
 		level_up.emit(level)
+	exp_changed.emit(exp)
 	return ups
