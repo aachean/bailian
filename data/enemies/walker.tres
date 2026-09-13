@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/enemy_swing.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"walker"
+display_name = "游荡者"
+max_hp = 30
+revive_delay = 2.0
+hurt_stun_frames = 14
+patrol_speed = 40.0
+chase_speed = 85.0
+patrol_range = 70.0
+aggro_range = 150.0
+deaggro_range = 240.0
+attack_range = 34.0
+attack_cooldown_frames = 45
+attack_skill = ExtResource("2_skill")

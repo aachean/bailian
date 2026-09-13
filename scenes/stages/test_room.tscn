@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/target_dummy.tscn" id="2_dummy"]
 [ext_resource type="Script" path="res://scripts/ui/hint.gd" id="3_hint"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="4_walker"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(640, 24)
@@ -62,6 +63,10 @@ shape = SubResource("RectangleShape2D_platform")
 
 [node name="TargetDummy" parent="." instance=ExtResource("2_dummy")]
 position = Vector2(590, 288)
+
+[node name="Walker" parent="." instance=ExtResource("4_walker")]
+position = Vector2(20, 288)
+ai_enabled = false
 
 [node name="Player" parent="." instance=ExtResource("1_player")]
 position = Vector2(200, 280)

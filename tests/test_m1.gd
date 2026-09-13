@@ -47,6 +47,7 @@ var _player             # CharacterBody2D；不标类型，才能访问 player.g
 var _visuals: Node2D
 var _dummy              # 训练靶子
 var _dummy_health: Health
+var _walker             # 会还手的敌人（M2 增量 1；test_room 里默认 ai_enabled=false）
 
 var _pass := 0
 var _fail := 0
@@ -59,6 +60,7 @@ func _ready() -> void:
 	_visuals = _player.get_node("Visuals")
 	_dummy = _room.get_node("TargetDummy")
 	_dummy_health = _dummy.get_node("Health")
+	_walker = _room.get_node_or_null("Walker")
 
 	# 参照物从场景里读，不写死
 	DUMMY_X = _dummy.global_position.x
@@ -105,6 +107,13 @@ func _ready() -> void:
 	print("")
 	print("── 界面语言 ──")
 	await _t25_i18n()
+
+	print("")
+	print("── 敌人（M2 增量 1）──")
+	await _t28_enemy_chase()
+	await _t29_enemy_hurts_player()
+	await _t30_player_hurt_stun()
+	await _t31_player_death_revive()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -903,4 +912,127 @@ func _has_cjk(s: String) -> bool:
 func _first_line(s: String) -> String:
 	var parts := s.split("\n")
 	return parts[0] if parts.size() > 0 else ""
+
+
+# ─────────────────────────────────────────────────────────────
+# 敌人（M2 增量 1）：会还手的小怪
+# ─────────────────────────────────────────────────────────────
+#
+# test_room 里的 Walker 默认 ai_enabled=false（就是一只靶子），
+# 前面 27 条测试靠这个隔离「移动手感」和「敌人行为」。
+# 这一段把 AI 打开，从头到尾真实地追、真的打、真的被打。
+
+## walker.gd 的 State 枚举
+const W_PATROL := 0
+const W_CHASE := 1
+const W_ATTACK := 2
+const W_HURT := 3
+const W_DEAD := 4
+
+
+func _t28_enemy_chase() -> void:
+	_release_all()
+	await _settle()
+	await _step(2)
+	if _walker == null:
+		_check("28", "敌人追击", false, "test_room 里找不到 Walker")
+		_check("29", "敌人攻击掉血", false, "test_room 里找不到 Walker")
+		_check("30", "受击硬直", false, "test_room 里找不到 Walker")
+		_check("31", "死亡重生", false, "test_room 里找不到 Walker")
+		return
+
+	# 玩家站进警戒圈：walker 巡逻中心 x=20，aggro 半径 150。
+	# 站 x=85（PlatformA 左缘 92 以内、够不着右侧路线），追击全程无地形阻挡。
+	_walker.ai_enabled = true
+	_player.global_position = Vector2(85.0, GROUND_STAND_Y - 16.0)
+	_player.velocity = Vector2.ZERO
+	await _step(6)
+
+	var x0: float = _walker.global_position.x
+	var saw_chase := false
+	for i in 120:
+		await get_tree().physics_frame
+		if int(_walker.state) == W_CHASE:
+			saw_chase = true
+			if i > 12:
+				break
+	var moved: float = _walker.global_position.x - x0
+	_check("28", "敌人会追人：进了警戒圈就逼近，不是站着挨打",
+		saw_chase and moved > 15.0,
+		"进入追击=%s　逼近 %.1f px（x %.0f → %.0f）" % [
+			str(saw_chase), moved, x0, x0 + moved])
+
+
+## 玩家站在原地，等 walker 追上来打 —— 断言「真的会掉血」，不是状态变了就算
+func _t29_enemy_hurts_player() -> void:
+	var hp0: int = _player.get_node("Health").hp
+	var hit := false
+	for i in 600:                   # 最多等 10 秒（追过去 + 攻击节奏都算在内）
+		await get_tree().physics_frame
+		if _player.get_node("Health").hp < hp0:
+			hit = true
+			break
+	var hp1: int = _player.get_node("Health").hp
+	var atk: int = _walker.attacks_started
+	_walker.ai_enabled = false      # 掉血证据到手，后面全是时序测试，别让敌人继续捣乱
+	_check("29", "敌人真的打得动你：被追上挨一下，血量下降",
+		hit and atk > 0 and hp1 < hp0,
+		"出招 %d 次　血量 %d → %d" % [atk, hp0, hp1])
+
+
+## 挨打要停一拍：受击无敌挡补刀 + 硬直里输入无效
+func _t30_player_hurt_stun() -> void:
+	# #29 断言完成时玩家刚挨打（同一物理帧进入硬直）；万一错过，等下一波
+	var guard := 0
+	while int(_player.state) != 3 and guard < 30:
+		await get_tree().physics_frame
+		guard += 1
+	var in_hurt := int(_player.state) == 3
+
+	# 【第一时间】注入补刀：受击无敌窗口（0.10 s = 6 帧）内必须被挡。
+	# 上一版在这里先按了 4 帧 J 再注入，无敌窗口早过了 —— 测试时序错，不是代码错。
+	var blocked: int = -1
+	if in_hurt:
+		blocked = _player.get_node("Health").take_damage(5, Vector2.ZERO, false, 1)
+
+	# 硬直中按 J：不许出招
+	var atk0: int = _player.attacks_started
+	if in_hurt:
+		_press("attack")
+		await _step(4)
+		_release("attack")
+	var during: int = _player.attacks_started - atk0
+
+	_check("30", "挨打会硬直：硬直里按 J 不出招，受击无敌挡住补刀",
+		in_hurt and during == 0 and blocked == 0,
+		"硬直中=%s　硬直里出招 %d 次　补刀受伤 %d（0=被无敌挡住）" % [
+			str(in_hurt), during, blocked])
+	await _settle()
+
+
+## 血归零 → 死亡锁输入 → 在出生点满血复活
+func _t31_player_death_revive() -> void:
+	var h: Health = _player.get_node("Health")
+	var deaths0: int = _player.deaths
+
+	h.take_damage(9999, Vector2.ZERO, true, 1)
+	await _step(2)
+	var dead := int(_player.state) == 4              # State.DEAD
+	var pos_at_death: Vector2 = _player.global_position
+
+	var revive_frames := int(ceil(_player.revive_delay * 60.0)) + 40
+	var revived := false
+	for i in revive_frames:
+		await get_tree().physics_frame
+		if int(_player.state) != 4:
+			revived = int(_player.state) == 0        # State.FREE
+			break
+
+	var full := h.hp == h.max_hp
+	var dx := absf(_player.global_position.x - _player._spawn_point.x)
+	_check("31", "死了会在出生点满血重来，不是黑屏卡死",
+		dead and revived and full and dx < 24.0,
+		"死亡=%s　复活=%s　血量 %d/%d　离出生点 %.1f px（死时 %.0f 处）" % [
+			str(dead), str(revived), h.hp, h.max_hp, dx, pos_at_death.x])
+	await _settle()
 

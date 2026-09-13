@@ -6,8 +6,10 @@ extends CharacterBody2D
 ##   2. 脚本里不出现"魔法数字"。
 ##   3. 手感优先。土狼时间、跳跃缓冲、连招缓冲、顿帧，都是这类游戏的地基。
 ##
-## ── 状态机只有三个状态 ────────────────────────────────────────
-## FREE（自由行动，地面和空中都算这一个）/ ATTACK / DODGE。
+## ── 状态机只有五个状态 ────────────────────────────────────────
+## FREE（自由行动，地面和空中都算这一个）/ ATTACK / DODGE / HURT（受击硬直）
+## / DEAD。M1 时只有前三个，因为靶子不还手；M2 有会打人的怪了，
+## 「被打」本身必须是玩家状态机里的一等公民，而不是一个瞬间。
 ## 没有拆成 IDLE/RUN/JUMP/AIRFALL/…那一套：现在只有这一个使用者，
 ## 拆细只会让「角色现在在干嘛」更难一眼看出来。M2 有怪物 AI 要复用时再抽。
 ##
@@ -20,7 +22,7 @@ extends CharacterBody2D
 ## 等衔接窗口一开就自动接上。玩家连按起来是「哒哒哒」连成一片，
 ## 而不是「按早了就没反应」。这就是「按一下没接上」和「按一下接上了」的分界。
 
-enum State { FREE, ATTACK, DODGE }
+enum State { FREE, ATTACK, DODGE, HURT, DEAD }
 
 const COMBO_PATHS := [
 	"res://data/skills/attack_1.tres",
@@ -65,6 +67,14 @@ const DODGE_PATH := "res://data/skills/dodge.tres"
 ## 攻击要不要限定在地面。M1 先不做空中攻击
 @export var attack_requires_ground: bool = true
 
+@export_group("受击")
+## 被击中后的硬直（帧 @60fps）。硬直里输入全部无效 —— 挨打要有代价
+@export var hurt_stun_frames: int = 14
+## 被击中时沿受击方向弹开的速度（像素/秒）
+@export var hurt_knockback: float = 140.0
+## 死亡后过多久在出生点满血重生（秒）
+@export var revive_delay: float = 1.2
+
 # ── 供自动验收读取的公开状态。改这些名字会让 tests/ 一起改 ──────
 var state: int = State.FREE
 ## 当前是连招的第几段（0/1/2），不在攻击时为 -1
@@ -74,6 +84,9 @@ var attacks_started: int = 0
 var dodges_started: int = 0
 ## 闪避冷却剩余帧数
 var dodge_cooldown: int = 0
+## 累计挨打 / 死亡次数（自动验收用）
+var hurts_taken: int = 0
+var deaths: int = 0
 
 var _state_frame: int = 0
 var _hitstop: int = 0
@@ -81,6 +94,8 @@ var _current: SkillData = null
 var _attack_queued: bool = false
 var _dodge_queued: bool = false
 var _dodge_dir: int = 1
+var _revive_t: float = 0.0
+var _hurt_flash: float = 0.0
 
 var _gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity", 1200.0)
 var _coyote_timer: float = 0.0
@@ -90,6 +105,10 @@ var _body_mask: int = 0
 
 ## 面朝方向：1 = 右，-1 = 左。它是一份"状态"，不是每帧算出来的临时值
 var _facing: int = 1
+
+## 出生点 = 场景里摆的位置（_ready 那一刻的坐标）。
+## 测试里瞬移玩家不影响它 —— 重生永远回到关卡设计者定的那个点。
+var _spawn_point: Vector2 = Vector2.ZERO
 
 @onready var _visuals: Node2D = $Visuals
 @onready var _blade: ColorRect = $Visuals/Blade
@@ -111,6 +130,15 @@ func _ready() -> void:
 		dodge_skill = load(DODGE_PATH) as SkillData
 	_body_mask = collision_mask
 	_hitbox.hit_landed.connect(_on_hit_landed)
+	_health.damaged.connect(_on_damaged)
+	_health.died.connect(_on_died)
+	_health.revived.connect(_on_revived)
+	_health.hp_changed.connect(_update_hp_bar)
+	_spawn_point = global_position
+
+
+func _update_hp_bar(_hp: int, _max_hp: int) -> void:
+	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -137,9 +165,36 @@ func _physics_process(delta: float) -> void:
 			_attack_process(delta)
 		State.DODGE:
 			_dodge_process(delta)
+		State.HURT:
+			_hurt_process(delta)
+		State.DEAD:
+			_dead_process(delta)
 
+	_update_hurt_flash(delta)
 	_update_facing()
 	move_and_slide()
+
+
+## 受击硬直：输入全部无效，只剩击退的惯性 + 重力。
+## 「挨打要停一拍」是动作游戏的基本代价，它让敌人的攻击真的构成威胁。
+func _hurt_process(delta: float) -> void:
+	_apply_gravity(delta)
+	_state_frame += 1
+	velocity.x = move_toward(velocity.x, 0.0, max_speed * 3.0 * delta)
+	if _state_frame >= hurt_stun_frames:
+		_end_action()
+
+
+## 死亡：锁一切输入，定时在出生点满血重来。
+## 原型阶段不搞读档/回城镇 —— M2 的存档系统会接手「死亡之后去哪」。
+func _dead_process(delta: float) -> void:
+	velocity.x = 0.0
+	_apply_gravity(delta)
+	_revive_t -= delta
+	if _revive_t <= 0.0:
+		global_position = _spawn_point
+		velocity = Vector2.ZERO
+		_health.heal_full()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -363,9 +418,57 @@ func _on_hit_landed(target: Node2D, _damage: int, _point: Vector2, _heavy: bool)
 		frames = _current.hitstop_frames
 	if frames <= 0:
 		return
-	_hitstop = maxi(_hitstop, frames)
+	apply_hitstop(frames)
 	if target != null and target.has_method("apply_hitstop"):
 		target.call("apply_hitstop", frames)
+
+
+## 公开给攻击方（敌人命中玩家时也会走 duck-typing 调这里）
+func apply_hitstop(frames: int) -> void:
+	_hitstop = maxi(_hitstop, frames)
+
+
+## 被敌人的判定框打中（Health.damaged）。做四件事：
+## 打断当前动作 → 进入硬直 → 沿受击方向弹开 → 闪一下。
+## 受击后的短暂无敌由 Health 内部负责（防同一次挥砍连扣），
+## 硬直帧数比无敌窗口长，所以连招惩罚依然成立 —— 这是有意的。
+func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir: int) -> void:
+	hurts_taken += 1
+	if state == State.ATTACK or state == State.DODGE:
+		_end_action()
+	if state == State.DEAD:
+		return
+	_end_action()
+	state = State.HURT
+	_state_frame = 0
+	var sign_dir := 1 if dir > 0 else (-1 if dir < 0 else -_facing)
+	velocity.x = hurt_knockback * float(sign_dir)
+	_hurt_flash = 1.0
+
+
+func _on_died() -> void:
+	deaths += 1
+	_end_action()
+	state = State.DEAD
+	_revive_t = revive_delay
+	_visuals.modulate = Color(0.45, 0.45, 0.5, 0.6)
+
+
+## Health.heal_full() 会发 revived —— 重生只在这里恢复外观
+func _on_revived() -> void:
+	state = State.FREE
+	_state_frame = 0
+	_hurt_flash = 0.0
+	_visuals.modulate = Color.WHITE
+
+
+## 受击变红 → 渐回原色。走 physics 帧的衰减，与硬直同步
+func _update_hurt_flash(delta: float) -> void:
+	if _hurt_flash <= 0.0 or state == State.DEAD:
+		return
+	_hurt_flash = move_toward(_hurt_flash, 0.0, 6.0 * delta)
+	var f := _hurt_flash
+	_visuals.modulate = Color(1.0, 1.0 - 0.45 * f, 1.0 - 0.45 * f, 1.0)
 
 
 ## 调试用：把状态名打出来（回放字幕和日志都靠它）
@@ -375,5 +478,9 @@ func state_name() -> String:
 			return "ATTACK%d" % (attack_index + 1)
 		State.DODGE:
 			return "DODGE"
+		State.HURT:
+			return "HURT"
+		State.DEAD:
+			return "DEAD"
 		_:
 			return "AIR" if not is_on_floor() else "FREE"

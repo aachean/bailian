@@ -41,10 +41,30 @@ color = Color(0.96, 0.92, 0.76, 1)
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("3_health")
+max_hp = 100
 
 [node name="Hitbox" type="Node2D" parent="."]
 script = ExtResource("2_hitbox")
 target_mask = 2
+
+[node name="HealthBar" type="Node2D" parent="."]
+position = Vector2(0, -26)
+
+[node name="BG" type="ColorRect" parent="HealthBar"]
+offset_left = -18.0
+offset_top = -3.0
+offset_right = 18.0
+offset_bottom = 3.0
+mouse_filter = 2
+color = Color(0.11, 0.1, 0.1, 0.85)
+
+[node name="Fill" type="ColorRect" parent="HealthBar"]
+offset_left = -17.0
+offset_top = -2.0
+offset_right = 17.0
+offset_bottom = 2.0
+mouse_filter = 2
+color = Color(0.86, 0.3, 0.26, 1)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_body")
