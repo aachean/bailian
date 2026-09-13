@@ -103,6 +103,10 @@ func _ready() -> void:
 	await _t24_full_chain()
 
 	print("")
+	print("── 界面语言 ──")
+	await _t25_i18n()
+
+	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
 	print("")
 
@@ -821,3 +825,82 @@ func _t24_full_chain() -> void:
 		"走了 %d 帧到 x=%.1f，出招 %d 段，靶子挨 %d 下共 %d 点" % [
 			walk_frames, stood, segs, _dummy.hits_taken, dealt])
 	await _settle()
+
+
+# ─────────────────────────────────────────────────────────────
+# 界面语言
+# ─────────────────────────────────────────────────────────────
+#
+# 三条断言分别防三种翻车：
+#   #25 默认跑成英文（或跟随系统语言，中文玩家打开是英文）
+#   #26 漏翻 —— CSV 里只填了一边，界面直接把 key 显示出来
+#   #27 切了语言但画面不刷新，得重开游戏才生效
+#
+# 中文缺字形（方框）在这里测不出来：Godot 遇到缺字不报错，只是画空白。
+# 那一层靠 tests/shot_i18n 截图看，以及 build_font.py 结尾的字形自检。
+
+## Hint 里用到的全部 key，必须和 scripts/ui/hint.gd 的 LINES 一致
+const HINT_KEYS := [
+	"UI_HINT_TITLE", "UI_HINT_MOVE", "UI_HINT_JUMP", "UI_HINT_ATTACK", "UI_HINT_DODGE",
+]
+
+
+func _t25_i18n() -> void:
+	var hint := _room.get_node_or_null("Hint") as Label
+	if hint == null:
+		_check("25", "默认中文", false, "找不到 Hint 节点")
+		_check("26", "中英译文齐全", false, "找不到 Hint 节点")
+		_check("27", "切语言即时刷新", false, "找不到 Hint 节点")
+		return
+
+	# #25 默认就是中文，而且标题带 CJK 字形 —— 不是把 key 原样显示出来
+	var title_zh := tr("UI_HINT_TITLE")
+	_check("25", "界面默认中文（默认值写死中文，不跟随系统语言）",
+		GameSettings.DEFAULT_LOCALE == "zh_CN"
+			and GameSettings.language == "zh_CN"
+			and title_zh != "UI_HINT_TITLE"
+			and _has_cjk(title_zh),
+		"默认=%s　当前=%s　标题=\"%s\"" % [
+			GameSettings.DEFAULT_LOCALE, GameSettings.language, title_zh])
+
+	# #26 每个 key 在两种语言下都有非空译文、且互不相同
+	var bad := PackedStringArray()
+	for k in HINT_KEYS:
+		TranslationServer.set_locale("zh_CN")
+		var zh := TranslationServer.translate(k)
+		TranslationServer.set_locale("en")
+		var en := TranslationServer.translate(k)
+		if zh == k or en == k or zh.strip_edges().is_empty() or en.strip_edges().is_empty() or zh == en:
+			bad.append(k)
+	TranslationServer.set_locale("zh_CN")
+	_check("26", "指引每一条都有中英两份，且内容不同（漏翻会直接显示 key）",
+		bad.is_empty(),
+		"查 %d 条，问题 %d 条%s" % [
+			HINT_KEYS.size(), bad.size(), "" if bad.is_empty() else "：" + ", ".join(bad)])
+
+	# #27 切语言 → 画面上的字跟着变，切回来也回得去
+	var before := hint.text
+	GameSettings.set_language("en")
+	await _step(1)
+	var switched := hint.text
+	GameSettings.set_language("zh_CN")
+	await _step(1)
+	var restored := hint.text
+	_check("27", "切语言后画面上的指引立刻跟着变（不用重开游戏）",
+		not before.is_empty() and before != switched and restored == before,
+		"中「%s」→ 英「%s」" % [_first_line(before), _first_line(switched)])
+	await _settle()
+
+
+func _has_cjk(s: String) -> bool:
+	for i in s.length():
+		var c := s.unicode_at(i)
+		if c >= 0x4E00 and c <= 0x9FFF:
+			return true
+	return false
+
+
+func _first_line(s: String) -> String:
+	var parts := s.split("\n")
+	return parts[0] if parts.size() > 0 else ""
+

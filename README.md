@@ -6,6 +6,7 @@
 |---|---|
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
+| 界面语言 | 中文（默认）；英文文案已就绪，设置界面待 M2 |
 | 现在能玩到 | 一个色块角色：左右跑、跳、落地（含土狼时间与跳跃缓冲）；三段连招、闪避（带无敌帧）；一个不还手、打死会满血重生的训练靶子 |
 
 ---
@@ -16,6 +17,40 @@
 2. 按 `F5`
 
 **操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击（连点三下是三段连招）　·　`K` 闪避（可打断自己的攻击）
+
+---
+
+## 界面语言
+
+界面文字一律走 Godot 内置的翻译系统，**任何地方都不写死人话**：
+
+```
+data/i18n/ui.csv        翻译源文件：一行一个 key，一列一种语言
+data/i18n/*.translation 导入产物（由上面的 csv 生成，已入库，运行时不需要编辑器）
+scripts/core/game_settings.gd   GameSettings（autoload）：set_language() / language_changed
+```
+
+- **默认固定中文，不跟随系统语言。** 中文是原作、英文是译件，两者完成度不对等；
+  语言由玩家在设置里主动选（设置界面属于 M2，现在只留了接口）。
+- 代码里用 `tr("KEY")`，场景里不写文案。新增一条文案 = csv 加一行。
+- 加一种语言 = csv 加一列 + `GameSettings.SUPPORTED` 加一项。
+
+### 中文字体
+
+`assets/fonts/NotoSansSC-Regular-subset.ttf`（2.47 MB，SIL OFL 1.1，`OFL.txt` 随附）。
+上游 17.7 MB 的可变字体，实例化成 Regular 后再裁到 GB2312 + ASCII + 中文标点。
+**不要手动往仓库塞字体**，重新生成走脚本：
+
+```
+python tools/build_font.py      # 从上游重新拉取、子集化，末尾自带字形自检
+```
+
+改完字体要在 Godot 里过一遍资源导入，否则 `.import` 是旧的。字体缺字**不会报错**，
+只会画空白 —— 所以有 `tests/shot_i18n.tscn` 截图兜底：
+
+```
+godot --path . res://tests/shot_i18n.tscn    # 中英各截一张到 build/shots/
+```
 
 ---
 
@@ -78,7 +113,9 @@ res://
 │   └── characters/  角色逻辑
 ├── data/            数据资源（.tres）← 内容都长在这里，脚本里不写魔法数字
 │   ├── characters/  enemies/  equipment/  skills/  stages/
-├── assets/          sprites / audio / fonts
+│   └── i18n/        界面文案（csv 源文件 + 导入产物）
+├── assets/          sprites / audio / fonts（中文字体见上）
 ├── addons/          第三方插件 + ai_bridge（AI 实时操控桥，见上）
+├── tools/           资源构建脚本（字体子集化等，不参与游戏运行）
 └── tests/           自动验收 / 可视化回放 / 截图（不参与游戏运行）
 ```

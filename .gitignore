@@ -9,9 +9,6 @@
 export.cfg
 export_presets.cfg
 
-# 自动生成的翻译资源
-*.translation
-
 # C# / Mono（本项目暂未使用，先留着）
 .mono/
 data_*/

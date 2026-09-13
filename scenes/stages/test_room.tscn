@@ -1,7 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/target_dummy.tscn" id="2_dummy"]
+[ext_resource type="Script" path="res://scripts/ui/hint.gd" id="3_hint"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(640, 24)
@@ -68,10 +69,8 @@ position = Vector2(200, 280)
 [node name="Hint" type="Label" parent="."]
 offset_left = 8.0
 offset_top = 6.0
-offset_right = 560.0
-offset_bottom = 54.0
+offset_right = 600.0
+offset_bottom = 96.0
 mouse_filter = 2
-theme_override_font_sizes/font_size = 11
-text = "BAILIAN  /  M1 combat prototype
-A-D or arrows: move    W / Space / Up: jump
-J: attack  (tap it 3 times for the 3-hit combo)    K: dodge"
+theme_override_font_sizes/font_size = 12
+script = ExtResource("3_hint")
