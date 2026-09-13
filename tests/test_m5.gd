@@ -50,6 +50,8 @@ func _ready() -> void:
 	await _t11_panel_shows_names_and_stats()
 	await _t12_empty_bag_state()
 	await _t13_no_translation_key_leak()
+	await _t14_item_icons()
+	await _t15_blade_takes_weapon_color()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -358,7 +360,7 @@ func _t11_panel_shows_names_and_stats() -> void:
 	_release("bag")
 	await _pframes(2)
 
-	var equip_text: String = str((hud.get_node("BagPanel/EquipText") as Label).text)
+	var equip_text := _hud_texts(hud)
 	var hint: String = str((hud.get_node("BagPanel/Hint") as Label).text)
 	var title: String = str((hud.get_node("BagPanel/Title") as Label).text)
 
@@ -374,9 +376,9 @@ func _t11_panel_shows_names_and_stats() -> void:
 		and not hint.contains("UI_")
 	_check("11", "面板写出装备名与词条，且不显示翻译 key 本身",
 		has_weapon_name and has_helm_name and has_stat and no_key_leak and not hint.is_empty(),
-		"武器名=%s　头盔名=%s　词条=%s　无 key 泄漏=%s\n              「%s」" % [
+		"武器名=%s　头盔名=%s　词条=%s　无 key 泄漏=%s\n              「%s」\n              操作提示「%s」" % [
 			str(has_weapon_name), str(has_helm_name), str(has_stat),
-			str(no_key_leak), equip_text.replace("\n", " ／ ")] + "\n              操作提示「%s」" % hint)
+			str(no_key_leak), equip_text.replace("\n", " ／ "), hint])
 
 
 ## 空背包：面板得说「（空）」，光标也不能越界
@@ -396,8 +398,8 @@ func _t12_empty_bag_state() -> void:
 	var cursor_after: int = int(hud.get("_cursor"))
 
 	var rows := (hud.get_node("BagPanel/Rows") as VBoxContainer)
-	var first_row: String = (rows.get_child(0) as Label).text
-	var equip_text: String = str((hud.get_node("BagPanel/EquipText") as Label).text)
+	var first_row: String = ((rows.get_child(0) as HBoxContainer).get_child(1) as Label).text
+	var equip_text := _hud_texts(hud)
 
 	_press("bag")
 	await _pframes(3)
@@ -425,22 +427,14 @@ func _t13_no_translation_key_leak() -> void:
 	_release("bag")
 	await _pframes(2)
 
-	var texts: Array[String] = []
-	for path in [
-		"CharPanel/Text", "BagPanel/Title", "BagPanel/EquipText", "BagPanel/Hint",
-		"Status/Level", "Bag/Count",
-	]:
-		var n := hud.get_node_or_null(path)
-		if n is Label:
-			texts.append((n as Label).text)
-	for l in (hud.get_node("BagPanel/Rows") as VBoxContainer).get_children():
-		texts.append((l as Label).text)
+	# 一次收全 HUD 上所有 Label 文本 —— 布局怎么改都不用动这条断言
+	var texts: Array = hud.call("panel_texts")
 
 	var leaks := PackedStringArray()
 	var re := RegEx.new()
 	re.compile("(UI|PANEL|HUD|ITEM|SLOT|STAT)_[A-Z_]+")
 	for t in texts:
-		for m in re.search_all(t):
+		for m in re.search_all(str(t)):
 			leaks.append(m.get_string())
 
 	_press("bag")
@@ -453,3 +447,99 @@ func _t13_no_translation_key_leak() -> void:
 		leaks.is_empty(),
 		"扫了 %d 段文本　泄漏的 key：%s" % [
 			texts.size(), "无" if leaks.is_empty() else ", ".join(leaks)])
+
+
+## 装备图标（用户反馈「武器装备没有图标」）：
+## 面板每个槽 / 每行都要有图标，图标内容要指向那一件装备；地上掉落物同理。
+## 图标是程序化画的（ItemIcon），所以除了「节点在不在」还要验「画的是哪一件」
+func _t14_item_icons() -> void:
+	var hud := _player.get_node("HUD")
+	PlayerState.set_equipment({}, [])
+	PlayerState.add_item(IRON_HELM)
+	PlayerState.equip(IRON_HELM)
+	await _pframes(2)
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	var equip_box := hud.get_node("BagPanel/EquipRows") as VBoxContainer
+	var rows_box := hud.get_node("BagPanel/Rows") as VBoxContainer
+	var helm_icon := equip_box.get_child(1).get_child(0) as ItemIcon
+	var weapon_icon := equip_box.get_child(0).get_child(0) as ItemIcon
+	var empty_bag_icon := rows_box.get_child(0).get_child(0) as ItemIcon
+
+	var helm_ok: bool = helm_icon != null and helm_icon.item() != null \
+		and helm_icon.item().id == &"iron_helm" and helm_icon.visible
+	var empty_slot_ok: bool = weapon_icon != null and weapon_icon.item() == null and weapon_icon.visible
+	var empty_row_ok: bool = empty_bag_icon != null and not empty_bag_icon.visible
+
+	# 换一把武器：图标要跟着换（不是画完就定死）
+	PlayerState.add_item(FLAME_BLADE)
+	PlayerState.equip(FLAME_BLADE)
+	await _pframes(2)
+	var switched: bool = weapon_icon.item() != null and weapon_icon.item().id == &"flame_blade"
+
+	_press("bag")
+	await _pframes(3)
+	_release("bag")
+	await _pframes(2)
+
+	# 地上的装备掉落物也用同一套图标
+	var drop: Node2D = PICKUP.instantiate()
+	drop.set("item_path", IRON_SWORD)
+	add_child(drop)
+	drop.global_position = Vector2(120.0, 288.0)      # 离玩家远点，免得当场被吸走
+	await _pframes(3)
+	var drop_icon := drop.get_node_or_null("Visual") as ItemIcon
+	var drop_ok: bool = drop_icon != null and drop_icon.item() != null \
+		and drop_icon.item().id == &"iron_sword"
+	# 先取值再释放：queue_free 之后碰 drop_icon 会拿到已释放对象
+	var drop_id := _id_of(drop_icon)
+	var drop_size := Vector2.ZERO if drop_icon == null else drop_icon.size
+	drop.queue_free()
+	await _pframes(2)
+
+	_check("14", "装备有图标：槽位 / 背包行 / 地上掉落物三处一致，换装图标跟着换",
+		helm_ok and empty_slot_ok and empty_row_ok and switched and drop_ok and drop_size.x >= 18.0,
+		"头盔槽图标=%s（%s）　空武器槽有框=%s　空背包行藏图标=%s\n              换装后武器图标=%s（%s）　掉落物图标=%s（%s，%.0f×%.0f px）" % [
+			str(helm_ok), str(_id_of(helm_icon)), str(empty_slot_ok), str(empty_row_ok),
+			str(switched), str(_id_of(weapon_icon)), str(drop_ok), str(drop_id),
+			drop_size.x, drop_size.y])
+
+
+## 手里的刀跟着武器变 —— 装备变强必须看得见，光面板数字不够
+func _t15_blade_takes_weapon_color() -> void:
+	await _place(320.0)
+	PlayerState.set_equipment({}, [])
+	await _pframes(2)
+	var blade := _player.get_node("Visuals/Blade") as ColorRect
+	var plain: Color = blade.color
+	var plain_reach: float = blade.offset_right
+
+	PlayerState.add_item(FLAME_BLADE)
+	PlayerState.equip(FLAME_BLADE)
+	await _pframes(2)
+	var armed: Color = blade.color
+	var armed_reach: float = blade.offset_right
+	var expect: Color = (load(FLAME_BLADE) as ItemData).tier_color().lightened(0.2)
+
+	_check("15", "装备武器后手里的光刃换成武器品质色，刃也更长",
+		not plain.is_equal_approx(armed) and armed.is_equal_approx(expect) \
+			and armed_reach > plain_reach,
+		"无武器 %s（长 %.0f） → 烈焰刃 %s（长 %.0f，期望色 %s）" % [
+			str(plain), plain_reach, str(armed), armed_reach, str(expect)])
+
+
+func _id_of(icon: ItemIcon) -> StringName:
+	if icon == null or icon.item() == null:
+		return &"无"
+	return icon.item().id
+
+
+## HUD 上全部 Label 文本拼成一个串（判定「某段文字在不在」用）
+func _hud_texts(hud: Node) -> String:
+	var out := ""
+	for t in hud.call("panel_texts"):
+		out += str(t) + "\n"
+	return out

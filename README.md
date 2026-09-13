@@ -74,7 +74,7 @@ godot --headless --path . res://tests/check_scenes.tscn              # 场景完
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 传送门 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击（15 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 背包界面（13 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -87,10 +87,16 @@ godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # �
 data/items/*.tres          八件装备（部位 / 品质 / 三条词条），加装备不改代码
 scripts/core/item_data.gd  ItemData：槽位与品质枚举、词条字段
 scripts/core/player_state.gd  装备栏与背包（真相在这，玩家节点只是读者）+ 词条聚合缓存
-scripts/characters/player.gd  _apply_upgrade() 把「强化 + 等级 + 装备」算成一个伤害倍率
+scripts/characters/player.gd  _apply_upgrade() 把「强化 + 等级 + 装备」算成一个伤害倍率；
+                              _refresh_blade() 让手里的光刃跟着武器换色换长
 scripts/components/health.gd  damage_reduction：挨打侧减伤，上限 60%、保底 1 点
+scripts/ui/item_icon.gd    程序化装备图标（按部位画形状、按品质上色，不引贴图）
 scripts/ui/hud.gd          B 键装备背包（打开即暂停）+ C 键角色面板的装备概览
 ```
+
+图标是**画的不是贴的**：16×16 的矢量形状，剑 / 盔 / 甲 / 坠四种轮廓，
+颜色直接取品质色。同一件装备在背包面板、地上掉落物、以及角色攻击时的光刃上，
+形状与颜色完全一致 —— 换了一件装备，三个地方一起变。
 
 ### 断言纪律（别破）
 

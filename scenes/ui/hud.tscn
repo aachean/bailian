@@ -194,12 +194,12 @@ visible = false
 offset_left = 384.0
 offset_top = 40.0
 offset_right = 628.0
-offset_bottom = 254.0
+offset_bottom = 306.0
 mouse_filter = 2
 
 [node name="Border" type="ColorRect" parent="BagPanel"]
 offset_right = 244.0
-offset_bottom = 214.0
+offset_bottom = 266.0
 mouse_filter = 2
 color = Color(0.47, 0.4, 0.26, 1)
 
@@ -207,7 +207,7 @@ color = Color(0.47, 0.4, 0.26, 1)
 offset_left = 2.0
 offset_top = 2.0
 offset_right = 242.0
-offset_bottom = 212.0
+offset_bottom = 264.0
 mouse_filter = 2
 color = Color(0.09, 0.09, 0.12, 0.97)
 
@@ -228,36 +228,35 @@ theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
 text = "背包"
 
-[node name="EquipText" type="Label" parent="BagPanel"]
+[node name="EquipRows" type="VBoxContainer" parent="BagPanel"]
 offset_left = 10.0
 offset_top = 30.0
 offset_right = 236.0
-offset_bottom = 92.0
-theme_override_constants/line_spacing = -5
-theme_override_font_sizes/font_size = 11
-text = ""
+offset_bottom = 110.0
+mouse_filter = 2
+theme_override_constants/separation = 0
 
 [node name="Divider" type="ColorRect" parent="BagPanel"]
 offset_left = 10.0
-offset_top = 96.0
+offset_top = 114.0
 offset_right = 234.0
-offset_bottom = 98.0
+offset_bottom = 116.0
 mouse_filter = 2
 color = Color(0.4, 0.35, 0.25, 1)
 
 [node name="Rows" type="VBoxContainer" parent="BagPanel"]
 offset_left = 10.0
-offset_top = 102.0
+offset_top = 120.0
 offset_right = 236.0
-offset_bottom = 186.0
+offset_bottom = 240.0
 mouse_filter = 2
 theme_override_constants/separation = 0
 
 [node name="Hint" type="Label" parent="BagPanel"]
 offset_left = 10.0
-offset_top = 190.0
+offset_top = 244.0
 offset_right = 236.0
-offset_bottom = 208.0
+offset_bottom = 262.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.78, 0.74, 0.64, 1)
 text = ""

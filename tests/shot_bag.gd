@@ -68,10 +68,50 @@ func _ready() -> void:
 	Input.parse_input_event(ev)
 	await _frames(4)
 	await _shot("char_panel.png")
+	player.get_node("HUD/CharPanel").visible = false   # 截图脚本直接关，不走输入去重
+	await _frames(3)
+
+	# ── 四、手里的刀：装上稀有武器挥一刀，光刃按武器品质变色 ──
+	PlayerState.set_equipment({}, [])
+	PlayerState.add_item("res://data/items/flame_blade.tres")
+	PlayerState.equip("res://data/items/flame_blade.tres")
+	player.global_position = Vector2(430.0, 288.0)
+	# 等真落地再出招：普攻要求站在地上，悬空按 J 什么都不发生（截图会空）
+	var n := 0
+	while not player.is_on_floor() and n < 60:
+		await get_tree().physics_frame
+		n += 1
+	await _frames(3)
+	var atk := InputEventAction.new()
+	atk.action = "attack"
+	atk.pressed = true
+	atk.strength = 1.0
+	# 窗口模式下 process 帧与 physics 帧不同步，单次注入可能正好落进帧缝里被漏掉
+	# （实测 attacks_started 一直是 0）。截图脚本只求画面，循环重试到真的出招为止
+	var before: int = player.attacks_started
+	var tries := 0
+	while player.attacks_started == before and tries < 30:
+		Input.action_press("attack")
+		await _frames(1)
+		Input.action_release("attack")
+		await _frames(1)
+		tries += 1
+	await _frames(6)                     # 前摇 6 帧
+	# 等到光刃真的亮起来（判定帧）再截，不靠数帧数——
+	# 窗口模式下的帧数和无头不一样，数帧会数偏
+	var blade := player.get_node("Visuals/Blade") as ColorRect
+	var waited := 0
+	while blade.modulate.a < 0.5 and waited < 30:
+		await get_tree().physics_frame
+		waited += 1
+	await _shot("blade_weapon.png")
 	get_tree().quit()
 
 
 func _shot(name: String) -> void:
+	# 等这一帧真的画完再取图 —— 否则截到的是上一帧，
+	# 只在判定帧亮 4 帧的光刃会整个漏掉（这就是为什么之前那张图里没有刀）
+	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://build/shots"))
 	print("%s err=%d" % [name, img.save_png("res://build/shots/" + name)])

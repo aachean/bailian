@@ -20,27 +20,27 @@ var item_path: String = ""
 
 var _player: Node2D = null
 var _collected := false
+var _icon: ItemIcon = null
 
 
 func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player")
+	_icon = get_node_or_null("Visual") as ItemIcon
 	if not item_path.is_empty():
 		_dress_as_item()
 
 
-## 装备掉落物按品质上色、画得比碎片大一圈 —— 地上一眼能分出「这个是装备」。
+## 装备掉落物：图标比碎片大一圈，形状按部位、颜色按品质 ——
+## 地上一眼分得出「掉的是剑还是甲、什么成色」。
 ## 掉了一地精铁里混着一件紫装却看不出来，那这件装备等于没掉
 func _dress_as_item() -> void:
-	var vis := get_node_or_null("Visual") as ColorRect
-	if vis == null:
+	if _icon == null:
 		return
-	vis.offset_left = -7.0
-	vis.offset_top = -7.0
-	vis.offset_right = 7.0
-	vis.offset_bottom = 7.0
-	var item := load(item_path) as ItemData
-	if item != null:
-		vis.color = item.tier_color()
+	_icon.offset_left = -10.0
+	_icon.offset_top = -10.0
+	_icon.offset_right = 10.0
+	_icon.offset_bottom = 10.0
+	_icon.set_item_path(item_path)
 
 
 func _physics_process(delta: float) -> void:

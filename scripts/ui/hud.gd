@@ -16,10 +16,13 @@ extends CanvasLayer
 const BAG_ROWS := 6              # 背包列表一屏几行，超出靠光标滚动
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
+const ROW_HEIGHT := 20.0         # 一行的高度：图标 16 + 上下各留 2
+const ICON_SIZE := 16.0
 
 var _bag_open := false
 var _cursor := 0                 # 全面板共用一个光标：0..3 是装备槽，之后是背包
-var _rows: Array[Label] = []
+var _equip_rows: Array[HBoxContainer] = []
+var _bag_rows: Array[HBoxContainer] = []
 ## 父节点是不是玩家。HUD 只在玩家身上工作 —— 被单独实例化（场景完整性检查器
 ## 就是这么干的）时不能崩，否则每一次校验都带一堆假报错
 var _has_player := false
@@ -37,7 +40,7 @@ var _has_player := false
 @onready var _skill_core: ColorRect = $SkillBar/IconCore
 @onready var _bag_panel: Panel = $BagPanel
 @onready var _bag_title: Label = $BagPanel/Title
-@onready var _equip_text: Label = $BagPanel/EquipText
+@onready var _equip_box: VBoxContainer = $BagPanel/EquipRows
 @onready var _rows_box: VBoxContainer = $BagPanel/Rows
 @onready var _bag_hint: Label = $BagPanel/Hint
 
@@ -73,15 +76,61 @@ func _unhandled_input(event: InputEvent) -> void:
 # 装备 / 背包面板
 # ─────────────────────────────────────────────────────────────
 
-## 背包列表的行节点由代码建。手写 tscn 的嵌套 parent 路径写错过三次，
-## 能省的静态节点就省掉 —— 少一个节点就少一次静默丢节点的机会
+## 面板的行节点全部由代码建。手写 tscn 的嵌套 parent 路径写错过三次，
+## 能省的静态节点就省掉 —— 少一个节点就少一次静默丢节点的机会。
+## 每行 = [装备图标][文字]，图标走 ItemIcon（程序化矢量图，不引贴图）
 func _build_rows() -> void:
+	for _i in ItemData.SLOT_IDS.size():
+		_equip_rows.append(_make_row(_equip_box))
 	for _i in BAG_ROWS:
-		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 11)
-		l.custom_minimum_size = Vector2(0.0, 14.0)
-		_rows_box.add_child(l)
-		_rows.append(l)
+		_bag_rows.append(_make_row(_rows_box))
+
+
+## 造一行：图标 + 文字。图标按部位画形状、按品质上色，与地上掉落物同一套
+func _make_row(parent: Node) -> HBoxContainer:
+	var box := HBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
+	box.add_theme_constant_override("separation", 3)
+
+	var icon := ItemIcon.new()
+	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(icon)
+
+	var lbl := Label.new()
+	lbl.add_theme_font_size_override("font_size", 11)
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(lbl)
+
+	parent.add_child(box)
+	return box
+
+
+func _row_icon(row: HBoxContainer) -> ItemIcon:
+	return row.get_child(0) as ItemIcon
+
+
+func _row_label(row: HBoxContainer) -> Label:
+	return row.get_child(1) as Label
+
+
+## 面板上全部文字（给断言用：漏翻的 key 会在这些文本里露出来）
+func panel_texts() -> Array[String]:
+	var out: Array[String] = []
+	_collect_labels(self, out)
+	return out
+
+
+func _collect_labels(node: Node, out: Array[String]) -> void:
+	if node is Label:
+		out.append((node as Label).text)
+	for c in node.get_children():
+		_collect_labels(c, out)
 
 
 func is_bag_open() -> bool:
@@ -143,39 +192,52 @@ func refresh_bag() -> void:
 		return
 	_bag_title.text = tr("UI_BAG_TITLE")
 	_bag_hint.text = tr("UI_BAG_HINT")
+	var dim := Color(0.62, 0.6, 0.55, 1)
+	var normal := Color(0.9, 0.88, 0.84, 1)
 
-	# 上半：四个装备槽，一行一项（造梦西游式属性表）
-	var lines: Array[String] = []
+	# 上半：四个装备槽 —— 每行 [图标][槽位名　装备名　词条]
 	var eq := PlayerState.equipped_list()
 	for i in ItemData.SLOT_IDS.size():
-		var mark := CURSOR_MARK if _cursor == i else INDENT
+		var row := _equip_rows[i]
+		var icon := _row_icon(row)
+		var lbl := _row_label(row)
+		var sel := _cursor == i
+		var mark := CURSOR_MARK if sel else INDENT
 		var slot_name: String = tr(String(ItemData.SLOT_KEYS[i]))
 		var it := eq[i] as ItemData
+		icon.empty_frame = true          # 空槽画一个空框，不留白（空状态也要可见）
+		icon.set_item(it)
 		if it == null:
-			lines.append("%s%s　%s" % [mark, slot_name, tr("UI_BAG_EMPTY")])
+			lbl.text = "%s%s　%s" % [mark, slot_name, tr("UI_BAG_EMPTY")]
+			lbl.modulate = dim
 		else:
-			lines.append("%s%s　%s　%s" % [mark, slot_name, _item_name(it), _stat_text(it)])
-	_equip_text.text = "\n".join(lines)
+			lbl.text = "%s%s　%s　%s" % [mark, slot_name, _item_name(it), _stat_text(it)]
+			lbl.modulate = Color(1, 1, 1, 1) if sel else normal
 
 	# 下半：背包列表（一屏 BAG_ROWS 行，随光标滚动）
 	var bag := PlayerState.bag
 	var top := _scroll_top(bag.size())
 	for r in BAG_ROWS:
-		var lbl := _rows[r]
+		var row := _bag_rows[r]
+		var icon := _row_icon(row)
+		var lbl := _row_label(row)
 		var idx := top + r
 		if idx >= bag.size():
 			# 空状态要可见：整个背包空着才写「（空）」，否则留空行
+			icon.visible = false
 			lbl.text = tr("UI_BAG_EMPTY") if (bag.is_empty() and r == 0) else ""
-			lbl.modulate = Color(0.62, 0.6, 0.55, 1)
+			lbl.modulate = dim
 			continue
 		var it := load(str(bag[idx])) as ItemData
-		var sel := (_cursor - ItemData.SLOT_IDS.size()) == idx
+		var row_sel := (_cursor - ItemData.SLOT_IDS.size()) == idx
+		icon.visible = true
+		icon.set_item(it)
 		lbl.text = "%s%s　%s" % [
-			CURSOR_MARK if sel else INDENT,
+			CURSOR_MARK if row_sel else INDENT,
 			_item_name(it) if it != null else "?",
 			_stat_text(it) if it != null else "",
 		]
-		lbl.modulate = Color(1, 1, 1, 1) if sel else Color(0.85, 0.85, 0.8, 1)
+		lbl.modulate = Color(1, 1, 1, 1) if row_sel else normal
 
 
 ## 让光标始终落在可见的 6 行里

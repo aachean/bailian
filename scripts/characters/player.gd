@@ -267,6 +267,11 @@ func _update_hp_bar(_hp: int, _max_hp: int) -> void:
 const UPGRADE_STEP := 0.2
 const LEVEL_ATK_STEP := 0.05
 
+## 手里那把刀的样子。攻击时挥出的光刃跟着【当前武器】走：换了武器，
+## 刃的颜色（品质色）和长度都跟着变 —— 装备变强必须看得见，光看面板数字不够
+const BLADE_BASE_COLOR := Color(0.96, 0.92, 0.76)
+const BLADE_BASE_REACH := 42.0
+
 
 ## 重算玩家身上所有「由外部数据推导出来」的属性：攻击倍率 / 生命上限 / 减伤。
 ## 触发点：开局、升级、铁砧强化、换装备、读档。
@@ -278,7 +283,20 @@ func _apply_upgrade() -> void:
 		+ LEVEL_ATK_STEP * float(level - 1) + float(bonus.get("atk", 0.0))
 	_set_max_hp(100 + (level - 1) * 15 + int(bonus.get("hp", 0)))
 	_health.damage_reduction = float(bonus.get("def", 0.0))
+	_refresh_blade()
 	_refresh_hud()
+
+
+## 光刃跟着武器变：颜色取品质色（与面板图标、地上掉落物同一个色源），
+## 刃长按品质递进。没拿武器时回到默认的米白短刃
+func _refresh_blade() -> void:
+	var weapon := PlayerState.item_at(&"weapon")
+	if weapon == null:
+		_blade.color = BLADE_BASE_COLOR
+		_blade.offset_right = BLADE_BASE_REACH
+	else:
+		_blade.color = weapon.tier_color().lightened(0.2)
+		_blade.offset_right = BLADE_BASE_REACH + 4.0 * (float(weapon.tier) + 1.0)
 
 
 ## 改生命上限时把新增的那截补进当前血（上限变低则把血夹回去）。
