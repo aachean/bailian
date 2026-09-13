@@ -87,6 +87,9 @@ var dodge_cooldown: int = 0
 ## 累计挨打 / 死亡次数（自动验收用）
 var hurts_taken: int = 0
 var deaths: int = 0
+## 精铁碎片（强化素材）与武器强化等级 —— 进存档，随快照恢复
+var shards: int = 0
+var upgrade_level: int = 0
 
 var _state_frame: int = 0
 var _hitstop: int = 0
@@ -119,6 +122,9 @@ const FALL_KILL_Y := 800.0
 func apply_saved(d: Dictionary) -> void:
 	_end_action()
 	_health.restore(int(d.get("hp", _health.max_hp)))
+	shards = int(d.get("shards", shards))
+	upgrade_level = int(d.get("upgrade", upgrade_level))
+	_apply_upgrade()
 	_hurt_flash = 0.0
 	_visuals.modulate = Color.WHITE
 	global_position = Vector2(float(d.get("x", _spawn_point.x)), float(d.get("y", _spawn_point.y)))
@@ -150,11 +156,26 @@ func _ready() -> void:
 	_health.died.connect(_on_died)
 	_health.revived.connect(_on_revived)
 	_health.hp_changed.connect(_update_hp_bar)
+	_apply_upgrade()
 	_spawn_point = global_position
 
 
 func _update_hp_bar(_hp: int, _max_hp: int) -> void:
 	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
+
+
+## 武器强化：每级 +20% 伤害。改的是 Hitbox 的伤害倍率，
+## 技能表（招式本身）不动 —— 强化的是人，不是招
+const UPGRADE_STEP := 0.2
+
+
+func _apply_upgrade() -> void:
+	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level)
+
+
+## 拾取碎片（Pickup 组件调）。满 3 块可去城镇铁砧强化一次
+func collect_shard() -> void:
+	shards += 1
 
 
 func _physics_process(delta: float) -> void:

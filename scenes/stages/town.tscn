@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
 [ext_resource type="PackedScene" path="res://scenes/core/portal.tscn" id="3_portal"]
+[ext_resource type="PackedScene" path="res://scenes/core/anvil.tscn" id="4_anvil"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1280, 24)
@@ -64,6 +65,9 @@ offset_right = 54.0
 offset_bottom = -33.0
 mouse_filter = 2
 color = Color(0.27, 0.23, 0.19, 1)
+
+[node name="Anvil" parent="." instance=ExtResource("4_anvil")]
+position = Vector2(900, 306)
 
 [node name="ExitPortal" parent="." instance=ExtResource("3_portal")]
 position = Vector2(1220, 290)

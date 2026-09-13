@@ -35,6 +35,10 @@ extends Resource
 ## 攻击用哪张技能表（data/skills/ 里的 SkillData）
 @export var attack_skill: SkillData
 
+@export_group("掉落")
+## 死亡时掉多少精铁碎片（强化素材）。0 = 不掉
+@export var drop_shards: int = 1
+
 @export_group("投射物（远程怪用，0 = 没有远程手段）")
 ## 投射物飞行速度（像素/秒）。0 = 不投掷
 @export var projectile_speed: float = 0.0

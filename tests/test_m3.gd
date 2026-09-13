@@ -13,6 +13,23 @@ const LEVEL1 := preload("res://scenes/stages/level_1.tscn")
 
 var _pass := 0
 var _fail := 0
+## 测试房的地面：被测实体（怪 / 碎片 / 玩家）在无重力环境里下落会让
+## 距离类断言抖动（第一遍过第二遍挂就是它）—— 都站在这块地上就稳定了
+var _ground: StaticBody2D = null
+
+
+func _ensure_ground() -> void:
+	if _ground != null:
+		return
+	_ground = StaticBody2D.new()
+	_ground.collision_layer = 4
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(4000, 24)
+	shape.shape = rect
+	_ground.add_child(shape)
+	_ground.position = Vector2(0, 332)
+	add_child(_ground)
 
 
 func _ready() -> void:
@@ -25,6 +42,10 @@ func _ready() -> void:
 	await _t4_dasher_is_distinct()
 	await _t5_portal_not_armed_inside()
 	await _t6_town_walkable()
+	await _t7_boss_present()
+	await _t8_drop_and_pickup()
+	await _t9_anvil_upgrade()
+	await _t10_upgrade_survives_snapshot()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -113,10 +134,11 @@ func _t1_scenes_wired() -> void:
 	level.queue_free()
 	await _pframes(2)
 
-	_check("1", "城镇与 3 屏关卡都摆得出来：门对门、四种怪各就位",
-		town_ok and portal_script.contains("level_1") and enemies == 4 and kinds.size() == 3
+	_check("1", "城镇与 3 屏关卡都摆得出来：门对门、怪各就位",
+		town_ok and portal_script.contains("level_1") and enemies >= 4
+			and kinds.size() >= 3 and kinds.has("boss")
 			and back_portal.contains("town"),
-		"城镇出口→%s　关卡回城→%s　怪 %d 只 / %d 种（walker/dasher/spearman）" % [
+		"城镇出口→%s　关卡回城→%s　怪 %d 只 / %d 种（含 boss）" % [
 			portal_script.get_file(), back_portal.get_file(), enemies, kinds.size()])
 
 
@@ -219,3 +241,120 @@ func _t5_portal_not_armed_inside() -> void:
 			str(armed_inside), str(armed_after_leave)])
 	town.queue_free()
 	await _pframes(2)
+
+
+## Boss 在关卡尽头，且是真 Boss：血厚、一击沉重（重击）
+func _t7_boss_present() -> void:
+	var level := LEVEL1.instantiate()
+	add_child(level)
+	await _pframes(3)
+	var boss := level.get_node_or_null("Boss")
+	if boss == null:
+		_check("7", "Boss 镇守关卡尽头", false, "level_1 里找不到 Boss")
+		level.queue_free()
+		await _pframes(2)
+		return
+	var d = boss.get("data")
+	var boss_hp: int = d.max_hp
+	var smash: SkillData = d.attack_skill
+	level.queue_free()
+	await _pframes(2)
+
+	_check("7", "Boss 镇守关卡尽头：血厚、重击",
+		boss_hp >= 150 and smash != null and smash.heavy and smash.damage >= 12,
+		"血 %d（≥150）　技能 \"%s\" 伤害 %d 重击=%s" % [
+			boss_hp, smash.display_name if smash != null else "?",
+			smash.damage if smash != null else -1, str(smash.heavy) if smash != null else "?"])
+
+
+## 怪死掉碎片、玩家走过捡起来计数 —— 循环的「掉落」半环
+func _t8_drop_and_pickup() -> void:
+	_ensure_ground()
+	var walker := (load("res://scenes/enemies/walker.tscn") as PackedScene).instantiate()
+	add_child(walker)
+	walker.global_position = Vector2(300.0, 280.0)
+	await _pframes(2)
+	var before: int = int(walker.get("data").drop_shards)
+	walker.call("_drop_shards")
+	await _pframes(1)
+
+	# 数一数场上碎片
+	var spawned := 0
+	var target: Node2D = null
+	for c in get_children():
+		if c.get_script() != null and str(c.get_script().resource_path).ends_with("pickup.gd"):
+			spawned += 1
+			target = c
+
+	var player := (load("res://scenes/characters/player.tscn") as PackedScene).instantiate()
+	add_child(player)
+	await _pframes(1)
+	player.set("shards", 0)
+	if target != null:
+		player.global_position = target.global_position
+	await _pframes(20)
+	var got: int = int(player.get("shards"))
+	walker.queue_free()
+	player.queue_free()
+	await _pframes(2)
+
+	_check("8", "怪死掉精铁碎片，玩家走过自动拾取计数",
+		before >= 1 and spawned >= before and got >= before,
+		"配置掉落 %d　场上生成 %d　玩家拾到 %d" % [before, spawned, got])
+
+
+## 铁砧强化：3 碎片 → 1 级，攻击伤害倍率真的上去
+func _t9_anvil_upgrade() -> void:
+	var town := TOWN.instantiate()
+	add_child(town)
+	await _pframes(3)
+	var player := town.get_node("Player")
+	var anvil := town.get_node("Anvil")
+
+	player.global_position = anvil.global_position + Vector2(0, -8)
+	player.set("shards", 3)
+	player.set("upgrade_level", 0)
+	player.call("_apply_upgrade")
+	await _pframes(6)
+	var scale0: float = (player.get_node("Hitbox") as Hitbox).damage_scale
+
+	_press("attack")
+	await _pframes(4)
+	_release("attack")
+	await _pframes(4)
+	var scale1: float = (player.get_node("Hitbox") as Hitbox).damage_scale
+	var lvl: int = int(player.get("upgrade_level"))
+	var shards: int = int(player.get("shards"))
+	town.queue_free()
+	await _pframes(2)
+
+	_check("9", "铁砧强化：3 碎片换 1 级，攻击伤害倍率 +20%",
+		is_equal_approx(scale0, 1.0) and is_equal_approx(scale1, 1.2)
+			and lvl == 1 and shards == 0,
+		"倍率 %.2f → %.2f　等级 %d　碎片剩 %d" % [scale0, scale1, lvl, shards])
+
+
+## 强化与碎片进快照 —— 「继续游戏」不能把练好的武器吐回去
+func _t10_upgrade_survives_snapshot() -> void:
+	var room := (load("res://scenes/stages/test_room.tscn") as PackedScene).instantiate()
+	add_child(room)
+	await _pframes(3)
+	var player := room.get_node("Player")
+	player.set("shards", 7)
+	player.set("upgrade_level", 2)
+	var snap := room.call("collect") as Dictionary
+
+	# 现场清零，再从快照恢复
+	player.set("shards", 0)
+	player.set("upgrade_level", 0)
+	room.call("_apply_state", snap)
+	await _pframes(2)
+	var shards: int = int(player.get("shards"))
+	var lvl: int = int(player.get("upgrade_level"))
+	var scale: float = (player.get_node("Hitbox") as Hitbox).damage_scale
+	room.queue_free()
+	await _pframes(2)
+
+	_check("10", "碎片与强化等级进快照，继续游戏原样回来",
+		shards == 7 and lvl == 2 and is_equal_approx(scale, 1.4),
+		"碎片 %d（期望 7）　等级 %d（期望 2）　倍率 %.2f（期望 1.40）" % [shards, lvl, scale])

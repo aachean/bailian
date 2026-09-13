@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="4_walker"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/dasher.tscn" id="5_dasher"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/spearman.tscn" id="6_spearman"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/boss.tscn" id="7_boss"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1920, 24)
@@ -121,6 +122,9 @@ position = Vector2(1200, 288)
 
 [node name="Spearman1" parent="." instance=ExtResource("6_spearman")]
 position = Vector2(1620, 288)
+
+[node name="Boss" parent="." instance=ExtResource("7_boss")]
+position = Vector2(1840, 280)
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(150, 280)

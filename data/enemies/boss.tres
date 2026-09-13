@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/boss_smash.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"boss"
+display_name = "磨刀石守卫"
+max_hp = 200
+revive_delay = 4.0
+hurt_stun_frames = 8
+patrol_speed = 30.0
+chase_speed = 70.0
+patrol_range = 60.0
+aggro_range = 200.0
+deaggro_range = 320.0
+attack_range = 46.0
+attack_cooldown_frames = 70
+attack_skill = ExtResource("2_skill")
+drop_shards = 10

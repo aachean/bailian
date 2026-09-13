@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/anvil.gd" id="1_anvil"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_zone"]
+size = Vector2(72, 64)
+
+[node name="Anvil" type="Area2D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_anvil")
+
+[node name="Visual" type="ColorRect" parent="."]
+offset_left = -14.0
+offset_top = -18.0
+offset_right = 14.0
+offset_bottom = 14.0
+mouse_filter = 2
+color = Color(0.5, 0.44, 0.38, 1)
+
+[node name="Top" type="ColorRect" parent="."]
+offset_left = -18.0
+offset_top = -22.0
+offset_right = 18.0
+offset_bottom = -16.0
+mouse_filter = 2
+color = Color(0.35, 0.3, 0.26, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_zone")
+
+[node name="Label" type="Label" parent="."]
+offset_left = -150.0
+offset_top = -74.0
+offset_right = 150.0
+offset_bottom = -50.0
+theme_override_font_sizes/font_size = 11
+horizontal_alignment = 1
+text = ""

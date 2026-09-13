@@ -11,6 +11,7 @@ extends CharacterBody2D
 enum State { PATROL, CHASE, ATTACK, HURT, DEAD }
 
 const DAMAGE_NUMBER := preload("res://scenes/ui/damage_number.tscn")
+const PICKUP := preload("res://scenes/components/pickup.tscn")
 
 ## 后仰弹簧参数，与靶子一致 —— 挨打的观感应该敌我相同
 const RECOIL_STIFF := 1500.0
@@ -290,10 +291,23 @@ func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: i
 
 func _on_died() -> void:
 	_enter(State.DEAD)
+	_drop_shards()
 	_revive_t = data.revive_delay
 	_target_alpha = 0.0
 	set_collision_layer_value(2, false)
 	bar.visible = false
+
+
+## 死亡掉落精铁碎片。散在尸体周围，玩家走近自动吸附
+func _drop_shards() -> void:
+	var host := get_tree().current_scene
+	if host == null or data.drop_shards <= 0:
+		return
+	for i in data.drop_shards:
+		var p: Node2D = PICKUP.instantiate()
+		host.add_child(p)
+		p.global_position = global_position + Vector2(
+			_rng.randf_range(-24.0, 24.0), _rng.randf_range(-16.0, 4.0))
 
 
 func _on_revived() -> void:

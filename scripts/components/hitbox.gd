@@ -17,6 +17,9 @@ signal hit_landed(target: Node2D, damage: int, point: Vector2, heavy: bool)
 
 ## 打谁（碰撞层位掩码）。玩家的判定框打 enemy 层 = 2
 @export_flags_2d_physics var target_mask: int = 2
+## 伤害倍率。装备强化加成走这里：持有者改它，判定结算时生效。
+## 放在 Hitbox 而不是改技能表 —— 强化改的是「这个人」，不是「这一招」
+@export var damage_scale: float = 1.0
 ## 是否画出判定框。调手感时开，正常关
 @export var debug_draw: bool = false
 
@@ -100,7 +103,7 @@ func _offset() -> Vector2:
 func _resolve(body: Node2D) -> void:
 	var h := body.get_node_or_null("Health") as Health
 	var point := body.global_position + Vector2(0.0, -12.0)
-	var dmg := _skill.roll_damage(_rng)
+	var dmg := int(round(float(_skill.roll_damage(_rng)) * damage_scale))
 
 	# 被击退的方向：从攻击方指向目标
 	var dir := 1
