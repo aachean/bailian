@@ -302,10 +302,14 @@ func _row_color(r: Dictionary, sel: bool) -> Color:
 
 ## 玩家现在的等级 / 武器强化够不够这个副本的推荐值。**只用来上色**，
 ## 任何地方都不拿它拦人 —— 硬门槛会把「刷」变成义务（docs/adr/0009 §5）
+##
+## 强化改成逐件之后（2026-09-14），这里比的是**手里那把武器**练到几级。
+## 没拿武器时算 0 级 —— 空手进副本本来就该标红
 func _too_weak(d: DungeonData) -> bool:
 	if PlayerState.level < d.rec_level:
 		return true
-	return PlayerState.upgrade_level < d.rec_weapon
+	var w := PlayerState.equipped_uid(&"weapon")
+	return PlayerState.forge_level(w) < d.rec_weapon
 
 
 ## 某个副本在行表里的下标。给不到就退回第一行可选行

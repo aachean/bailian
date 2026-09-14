@@ -134,7 +134,9 @@ func _reward(d: DialogueData) -> void:
 		return
 	if PlayerState.has_flag(d.flag):
 		return
-	if PlayerState.add_item(d.give_item):
+	# add_item 返回的是**实例 uid**（空串 = 不是装备）。这里只关心成没成功，
+	# 所以判空串而不是拿它当 bool —— 别指望 GDScript 替你隐式转换
+	if not PlayerState.add_item(d.give_item).is_empty():
 		PlayerState.set_flag(d.flag)
 
 

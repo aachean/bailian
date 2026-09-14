@@ -147,9 +147,12 @@ func _make_row(parent: Node, row_height: float = ROW_HEIGHT, as_skill: bool = fa
 
 ## 填一行装备：图标 + 「槽位名　装备名　词条」。背包面板与角色面板共用 ——
 ## 两处必须长得一样，否则「同一件装备在哪儿都是同一个样」这条就断了
-func _fill_equip_row(row: HBoxContainer, i: int, it: ItemData, mark: String) -> void:
+## 参数是**实例 uid**（不是 ItemData）—— 强化等级挂在 uid 上，
+## 只拿 ItemData 就说不清「这一件练到几级了」
+func _fill_equip_row(row: HBoxContainer, i: int, uid: String, mark: String) -> void:
 	var icon := _row_icon(row)
 	var lbl := _row_label(row)
+	var it := PlayerState.item_of(uid)
 	icon.empty_frame = true          # 空槽画一个空框，不留白（空状态也要可见）
 	icon.set_item(it)
 	var slot_name: String = tr(String(ItemData.SLOT_KEYS[i]))
@@ -157,7 +160,7 @@ func _fill_equip_row(row: HBoxContainer, i: int, it: ItemData, mark: String) -> 
 		lbl.text = "%s%s　%s" % [mark, slot_name, tr("UI_BAG_EMPTY")]
 		lbl.modulate = Color(0.62, 0.6, 0.55, 1)
 	else:
-		lbl.text = "%s%s　%s　%s" % [mark, slot_name, _item_name(it), _stat_text(it)]
+		lbl.text = "%s%s　%s　%s" % [mark, slot_name, _item_name(it), _stat_text(uid, it)]
 		lbl.modulate = Color(0.9, 0.88, 0.84, 1)
 
 
@@ -447,9 +450,14 @@ func _death_open() -> bool:
 	return dm != null and dm.has_method("is_open") and bool(dm.call("is_open"))
 
 
-## 把本节点上开着的面板全收掉（死亡界面调）。
-## **必须顺手解暂停** —— 面板的可见性与 paused 是一起管的，
-## 只藏面板不解暂停，新界面一出来游戏还是停着的
+## 把本节点上开着的面板全收掉（别的模态界面开之前调它让路）。
+##
+## **这里刻意不碰 `paused`。** 早先的版本顺手写了一句 `get_tree().paused = false`，
+## 理由是「面板的可见性与 paused 是一起管的」。那是个陷阱：调用方是「我要开一个新界面」，
+## 它自然会在自己那边设 `paused = true` —— 于是成败取决于两行的先后顺序。
+## 死亡界面侥幸写对了（先让路、后设暂停），铁匠铺（2026-09-14 加）写反了顺序，
+## 结果面板开着、游戏还在跑，只有拿帧号打点才看得出来。
+## 现在职责划清：本方法只管可见性，暂停归调用方
 func close_all_panels() -> void:
 	if _bag_open:
 		_bag_open = false
@@ -457,7 +465,6 @@ func close_all_panels() -> void:
 	if _skill_open:
 		_skill_open = false
 		_skill_panel.visible = false
-	get_tree().paused = false
 
 
 func refresh_bag() -> void:
@@ -469,10 +476,10 @@ func refresh_bag() -> void:
 	var normal := Color(0.9, 0.88, 0.84, 1)
 
 	# 上半：四个装备槽 —— 每行 [图标][槽位名　装备名　词条]
-	var eq := PlayerState.equipped_list()
 	for i in ItemData.SLOT_IDS.size():
 		var sel := _cursor == i
-		_fill_equip_row(_equip_rows[i], i, eq[i] as ItemData, CURSOR_MARK if sel else INDENT)
+		_fill_equip_row(_equip_rows[i], i, PlayerState.equipped_uid(ItemData.SLOT_IDS[i]),
+			CURSOR_MARK if sel else INDENT)
 		if sel:
 			_row_label(_equip_rows[i]).modulate = Color(1, 1, 1, 1)
 
@@ -490,14 +497,15 @@ func refresh_bag() -> void:
 			lbl.text = tr("UI_BAG_EMPTY") if (bag.is_empty() and r == 0) else ""
 			lbl.modulate = dim
 			continue
-		var it := load(str(bag[idx])) as ItemData
+		var uid := str(bag[idx])
+		var it := PlayerState.item_of(uid)
 		var row_sel := (_cursor - ItemData.SLOT_IDS.size()) == idx
 		icon.visible = true
 		icon.set_item(it)
 		lbl.text = "%s%s　%s" % [
 			CURSOR_MARK if row_sel else INDENT,
 			_item_name(it) if it != null else "?",
-			_stat_text(it) if it != null else "",
+			_stat_text(uid, it) if it != null else "",
 		]
 		lbl.modulate = Color(1, 1, 1, 1) if row_sel else normal
 
@@ -523,13 +531,20 @@ func _item_name(it: ItemData) -> String:
 	return n + " ★" if it.tier == ItemData.Tier.RARE else n
 
 
-## 一件装备的词条文本：「攻+15%　血+20」。三条都为 0 时给「—」，不显示空白
-func _stat_text(it: ItemData) -> String:
+## 一件装备的词条文本：「+2　攻+38%　血+20」。
+## **攻击那一项算的是「基础词条 + 强化」的合计** —— 设计原则 4.1 要求面板上的
+## 加成必须等于实际打出的倍率；强化既然在打怪时生效，就必须在面板上出现，
+## 开头的 `+N` 是它的来源标注。什么都没给时是「—」，不显示空白
+func _stat_text(uid: String, it: ItemData) -> String:
 	if it == null:
 		return ""
 	var parts: Array[String] = []
-	if not is_zero_approx(it.atk_bonus):
-		parts.append("%s+%d%%" % [tr("STAT_ATK"), int(round(it.atk_bonus * 100.0))])
+	var lv := PlayerState.forge_level(uid)
+	var atk := it.atk_bonus + PlayerState.forge_atk(uid)
+	if lv > 0:
+		parts.append("+%d" % lv)
+	if not is_zero_approx(atk):
+		parts.append("%s+%d%%" % [tr("STAT_ATK"), int(round(atk * 100.0))])
 	if it.hp_bonus != 0:
 		parts.append("%s+%d" % [tr("STAT_HP"), it.hp_bonus])
 	if not is_zero_approx(it.def_bonus):
@@ -594,6 +609,17 @@ func refresh_stage_label() -> void:
 		_stage_label.text = txt
 
 
+## 角色面板的「武器强化」那一行。
+## 逐件强化之后，强化不再是玩家身上的一个数字，而是**当前那把武器**的数字 ——
+## 没拿武器就写「—」，不要拿一个 0 假装有
+func _weapon_forge_line() -> String:
+	var uid := PlayerState.equipped_uid(&"weapon")
+	if uid.is_empty():
+		return "%s —" % tr("PANEL_WEAPON")
+	return "%s +%d/%d" % [
+		tr("PANEL_WEAPON"), PlayerState.forge_level(uid), PlayerState.forge_max(uid)]
+
+
 ## 经验那一行。满级时写「已满」而不是「0 / 0」——
 ## 后者会被读成「经验全丢了」，而实际上是「不需要了」
 func _exp_line(level: int, exp_pts: int) -> String:
@@ -624,12 +650,12 @@ func refresh_char_panel(h: Health) -> void:
 		# 直接显示 "PANEL_SHARD" 四个字，而且**不报任何错**。
 		# 漏翻 / 拼错 key 一律静默，只能靠截图或断言抓（截图抓到了）
 		"%s ×%d" % [tr("HUD_SHARD"), shards_of()],
-		"%s Lv.%d" % [tr("PANEL_WEAPON"), int(_player.get("upgrade_level"))],
+		_weapon_forge_line(),
 	]
 	_panel_text.text = "\n".join(lines)
 	# 装备四行带图标 —— 与背包面板同一个填法、同一套图标、同一个品质色
 	for i in ItemData.SLOT_IDS.size():
-		_fill_equip_row(_char_equip_rows[i], i, PlayerState.item_at(ItemData.SLOT_IDS[i]), "")
+		_fill_equip_row(_char_equip_rows[i], i, PlayerState.equipped_uid(ItemData.SLOT_IDS[i]), "")
 
 
 ## 技能栏：5 格各显各的技能。冷却遮罩从满格缩到无（造梦西游式），

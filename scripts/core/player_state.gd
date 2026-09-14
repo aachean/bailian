@@ -1,19 +1,28 @@
 extends Node
-## 玩家成长数据（autoload）：等级 / 经验 / 蓝量上限 / 装备 —— 「属于玩家」的东西。
+## 玩家成长数据（autoload）：等级 / 经验 / 蓝量上限 / 装备 / 强化 —— 「属于玩家」的东西。
 ##
 ## 与 PlayerState 合并过考虑——但它已经叫 PlayerState，等级经验就住在同一家：
-## 本文件实际承担 shards / upgrade / level / exp / 装备栏 / 背包 六样跨场景数据。
+## 本文件实际承担 shards / level / exp / 装备栏 / 背包 / 强化 六样跨场景数据。
 ## 升级逻辑也在这（纯数据 + 信号），玩家节点只负责听信号改血条和蓝上限。
 ##
 ## ── 装备为什么也存在这里 ──────────────────────────────────────
 ## 和碎片同一个理由：切场景会重建玩家节点，挂在节点上的东西会丢（实测丢过碎片）。
 ## 「属于玩家而不是属于关卡」的数据一律放 autoload，这是第三次因此改架构。
 ##
-## ── 装备用什么当键 ───────────────────────────────────────────
-## 存的是【资源路径】（"res://data/items/iron_sword.tres"）而不是 id。
-## 理由：读档时要拿回 ItemData 本身，路径可以一步 load()；用 id 还得再维护一张
-## id→路径的表，而那张表迟早会和目录里的文件对不上。代价是重命名资源文件会让
-## 老存档失效 —— 开发期可接受，写在这里备案。
+## ── 装备是【实例】，不是【型号】（2026-09-14 改）────────────────
+## 一开始存的是资源路径（"res://data/items/iron_sword.tres"）——
+## 那等于「铁剑」这个**型号**，于是两把铁剑在系统眼里是同一件东西。
+## 强化一旦做成逐件（设计原则 5.2：品质档位绑定强化上限），这个模型就塌了：
+## 练过的剑卖掉、再捡一把同型号的，它居然也是练过的。
+##
+## 现在每个**实例**有一个 uid：`资源路径#序号`，例如
+## `res://data/items/iron_sword.tres#7`。背包和装备栏存 uid，
+## 强化等级挂在 uid 上（`forge` 表），一件装备练到几级只跟它自己有关。
+##
+## **旧档天然兼容**：老存档里的纯路径就是一个「没有 # 后缀的 uid」，
+## path_of() 原样返回，forge 表里查不到就是 0 级。不需要迁移代码。
+##
+## 代价：重命名资源文件仍会让老档失效（开发期可接受，写在这里备案）。
 
 ## 升级时发。玩家听了加血上限 / 蓝上限并回满
 signal level_up(new_level: int)
@@ -22,19 +31,24 @@ signal level_up(new_level: int)
 ## 否则 HUD 上的经验条只会在切场景后「突然」跳起来（实测反馈）
 signal exp_changed(new_exp: int)
 
-## 装备栏或背包变化时发（穿戴 / 卸下 / 捡到新装备）。
-## 两件事共用一个信号：界面拿到它一律全量重刷，不做增量。
-## 场景里的玩家节点也听它 —— 换装要立刻改变攻击倍率 / 生命上限 / 减伤。
+## 装备栏 / 背包 / 强化变化时发（穿戴 / 卸下 / 捡到 / 强化成功）。
+## 这些事共用一个信号：界面拿到它一律全量重刷，不做增量。
+## 场景里的玩家节点也听它 —— 换装与强化要立刻改变攻击倍率 / 生命上限 / 减伤。
 signal equipment_changed
 
 ## 槽位 id，顺序与 ItemData.Slot 枚举一致
 const SLOT_IDS: Array[StringName] = [&"weapon", &"helm", &"armor", &"trinket"]
 
-## 成长曲线的唯一真相（等级上限 / 经验幂函数 / 每级给多少）。
-## 和 ItemData / EnemyData 同一套路：数字在 .tres，代码只读它 —— 调曲线不改代码
+## 实例 id 的分隔符
+const UID_SEP := "#"
+
+## 成长曲线的唯一真相（等级上限 / 经验幂函数 / 每级给多少）
 const PROGRESSION_PATH := "res://data/progression.tres"
+## 强化的唯一真相（品质上限 / 成本递增 / 收益递减）
+const FORGE_PATH := "res://data/forge.tres"
 
 @onready var progression: ProgressionData = load(PROGRESSION_PATH) as ProgressionData
+@onready var _forge: ForgeData = load(FORGE_PATH) as ForgeData
 
 ## 等级上限（给界面用，省得到处 PlayerState.progression.level_cap）
 @onready var level_cap: int = progression.level_cap
@@ -50,17 +64,22 @@ func is_max_level() -> bool:
 
 
 var shards: int = 0
-var upgrade_level: int = 0
 
 var level: int = 1
 var exp: int = 0
 
-## 装备栏：槽位 id → 装备资源路径。没穿的槽不在字典里
+## 装备栏：槽位 id → 装备**实例 uid**。没穿的槽不在字典里
 var equipped: Dictionary = {}
-## 背包：捡到但没穿的装备资源路径，按捡到的先后排
+## 背包：捡到但没穿的装备 uid，按捡到的先后排
 var bag: Array = []
+## 强化表：装备 uid → 强化等级。没练过的 uid 不在表里（= 0 级）
+var forge: Dictionary = {}
 
-## 主线进度标记（对话有没有发生过、奖励有没有给过）。键是字符串 flag 名，值都是 true。
+## 下一个要发的实例序号。进存档 —— 不存的话读档后从 1 重来，
+## 新捡的装备会和档案里已有的 uid 撞号，两件东西从此共享强化等级
+var next_uid: int = 1
+
+## 主线进度标记（有没有发生过、奖励有没有给过）。键是字符串 flag 名，值都是 true。
 ## 为什么用字典而不是一堆 bool 成员：flag 会越来越多（每个 NPC、每个主线节点一个），
 ## 加一个就要改存档结构、改 reset、改测试。字典是加一个 flag 零成本的形状。
 ## 存档里存的是普通字符串键，没进过历史的 flag 直接不存在 —— 老存档天然兼容。
@@ -84,11 +103,12 @@ var _bonus: Dictionary = {"atk": 0.0, "hp": 0, "def": 0.0}
 
 func reset_for_new_game() -> void:
 	shards = 0
-	upgrade_level = 0
 	level = 1
 	exp = 0
 	equipped.clear()
 	bag.clear()
+	forge.clear()
+	next_uid = 1
 	flags.clear()
 	skill_slots = _empty_slots()
 	_recalc_bonus()
@@ -98,11 +118,14 @@ func reset_for_new_game() -> void:
 
 func load_from(d: Dictionary) -> void:
 	shards = int(d.get("shards", shards))
-	upgrade_level = int(d.get("upgrade", upgrade_level))
 	level = progression.clamp_level(int(d.get("level", level)))
 	exp = int(d.get("exp", exp))
 	equipped = (d.get("equipped", {}) as Dictionary).duplicate()
 	bag = (d.get("bag", []) as Array).duplicate()
+	forge = (d.get("forge", {}) as Dictionary).duplicate()
+	next_uid = int(d.get("next_uid", 0))
+	_migrate_legacy_upgrade(int(d.get("upgrade", 0)))
+	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
 	skill_slots = _empty_slots()
@@ -116,20 +139,139 @@ func load_from(d: Dictionary) -> void:
 func save_to() -> Dictionary:
 	return {
 		"shards": shards,
-		"upgrade": upgrade_level,
 		"level": level,
 		"exp": exp,
 		"equipped": equipped.duplicate(),
 		"bag": bag.duplicate(),
+		"forge": forge.duplicate(),
+		"next_uid": next_uid,
 		"flags": flags.duplicate(),
 		"skill_slots": skill_slots.duplicate(),
 	}
+
+
+## 老档的「全局强化等级」搬到当前武器上（clamp 到该品质的上限）。
+## 旧档里 upgrade 是玩家身上的一个数字，与装备无关 —— 新模型里没有它的位置了。
+## 找不到武器就丢掉（无法归属），这一点写在 ADR 里
+func _migrate_legacy_upgrade(legacy: int) -> void:
+	if legacy <= 0:
+		return
+	var w := equipped_uid(&"weapon")
+	if w.is_empty():
+		return
+	forge[w] = mini(legacy, forge_max(w))
+
+
+## 把 next_uid 推到「所有已存在 uid 的最大序号 + 1」之后。
+## 存档里没带 next_uid（旧档 / 手改档）时靠这一步兜底，
+## 否则新捡的装备会撞上档案里已有的 uid
+func _ensure_uid_counter() -> void:
+	var max_seen := 0
+	var all: Array = bag.duplicate()
+	for s in SLOT_IDS:
+		all.append(equipped_uid(s))
+	for u in all:
+		var i := str(u).find(UID_SEP)
+		if i >= 0:
+			max_seen = maxi(max_seen, int(str(u).substr(i + 1)))
+	next_uid = maxi(next_uid, max_seen + 1)
 
 
 func _empty_slots() -> Array:
 	var out: Array = []
 	for _i in SKILL_SLOT_COUNT:
 		out.append("")
+	return out
+
+
+# ── 装备实例 id ────────────────────────────────────────────────
+
+## 新实例的 uid。序号全局递增，不按路径分 —— 只要在同一份存档里唯一就够了
+func make_uid(path: String) -> String:
+	var uid := "%s%s%d" % [path, UID_SEP, next_uid]
+	next_uid += 1
+	return uid
+
+
+## uid → 资源路径。**没有 # 的串原样返回** —— 老存档里的纯路径就是这种情况
+func path_of(uid: String) -> String:
+	var i := uid.find(UID_SEP)
+	return uid if i < 0 else uid.substr(0, i)
+
+
+## uid → 装备数据。坏路径返回 null（不崩）
+func item_of(uid: String) -> ItemData:
+	if uid.is_empty():
+		return null
+	return load(path_of(uid)) as ItemData
+
+
+# ── 强化 ───────────────────────────────────────────────────────
+
+## 这件装备练到几级了（没练过 = 0）
+func forge_level(uid: String) -> int:
+	return int(forge.get(uid, 0))
+
+
+## 这件装备能练到几级（按品质）。不是装备资源就返回 0
+func forge_max(uid: String) -> int:
+	var it := item_of(uid)
+	return 0 if it == null else _forge.max_for_tier(int(it.tier))
+
+
+## 从当前等级再练一级要花多少精铁
+func forge_cost(uid: String) -> int:
+	return _forge.cost_at_level(forge_level(uid))
+
+
+## 这件装备的强化贡献的攻击加成（已含收益递减）
+func forge_atk(uid: String) -> float:
+	return _forge.atk_bonus_at(forge_level(uid))
+
+
+## 练到 level 级时总共给多少攻击加成（**不看具体哪件**）。
+## 面板要显示「再练一级能多多少」，断言要验「每级给的比上一级少」—— 两条都需要它
+func forge_atk_at(level: int) -> float:
+	return _forge.atk_bonus_at(level)
+
+
+func forge_is_maxed(uid: String) -> bool:
+	return forge_level(uid) >= forge_max(uid)
+
+
+## 现在能不能强化这一件（没到顶 + 精铁够）
+func can_forge(uid: String) -> bool:
+	return not uid.is_empty() and not forge_is_maxed(uid) and shards >= forge_cost(uid)
+
+
+## 强化一级。花掉精铁、写进 forge 表、重算属性并发信号。
+## 返回 true = 成功了；false = 到顶了 / 精铁不够 / 不是装备
+func forge_once(uid: String) -> bool:
+	if not can_forge(uid):
+		return false
+	shards -= forge_cost(uid)
+	forge[uid] = forge_level(uid) + 1
+	_recalc_bonus()
+	equipment_changed.emit()
+	return true
+
+
+## 摆回实例计数器（读档用）。直接写字段也行，但这个方法会顺手跟已有的 uid 取大值 ——
+## 手改过档 / 旧档漏了 next_uid 时，这是最后一道兜底
+func set_uid_counter(n: int) -> void:
+	next_uid = maxi(n, 1)
+	_ensure_uid_counter()
+
+
+## 所有能强化的装备（已装备的 4 件在前，背包在后），元素是 uid。
+## 铁匠铺的列表就用它 —— 顺序稳定，光标不会跳
+func forgeable_uids() -> Array:
+	var out: Array = []
+	for s in SLOT_IDS:
+		var uid := equipped_uid(s)
+		if not uid.is_empty():
+			out.append(uid)
+	out.append_array(bag)
 	return out
 
 
@@ -208,10 +350,14 @@ func auto_fill_slots(available: Array) -> bool:
 
 # ── 装备栏操作 ─────────────────────────────────────────────────
 
+## 某槽位穿着的装备 uid（空槽返回空串）
+func equipped_uid(slot: StringName) -> String:
+	return str(equipped.get(String(slot), ""))
+
+
 ## 取某个槽位穿着的装备。空槽返回 null
 func item_at(slot: StringName) -> ItemData:
-	var p := str(equipped.get(String(slot), ""))
-	return load(p) as ItemData if not p.is_empty() else null
+	return item_of(equipped_uid(slot))
 
 
 ## 按槽位顺序取「当前穿着的全部装备」，空槽是 null（界面按顺序画四行）
@@ -222,57 +368,66 @@ func equipped_list() -> Array:
 	return out
 
 
-## 捡到一件装备：进背包。返回 false = 这不是一件装备（路径坏 / 不是 ItemData）
-func add_item(path: String) -> bool:
+## 捡到一件装备：发一个新实例 id 进背包。返回新 uid；空串 = 这不是一件装备
+func add_item(path: String) -> String:
 	if not (load(path) is ItemData):
 		push_warning("PlayerState: 不是装备资源: %s" % path)
-		return false
-	bag.append(path)
+		return ""
+	var uid := make_uid(path)
+	bag.append(uid)
 	equipment_changed.emit()
-	return true
+	return uid
 
 
-## 穿上一件背包里的装备。返回被替换下来的那件（"" = 原来空槽）。
+## 穿上一件背包里的装备（参数是 uid）。返回被替换下来的那件 uid（"" = 原来空槽）。
 ## 换下来的自动回背包 —— 玩家不该因为换装而丢东西
-func equip(path: String) -> String:
-	var item := load(path) as ItemData
+func equip(uid: String) -> String:
+	var item := item_of(uid)
 	if item == null:
 		return ""
-	var idx := bag.find(path)
-	if idx >= 0:
-		bag.remove_at(idx)
+	_remove_from_bag(uid)
 	var slot := String(item.slot_id())
-	var old := str(equipped.get(slot, ""))
+	var old := equipped_uid(StringName(slot))
 	if not old.is_empty():
 		bag.append(old)          # 换下来的回背包
-	equipped[slot] = path
+	equipped[slot] = uid
 	_recalc_bonus()
 	equipment_changed.emit()
 	return old
 
 
-## 卸下某个槽位，装备回背包。返回卸下的路径（"" = 本来就空着）
+## 卸下某个槽位，装备回背包。返回卸下的 uid（"" = 本来就空着）
 func unequip(slot: StringName) -> String:
 	var key := String(slot)
-	var path := str(equipped.get(key, ""))
-	if path.is_empty():
+	var uid := str(equipped.get(key, ""))
+	if uid.is_empty():
 		return ""
 	equipped.erase(key)
-	bag.append(path)
+	bag.append(uid)
 	_recalc_bonus()
 	equipment_changed.emit()
-	return path
+	return uid
 
 
-## 全部装备的词条总和：{"atk": 倍率, "hp": 点, "def": 减伤比例}
+## 背包里去掉某件（穿上时调）。找不到就什么都不做 ——
+## 老档里的装备可能是「直接摆进装备栏」的，不在背包里
+func _remove_from_bag(uid: String) -> void:
+	var idx := bag.find(uid)
+	if idx >= 0:
+		bag.remove_at(idx)
+
+
+## 全部装备的词条总和（含各件的强化加成）：{"atk": 倍率, "hp": 点, "def": 减伤比例}
 func bonus_total() -> Dictionary:
 	return _bonus
 
 
-## 直接摆入装备栏与背包（读档用）。摆完重算词条并发信号让玩家节点跟上
-func set_equipment(e: Dictionary, b: Array) -> void:
+## 直接摆入装备栏、背包与强化表（读档用）。摆完重算词条并发信号让玩家节点跟上
+func set_equipment(e: Dictionary, b: Array, f: Dictionary = {}) -> void:
 	equipped = e.duplicate()
 	bag = b.duplicate()
+	forge = f.duplicate()
+	_ensure_uid_counter()
 	_recalc_bonus()
 	equipment_changed.emit()
 
@@ -282,10 +437,11 @@ func _recalc_bonus() -> void:
 	var hp := 0
 	var def := 0.0
 	for s in SLOT_IDS:
-		var it := item_at(s)
+		var uid := equipped_uid(s)
+		var it := item_of(uid)
 		if it == null:
 			continue
-		atk += it.atk_bonus
+		atk += it.atk_bonus + forge_atk(uid)     # 强化加成叠进同一个乘区（设计原则 4.1）
 		hp += it.hp_bonus
 		def += it.def_bonus
 	_bonus = {"atk": atk, "hp": hp, "def": def}

@@ -149,7 +149,7 @@ func _reset() -> void:
 	PlayerState.skill_slots = ["", "", "", "", ""]
 	_player.set("level", 1)
 	_player.set("exp_pts", 0)
-	_player.set("upgrade_level", 0)
+	PlayerState.set_equipment(PlayerState.equipped, PlayerState.bag, {})   # 强化钉回基线（逐件之后没有全局等级了）
 
 
 func _cooldowns() -> Array:

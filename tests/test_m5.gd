@@ -59,6 +59,25 @@ func _ready() -> void:
 	get_tree().quit(0 if _fail == 0 else 1)
 
 
+## 捡一件并立刻穿上，返回实例 uid。
+## **装备走实例 uid**（强化等级挂在实例上），路径只是「型号」——
+## 测试里也不能拿路径当装备的凭据，否则会穿上一件、背包里留一件
+func _wear(path: String) -> String:
+	var uid: String = PlayerState.add_item(path)
+	PlayerState.equip(uid)
+	return uid
+
+
+## 包里有没有这个**型号**的装备。
+## 直接写 bag.has(路径) 会永远为假（背包里存的是 uid#序号），
+## 断言于是静默变成「永远不通过」——这类假绿比真红更难查
+func _in_bag(path: String) -> bool:
+	for u in PlayerState.bag:
+		if PlayerState.path_of(str(u)) == path:
+			return true
+	return false
+
+
 func _check(id: String, desc: String, ok: bool, detail: String) -> void:
 	if ok:
 		_pass += 1
@@ -104,7 +123,7 @@ func _reset_stats() -> void:
 	PlayerState.exp = 0
 	_player.set("level", 1)
 	_player.set("exp_pts", 0)
-	_player.set("upgrade_level", 0)
+	PlayerState.set_equipment(PlayerState.equipped, PlayerState.bag, {})   # 强化钉回基线（逐件之后没有全局等级了）
 	_player.set("shards", 0)
 	_player.call("_apply_upgrade")
 	_player.get_node("Health").heal_full()
@@ -174,7 +193,7 @@ func _t2_walk_over_pickup() -> void:
 	var gained: int = PlayerState.bag.size() - before
 	var on_ground := _item_pickups()
 	_check("2", "走到装备上自动拾取，进背包（地上不再留着）",
-		gained == 1 and PlayerState.bag.has(IRON_SWORD),
+		gained == 1 and _in_bag(IRON_SWORD),
 		"背包 %d → %d（+%d）　地上剩余装备掉落物 %d" % [
 			before, PlayerState.bag.size(), gained, on_ground])
 
@@ -184,10 +203,8 @@ func _t3_equip_raises_attack() -> void:
 	await _place(320.0)
 	# 前面打 Boss 给了 60 经验，等级已经变了 —— 倍率断言要先把成长值钉回基线
 	_reset_stats()
-	if not PlayerState.bag.has(IRON_SWORD):
-		PlayerState.add_item(IRON_SWORD)
 	var before := _scale()
-	PlayerState.equip(IRON_SWORD)
+	_wear(IRON_SWORD)
 	await _pframes(2)
 	var after := _scale()
 	_check("3", "穿上铁剑：攻击倍率 +15%（装备词条进了伤害管线）",
@@ -197,12 +214,11 @@ func _t3_equip_raises_attack() -> void:
 
 ## 同部位再穿一件：旧的自动回背包，不丢东西
 func _t4_same_slot_replaces() -> void:
-	PlayerState.add_item(FLAME_BLADE)
 	var bag_before: int = PlayerState.bag.size()
-	PlayerState.equip(FLAME_BLADE)
+	_wear(FLAME_BLADE)
 	await _pframes(2)
 	var wearing := PlayerState.item_at(&"weapon")
-	var back_in_bag := PlayerState.bag.has(IRON_SWORD)
+	var back_in_bag := _in_bag(IRON_SWORD)
 	var scale_now := _scale()
 	_check("4", "换同部位装备：旧的自动回背包，新件生效（+30%）",
 		wearing != null and wearing.id == &"flame_blade" and back_in_bag \
@@ -219,7 +235,7 @@ func _t5_unequip_returns_to_bag() -> void:
 	await _pframes(2)
 	var after := _scale()
 	var slot_empty := PlayerState.item_at(&"weapon") == null
-	var back := PlayerState.bag.has(FLAME_BLADE)
+	var back := _in_bag(FLAME_BLADE)
 	_check("5", "卸下武器：回背包、倍率回落到没穿装备的水平",
 		slot_empty and back and is_equal_approx(round(after * 100.0) / 100.0, 1.0),
 		"槽空=%s　烈焰刃回背包=%s　倍率 %.2f → %.2f（期望 1.00）" % [
@@ -232,8 +248,7 @@ func _t6_hp_bonus_raises_max_hp() -> void:
 	await _pframes(1)
 	var hp_before := _max_hp()
 	var cur_before := int((_player.get_node("Health") as Health).hp)
-	PlayerState.add_item(IRON_HELM)
-	PlayerState.equip(IRON_HELM)
+	_wear(IRON_HELM)
 	await _pframes(2)
 	var hp_after := _max_hp()
 	var cur_after := int((_player.get_node("Health") as Health).hp)
@@ -249,8 +264,7 @@ func _t7_def_bonus_reduces_damage() -> void:
 	h.heal_full()
 	var no_armor: int = h.take_damage(20, Vector2.ZERO, false, 0)
 	h.heal_full()
-	PlayerState.add_item(IRON_ARMOR)
-	PlayerState.equip(IRON_ARMOR)
+	_wear(IRON_ARMOR)
 	await _pframes(2)
 	var reduction: float = h.damage_reduction
 	h.heal_full()
@@ -350,10 +364,8 @@ func _t10_cursor_and_equip_by_key() -> void:
 func _t11_panel_shows_names_and_stats() -> void:
 	var hud := _player.get_node("HUD")
 	PlayerState.set_equipment({}, [])
-	PlayerState.add_item(IRON_HELM)
-	PlayerState.add_item(FLAME_BLADE)
-	PlayerState.equip(IRON_HELM)
-	PlayerState.equip(FLAME_BLADE)
+	_wear(IRON_HELM)
+	_wear(FLAME_BLADE)
 	await _pframes(2)
 	_press("bag")
 	await _pframes(3)
@@ -455,8 +467,7 @@ func _t13_no_translation_key_leak() -> void:
 func _t14_item_icons() -> void:
 	var hud := _player.get_node("HUD")
 	PlayerState.set_equipment({}, [])
-	PlayerState.add_item(IRON_HELM)
-	PlayerState.equip(IRON_HELM)
+	_wear(IRON_HELM)
 	await _pframes(2)
 	_press("bag")
 	await _pframes(3)
@@ -475,8 +486,7 @@ func _t14_item_icons() -> void:
 	var empty_row_ok: bool = empty_bag_icon != null and not empty_bag_icon.visible
 
 	# 换一把武器：图标要跟着换（不是画完就定死）
-	PlayerState.add_item(FLAME_BLADE)
-	PlayerState.equip(FLAME_BLADE)
+	_wear(FLAME_BLADE)
 	await _pframes(2)
 	var switched: bool = weapon_icon.item() != null and weapon_icon.item().id == &"flame_blade"
 
@@ -532,8 +542,7 @@ func _t15_blade_takes_weapon_color() -> void:
 	var plain: Color = blade.color
 	var plain_reach: float = blade.offset_right
 
-	PlayerState.add_item(FLAME_BLADE)
-	PlayerState.equip(FLAME_BLADE)
+	_wear(FLAME_BLADE)
 	await _pframes(2)
 	var armed: Color = blade.color
 	var armed_reach: float = blade.offset_right

@@ -123,7 +123,6 @@ var hurts_taken: int = 0
 var deaths: int = 0
 ## 精铁碎片（强化素材）与武器强化等级 —— 进存档，随快照恢复
 var shards: int = 0
-var upgrade_level: int = 0
 ## 等级 / 经验跨场景住在 PlayerState；蓝量是场景内资源（回城满蓝）
 var level: int = 1
 var exp_pts: int = 0
@@ -172,17 +171,21 @@ const FALL_KILL_Y := 800.0
 func apply_saved(d: Dictionary) -> void:
 	_end_action()
 	shards = int(d.get("shards", shards))
-	upgrade_level = int(d.get("upgrade", upgrade_level))
 	level = PlayerState.progression.clamp_level(int(d.get("level", level)))
 	exp_pts = int(d.get("exp", exp_pts))
 	mp = int(d.get("mp", max_mp))
 	PlayerState.shards = shards
-	PlayerState.upgrade_level = upgrade_level
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
-	# 装备栏 / 背包也在快照里，先摆回 PlayerState 再算属性
-	if d.has("equipped") or d.has("bag"):
-		PlayerState.set_equipment(d.get("equipped", {}) as Dictionary, d.get("bag", []) as Array)
+	# 装备栏 / 背包 / 强化表也在快照里，先摆回 PlayerState 再算属性。
+	# 实例计数器必须比 set_equipment 先摆 —— 后者会拿它去和已有的 uid 取大值兜底
+	if d.has("next_uid"):
+		PlayerState.set_uid_counter(int(d.get("next_uid", 1)))
+	if d.has("equipped") or d.has("bag") or d.has("forge"):
+		PlayerState.set_equipment(
+			d.get("equipped", {}) as Dictionary,
+			d.get("bag", []) as Array,
+			d.get("forge", {}) as Dictionary)
 	# 携带的技能同理
 	if d.has("skill_slots"):
 		PlayerState.skill_slots = (d.get("skill_slots", []) as Array).duplicate()
@@ -243,7 +246,6 @@ func _ready() -> void:
 	# 碎片 / 强化 / 等级经验是「属于玩家」的数据，住在 PlayerState（autoload）里 ——
 	# 切场景会重建玩家节点，存在节点上的东西会丢（实测丢过）
 	shards = PlayerState.shards
-	upgrade_level = PlayerState.upgrade_level
 	level = PlayerState.level
 	exp_pts = PlayerState.exp
 	# 回城即治疗：进场景满血满蓝；等级越高蓝上限越高
@@ -314,7 +316,6 @@ func _exit_tree() -> void:
 	# 离开场写回：下一次进任何场景，碎片和等级都还在。
 	# 装备栏 / 背包不在这里写回 —— 它们本来就住在 PlayerState，玩家节点只是读者
 	PlayerState.shards = shards
-	PlayerState.upgrade_level = upgrade_level
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
 
@@ -365,10 +366,6 @@ func _update_hp_bar(_hp: int, _max_hp: int) -> void:
 	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
 
 
-## 武器强化每级 +20%。角色等级那一份从 ProgressionData 取（不再是写死的常量）——
-## 改的是 Hitbox 的伤害倍率，技能表（招式本身）不动 —— 强化的是人，不是招
-const UPGRADE_STEP := 0.2
-
 ## 手里那把刀的样子。攻击时挥出的光刃跟着【当前武器】走：换了武器，
 ## 刃的颜色（品质色）和长度都跟着变 —— 装备变强必须看得见，光看面板数字不够
 const BLADE_BASE_COLOR := Color(0.96, 0.92, 0.76)
@@ -382,8 +379,9 @@ const BLADE_BASE_REACH := 42.0
 func _apply_upgrade() -> void:
 	var bonus := PlayerState.bonus_total()
 	var prog := PlayerState.progression
-	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level) \
-		+ prog.atk_bonus_at(level) + float(bonus.get("atk", 0.0))
+	# 攻击倍率只有一个乘区（设计原则 4.1）：等级 + 装备词条 + 逐件强化。
+	# 后两样都已经在 bonus 里（_recalc_bonus 把强化加成也算进去了），这里只补等级那一份
+	_hitbox.damage_scale = 1.0 + prog.atk_bonus_at(level) + float(bonus.get("atk", 0.0))
 	_set_max_hp(prog.hp_at(level) + int(bonus.get("hp", 0)))
 	_base_reduction = float(bonus.get("def", 0.0))
 	_health.damage_reduction = _base_reduction
@@ -422,7 +420,7 @@ func _on_equipment_changed() -> void:
 
 ## 拾取装备（地面掉落物调）。装备本体进 PlayerState 的背包，玩家节点只负责表现
 func collect_item(path: String) -> void:
-	if not PlayerState.add_item(path):
+	if PlayerState.add_item(path).is_empty():
 		return
 	var it := load(path) as ItemData
 	if it != null:

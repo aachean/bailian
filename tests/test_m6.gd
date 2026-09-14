@@ -47,6 +47,16 @@ func _ready() -> void:
 	get_tree().quit(0 if _fail == 0 else 1)
 
 
+## 包里有没有这个**型号**的装备。
+## 背包里存的是实例 uid（`路径#序号`），直接写 bag.has(路径) 永远为假 ——
+## 那会让断言静默变成「永远不通过」
+func _in_bag(path: String) -> bool:
+	for u in PlayerState.bag:
+		if PlayerState.path_of(str(u)) == path:
+			return true
+	return false
+
+
 func _check(id: String, desc: String, ok: bool, detail: String) -> void:
 	if ok:
 		_pass += 1
@@ -101,7 +111,7 @@ func _reset_progress() -> void:
 	PlayerState.set_equipment({}, [])
 	PlayerState.flags.clear()
 	PlayerState.shards = 0
-	PlayerState.upgrade_level = 0
+	PlayerState.set_equipment(PlayerState.equipped, PlayerState.bag, {})   # 强化钉回基线（逐件之后没有全局等级了）
 	PlayerState.level = 1
 	PlayerState.exp = 0
 
@@ -185,7 +195,7 @@ func _t5_close_and_reward() -> void:
 	var closed: bool = not bool(_box.call("is_open"))
 	var resumed: bool = not get_tree().paused
 	var root_hidden: bool = not (_box.get_node("Root") as Control).visible
-	var got: bool = PlayerState.bag.has("res://data/items/iron_sword.tres")
+	var got: bool = _in_bag("res://data/items/iron_sword.tres")
 	var flagged: bool = PlayerState.has_flag(&"met_smith")
 	_check("5", "说完最后一句按 J：对话关闭、世界恢复，并获得铁匠给的一把剑",
 		fourth and closed and resumed and root_hidden and got and flagged,

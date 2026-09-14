@@ -55,7 +55,7 @@ func _wipe_all_slots() -> void:
 	for s in range(1, SaveManager.SLOT_COUNT + 1):
 		SaveManager.erase_slot(s)
 	PlayerState.shards = 0
-	PlayerState.upgrade_level = 0
+	PlayerState.set_equipment(PlayerState.equipped, PlayerState.bag, {})   # 强化钉回基线（逐件之后没有全局等级了）
 
 
 ## 菜单能摆出来：标题 + 五个按钮，文案是真话不是 key

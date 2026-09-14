@@ -11,6 +11,8 @@ extends Node
 const TOWN := preload("res://scenes/stages/town.tscn")
 const LICHANG := preload("res://scenes/stages/lichang.tscn")
 
+const IRON_SWORD := "res://data/items/iron_sword.tres"   # 精良武器｜攻 +15%，强化上限 5
+
 var _pass := 0
 var _fail := 0
 ## 测试房的地面：被测实体（怪 / 碎片 / 玩家）在无重力环境里下落会让
@@ -44,8 +46,8 @@ func _ready() -> void:
 	await _t6_town_walkable()
 	await _t7_boss_present()
 	await _t8_drop_and_pickup()
-	await _t9_anvil_upgrade()
-	await _t10_upgrade_survives_snapshot()
+	await _t9_forge_at_anvil()
+	await _t10_forge_survives_snapshot()
 	await _t11_shards_survive_scene_change()
 	await _t12_hud_shows_player_state()
 
@@ -66,6 +68,18 @@ func _check(id: String, desc: String, ok: bool, detail: String) -> void:
 func _pframes(n: int) -> void:
 	for _i in n:
 		await get_tree().physics_frame
+
+
+## 注入一次**真实按键**。铁匠铺这类「上下选 + 确认」的界面按的是具体键位
+## （KEY_J / KEY_UP），用 _press 那种 InputEventAction 注入它们收不到 ——
+## 事件类型对不上，界面在自己那一层就静默返回了
+func _tap_key(code: Key) -> void:
+	for pressed in [true, false]:
+		var ev := InputEventKey.new()
+		ev.keycode = code
+		ev.physical_keycode = code
+		ev.pressed = pressed
+		Input.parse_input_event(ev)
 
 
 func _press(action: String) -> void:
@@ -357,99 +371,130 @@ func _t8_drop_and_pickup() -> void:
 
 
 ## 铁砧强化：3 碎片 → 1 级，攻击伤害倍率真的上去
-func _t9_anvil_upgrade() -> void:
+## 铁匠铺：站上铁砧按 J 开面板 → 面板里选中一件按 J 强化 → 倍率涨、精铁扣。
+##
+## 2026-09-14 改：原来是「按一下 J 就把【全局强化等级】+1」。
+## 强化改成**逐件 + 按品质封顶**之后（设计原则 5.2 / 5.4），铁砧只负责把界面叫出来 ——
+## 「练哪一件」是玩家的决定。所以断言改成盯：面板开没开、光标选中的是不是那一件、
+## 强化的是不是**那一件**、别的有没有被牵连
+func _t9_forge_at_anvil() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 10
+	var uid: String = PlayerState.add_item(IRON_SWORD)
+	PlayerState.equip(uid)
 	var town := TOWN.instantiate()
 	add_child(town)
 	await _pframes(3)
 	var player := town.get_node("Player")
 	var anvil := town.get_node("Anvil")
-
+	var panel := player.get_node("ForgePanel")
 	player.global_position = anvil.global_position + Vector2(0, -8)
-	player.set("shards", 3)
-	player.set("upgrade_level", 0)
-	player.call("_apply_upgrade")
 	await _pframes(6)
 	var scale0: float = (player.get_node("Hitbox") as Hitbox).damage_scale
 
-	_press("attack")
+	_press("attack")                 # 站上铁砧按 J → 开铁匠铺
 	await _pframes(4)
 	_release("attack")
+	await _pframes(2)
+	# 暂停状态要在**打开那一刻**存下来：下面 detail 里的求值发生在 Esc 之后，
+	# 那时已经恢复运行，直接写 get_tree().paused 会打出一句与事实相反的话
+	var paused_when_open: bool = get_tree().paused
+	var opened: bool = bool(panel.call("is_open")) and paused_when_open
+	var picked: String = str(panel.call("selected_uid"))
+
+	_tap_key(KEY_J)                  # 面板里按 J → 强化光标那一件
 	await _pframes(4)
+	var lv := PlayerState.forge_level(uid)
+	var shards: int = PlayerState.shards
 	var scale1: float = (player.get_node("Hitbox") as Hitbox).damage_scale
-	var lvl: int = int(player.get("upgrade_level"))
-	var shards: int = int(player.get("shards"))
+
+	_tap_key(KEY_ESCAPE)             # Esc 关掉
+	await _pframes(4)
+	var closed: bool = not bool(panel.call("is_open")) and not get_tree().paused
+
+	var expect: float = 1.0 + PlayerState.progression.atk_bonus_at(PlayerState.level) \
+		+ (load(IRON_SWORD) as ItemData).atk_bonus + PlayerState.forge_atk(uid)
 	town.queue_free()
 	await _pframes(2)
 
-	_check("9", "铁砧强化：3 碎片换 1 级，攻击伤害倍率 +20%",
-		is_equal_approx(scale0, 1.0) and is_equal_approx(scale1, 1.2)
-			and lvl == 1 and shards == 0,
-		"倍率 %.2f → %.2f　等级 %d　碎片剩 %d" % [scale0, scale1, lvl, shards])
+	_check("9", "铁匠铺：站上铁砧按 J 开面板 → 选中那件按 J 强化（倍率涨、精铁 -3）",
+		opened and picked == uid and lv == 1 and shards == 7 \
+			and is_equal_approx(scale1, expect) and closed,
+		"开面板=%s（当时暂停=%s）　光标选中=穿着的武器=%s　强化 +%d　精铁 10→%d　"
+		% [str(opened), str(paused_when_open), str(picked == uid), lv, shards]
+		+ "倍率 %.3f → %.3f（期望 %.3f）　Esc 关掉=%s" % [scale0, scale1, expect, str(closed)])
 
 
 ## 强化与碎片进快照 —— 「继续游戏」不能把练好的武器吐回去
-func _t10_upgrade_survives_snapshot() -> void:
+## 强化等级与装备实例进快照 —— 「继续游戏」不能把练好的武器吐回去，
+## 也不能把装备认成「另一件同型号的」（那样强化等级就丢了）
+func _t10_forge_survives_snapshot() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 7
+	var uid: String = PlayerState.add_item(IRON_SWORD)
+	PlayerState.equip(uid)
+	PlayerState.forge_once(uid)                  # 花掉 3，剩 4，+1 级
+
 	var room := (load("res://scenes/stages/test_room.tscn") as PackedScene).instantiate()
 	add_child(room)
 	await _pframes(3)
-	var player := room.get_node("Player")
-	player.set("shards", 7)
-	player.set("upgrade_level", 2)
 	var snap := room.call("collect") as Dictionary
 
 	# 现场清零，再从快照恢复
-	player.set("shards", 0)
-	player.set("upgrade_level", 0)
+	PlayerState.shards = 0
+	PlayerState.forge.clear()
+	PlayerState.set_equipment({}, [])
 	room.call("_apply_state", snap)
 	await _pframes(2)
-	var shards: int = int(player.get("shards"))
-	var lvl: int = int(player.get("upgrade_level"))
-	var scale: float = (player.get_node("Hitbox") as Hitbox).damage_scale
+	var shards: int = PlayerState.shards
+	var lv := PlayerState.forge_level(uid)
+	var same_uid: bool = PlayerState.equipped_uid(&"weapon") == uid
 	room.queue_free()
 	await _pframes(2)
 
-	_check("10", "碎片与强化等级进快照，继续游戏原样回来",
-		shards == 7 and lvl == 2 and is_equal_approx(scale, 1.4),
-		"碎片 %d（期望 7）　等级 %d（期望 2）　倍率 %.2f（期望 1.40）" % [shards, lvl, scale])
+	_check("10", "强化等级与装备实例进快照，继续游戏原样回来",
+		shards == 4 and lv == 1 and same_uid,
+		"精铁 %d（期望 4）　武器强化 +%d（期望 1）　实例 id 一致=%s" % [
+			shards, lv, str(same_uid)])
 
 
 ## 碎片跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。
 ## 根因：碎片存在玩家节点上，切场景玩家整个重建。现在住在 PlayerState（autoload），
 ## 玩家 _exit_tree 写回、_ready 读出。这条测试模拟完整的「城镇 → 关卡」重建。
+## 碎片跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。
+## 根因：碎片存在玩家节点上，切场景玩家整个重建。现在住在 PlayerState（autoload），
+## 玩家 _exit_tree 写回、_ready 读出。这条测试模拟完整的「城镇 → 关卡」重建。
 func _t11_shards_survive_scene_change() -> void:
-	PlayerState.shards = 0
-	PlayerState.upgrade_level = 0
+	PlayerState.reset_for_new_game()
 
 	var town := TOWN.instantiate()
 	add_child(town)
 	await _pframes(3)
 	var town_player := town.get_node("Player")
 	town_player.set("shards", 5)
-	town_player.set("upgrade_level", 1)
 	town.queue_free()               # 触发 _exit_tree 写回 PlayerState
 	await _pframes(3)
 
-	var wrote_back: bool = PlayerState.shards == 5 and PlayerState.upgrade_level == 1
+	var wrote_back: bool = PlayerState.shards == 5
 
 	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
 	var level_player := level.get_node("Player")
-	var carried: bool = int(level_player.get("shards")) == 5 \
-		and int(level_player.get("upgrade_level")) == 1
-	var scale: float = (level_player.get_node("Hitbox") as Hitbox).damage_scale
+	# 先把值取出来再释放 —— 释放之后再 get() 就是「对已释放实例调方法」，
+	# 报错而不崩，但 detail 会变成一句废话
+	var carried_shards: int = int(level_player.get("shards"))
+	var carried: bool = carried_shards == 5
 	level.queue_free()
 	await _pframes(2)
 
 	_check("11", "关卡里捡的碎片，回城镇还在（跨场景不丢）",
-		wrote_back and carried and is_equal_approx(scale, 1.2),
-		"写回 autoload=%s　新场景带过来=%s　强化倍率 %.2f（期望 1.20）" % [
-			str(wrote_back), str(carried), scale])
+		wrote_back and carried,
+		"写回 autoload=%s　新场景带过来=%s（%d）" % [
+			str(wrote_back), str(carried), carried_shards])
 	PlayerState.shards = 0
-	PlayerState.upgrade_level = 0
 
 
-## HUD：左上角色状态、右上背包，数字跟玩家走
 func _t12_hud_shows_player_state() -> void:
 	var town := TOWN.instantiate()
 	add_child(town)

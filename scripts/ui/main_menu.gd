@@ -81,16 +81,20 @@ func _slot_text(slot: int, index: int) -> String:
 	var st := info.get("state", {}) as Dictionary
 	var player := st.get("player", {}) as Dictionary
 	var shards := int(player.get("shards", 0))
-	var upgrade := int(player.get("upgrade", 0))
+	var level := int(player.get("level", 1))
 	var level_file := str(info.get("level", "")).get_file().get_basename()
 	var place := tr("UI_LEVEL_" + level_file.to_upper())
-	# 旧结构的档：等级 / 装备 / 精铁都在，但「打到第几关」那套记录已经作废
-	# （线性三关 → 地图/副本/关卡三层）。**不能静默** ——
-	# 玩家点进去会发现自己站在城镇、进度从头开始，得先在这里说清楚
-	var stale := SaveManager.slot_version(slot) < SaveManager.VERSION
+	# 旧结构的档（三层结构之前存的）：等级 / 装备 / 精铁都在，但「打到第几关」
+	# 那套记录已经作废。**不能静默** —— 玩家点进去会发现自己站在城镇、
+	# 进度从头开始，得先在这里说清楚。
+	#
+	# 判定用 STRUCTURE_VERSION 而不是 VERSION：后者每次加字段都会涨，
+	# 拿它判会把「能读的档」误报成「进度要重来」
+	var stale := SaveManager.slot_version(slot) < SaveManager.STRUCTURE_VERSION
 	var tail := tr("UI_SLOT_OLD") if stale else place
+	# 摘要里不再写「武器 Lv.N」—— 强化改成逐件之后，那个全局等级不存在了
 	return "%d. %s　%s ×%d　%s Lv.%d" % [
-		index, tail, tr("HUD_SHARD"), shards, tr("HUD_WEAPON"), upgrade]
+		index, tail, tr("HUD_SHARD"), shards, tr("PANEL_LEVEL"), level]
 
 
 # ── 按钮动作 ───────────────────────────────────────────────────
@@ -135,7 +139,7 @@ func _enter_slot(slot: int) -> void:
 	# 旧结构的档（三层结构之前存的）：等级 / 装备 / 精铁照旧带回，
 	# 但「打到第几关」那套记录已经作废 —— 把玩家送回城镇，解锁进度重新初始化。
 	# **保留成长、只重来关卡进度**：直接作废整份档等于让玩家白玩，太粗暴
-	if SaveManager.slot_version(slot) < SaveManager.VERSION:
+	if SaveManager.slot_version(slot) < SaveManager.STRUCTURE_VERSION:
 		if st.has("player"):
 			PlayerState.load_from(st.player)
 		# 那份快照里的坐标是老关卡的（x 可能到 1800），套不进城镇。

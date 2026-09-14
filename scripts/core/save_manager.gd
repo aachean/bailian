@@ -9,11 +9,20 @@ extends Node
 ## 快照的收集 / 恢复由关卡根节点（stage.gd）负责，这里只管序列化与槽位。
 
 const SECTION := "progress"
-## 7：副本粒度重定（副本 = 一条 3~4 屏的路，不再切成独立的一屏关卡）。
-## 存档里只剩「哪些副本通关了」这一张表。
-## 旧档（< 7）不作废：等级 / 装备 / 精铁照旧带回，只把「打到哪」重来 ——
-## 见 main_menu._enter_slot 的旧档分支
-const VERSION := 7
+## 存档格式版本。
+##
+## 8（2026-09-14）：装备从「型号（资源路径）」换成「实例 uid」，强化改成逐件 + 按品质封顶。
+##   存档多了 forge（uid → 强化等级）与 next_uid 两张表，upgrade（全局强化等级）作废。
+##   **8 不作废进度**：等级 / 装备 / 精铁 / 打到哪全都能读回来，
+##   旧档里的 upgrade 会搬到当时装备的那把武器上（PlayerState._migrate_legacy_upgrade）。
+## 7：副本粒度重定（副本 = 一条 3~4 屏的路），存档只剩「哪些副本通关了」这一张表。
+const VERSION := 8
+
+## 低于这个版本的档，「打到哪」那套记录作废（只带回成长）。
+## 7 之前的档记的是**线性三关**的进度，套不进「地图 → 副本 → 屏」的结构 ——
+## 见 main_menu 的旧档分支。**判定要用它，不是 VERSION**：
+## 拿 VERSION 判的话，每次加一层同格式的新字段都会误伤一批能用的档
+const STRUCTURE_VERSION := 7
 const SLOT_COUNT := 3
 const LAST_SLOT_PATH := "user://last_slot.cfg"
 

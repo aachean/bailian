@@ -20,9 +20,10 @@ extends Node
 const SaveGuard := preload("res://tests/save_guard.gd")
 
 const TOWN_PATH := "res://scenes/stages/town.tscn"
-## 一件白装 / 一件精良 / 一件稀有，拿来验品质封顶的台阶
-const ITEM_COMMON := "res://data/items/leather_cap.tres"
-const ITEM_FINE := "res://data/items/iron_sword.tres"
+## 三档品质各一件，拿来验「强化上限按品质递增」的台阶
+const ITEM_COMMON := "res://data/items/leather_cap.tres"     # 普通｜上限 3
+const ITEM_FINE := "res://data/items/iron_sword.tres"        # 精良｜上限 5
+const ITEM_RARE := "res://data/items/flame_blade.tres"       # 稀有｜上限 8
 
 var _pass := 0
 var _fail := 0
@@ -45,6 +46,14 @@ func _ready() -> void:
 	await _t4_max_level_stops_exp()
 	await _t5_growth_numbers_come_from_resource()
 	await _t6_bad_level_is_clamped()
+	await _t7_items_are_instances()
+	await _t8_forge_cap_by_tier()
+	await _t9_maxed_cannot_forge()
+	await _t10_cost_rises_with_level()
+	await _t11_gain_falls_off_with_level()
+	await _t12_forge_survives_save()
+	await _t13_legacy_upgrade_migrates()
+	await _t14_forge_atk_joins_damage_pool()
 
 	SaveManager.current_slot = _slot_before
 	SaveGuard.restore(_bak)
@@ -144,3 +153,165 @@ func _t6_bad_level_is_clamped() -> void:
 	_check("6", "越界等级被夹回 [1, cap]",
 		hi == p.level_cap and lo == 1,
 		"level=999 → %d（期望 %d）　level=-5 → %d（期望 1）" % [hi, p.level_cap, lo])
+
+
+# ── 5.2 装备是【实例】，不是型号 ────────────────────────────────
+
+## 两把同型号的剑必须是两件东西 —— 练过一把，另一把不该跟着变。
+## 这条是「拿资源路径当键」那个模型的墓碑：那个版本下两把剑共享强化等级
+func _t7_items_are_instances() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 999
+	var a: String = PlayerState.add_item(ITEM_FINE)
+	var b: String = PlayerState.add_item(ITEM_FINE)
+	var distinct: bool = a != b and PlayerState.path_of(a) == PlayerState.path_of(b)
+	PlayerState.forge_once(a)
+	PlayerState.forge_once(a)
+	var lv_a := PlayerState.forge_level(a)
+	var lv_b := PlayerState.forge_level(b)
+	_check("7", "装备是实例：同型号两件各自记强化等级（练一把不影响另一把）",
+		distinct and lv_a == 2 and lv_b == 0,
+		"两件同型号 uid 不同=%s　练过的那件 +%d（期望 2）　没练的 +%d（期望 0）" % [
+			str(distinct), lv_a, lv_b])
+
+
+## 品质档位绑定强化上限（设计原则 5.2）：白 < 精良 < 稀有，
+## 而且**每一档的上限都是它自己的**，不是「全部共用一个上限」
+func _t8_forge_cap_by_tier() -> void:
+	PlayerState.reset_for_new_game()
+	var a: String = PlayerState.add_item(ITEM_COMMON)
+	var b: String = PlayerState.add_item(ITEM_FINE)
+	var c: String = PlayerState.add_item(ITEM_RARE)
+	var ca := PlayerState.forge_max(a)
+	var cb := PlayerState.forge_max(b)
+	var cc := PlayerState.forge_max(c)
+	_check("8", "品质档位绑定强化上限：普通 < 精良 < 稀有",
+		ca > 0 and ca < cb and cb < cc,
+		"普通 %d ／ 精良 %d ／ 稀有 %d" % [ca, cb, cc])
+
+
+## 练到顶之后：不能再练，而且**不能白扣精铁**。
+## 「按了没反应还不说为什么」是不合格的 —— 面板那边另有一条断言盯着提示文字
+func _t9_maxed_cannot_forge() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 9999
+	var uid: String = PlayerState.add_item(ITEM_COMMON)
+	var cap := PlayerState.forge_max(uid)
+	var forged := 0
+	while PlayerState.forge_once(uid):
+		forged += 1
+		if forged > 50:
+			break                        # 死循环保护：真出问题要让断言红，不是挂住
+	var shards_after_full: int = PlayerState.shards
+	var again: bool = PlayerState.forge_once(uid)
+	_check("9", "练到品质上限就停：再按不生效、也不扣精铁",
+		forged == cap and PlayerState.forge_level(uid) == cap \
+			and not again and PlayerState.shards == shards_after_full,
+		"白装练了 %d 次（上限 %d）　到顶后再练=%s　精铁 %d → %d" % [
+			forged, cap, str(again), shards_after_full, PlayerState.shards])
+
+
+## 成本递增（设计原则 5.4）：越往上越贵，逼玩家真的去刷
+func _t10_cost_rises_with_level() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 9999
+	var uid: String = PlayerState.add_item(ITEM_RARE)
+	var c0 := PlayerState.forge_cost(uid)
+	PlayerState.forge_once(uid)
+	var c1 := PlayerState.forge_cost(uid)
+	PlayerState.forge_once(uid)
+	var c2 := PlayerState.forge_cost(uid)
+	_check("10", "强化成本递增：0→1 级最便宜，越往上越贵",
+		c0 < c1 and c1 < c2,
+		"第 1 级 %d ／ 第 2 级 %d ／ 第 3 级 %d 精铁" % [c0, c1, c2])
+
+
+## 收益递减（设计原则 5.4 / 3.4）：每一级给的加成比上一级少。
+## 用**一阶差分**验形状 —— 只看总量的话，线性叠加也「看起来在涨」
+func _t11_gain_falls_off_with_level() -> void:
+	var d1 := PlayerState.forge_atk_at(1) - PlayerState.forge_atk_at(0)
+	var d2 := PlayerState.forge_atk_at(2) - PlayerState.forge_atk_at(1)
+	var d3 := PlayerState.forge_atk_at(3) - PlayerState.forge_atk_at(2)
+	_check("11", "强化收益递减：第 n 级给的加成少于第 n-1 级",
+		d1 > d2 and d2 > d3,
+		"Δ1=%.4f　Δ2=%.4f　Δ3=%.4f　（练满 8 级合计 +%.1f%%）" % [
+			d1, d2, d3, PlayerState.forge_atk_at(8) * 100.0])
+
+
+## 强化等级与实例 id 都要过存档 —— 少一个就会出现
+## 「读档后武器还是那把，但强化等级归零」或者「强化等级跳到同型号的另一件上」
+func _t12_forge_survives_save() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 100
+	var uid: String = PlayerState.add_item(ITEM_FINE)
+	PlayerState.equip(uid)
+	PlayerState.forge_once(uid)
+	PlayerState.forge_once(uid)
+	var snap := PlayerState.save_to()
+
+	PlayerState.reset_for_new_game()
+	PlayerState.load_from(snap)
+	var lv := PlayerState.forge_level(uid)
+	var worn: String = PlayerState.equipped_uid(&"weapon")
+	# 读档后新捡的一件**不能撞上档案里已有的号** —— 撞了就是两件东西共享强化等级。
+	# 这比「看一眼计数器数值」直接得多
+	var fresh: String = PlayerState.add_item(ITEM_FINE)
+	_check("12", "强化等级 / 实例 id 过存档往返，读档后新捡的不会撞号",
+		lv == 2 and worn == uid and fresh != uid,
+		"强化 +%d（期望 2）　穿着的还是那一件=%s　读档后新捡 uid=%s（原 %s）" % [
+			lv, str(worn == uid), fresh, uid])
+
+
+## 旧档迁移：老存档里 equipped / bag 是**纯路径**（没有 # 后缀），
+## 强化是**玩家身上的一个全局数字**。读进来之后要变成
+## 「路径即 uid」+「那个数字搬到当时装备的武器上」，而不是把玩家的强化吞掉
+func _t13_legacy_upgrade_migrates() -> void:
+	PlayerState.reset_for_new_game()
+	var old := {
+		"shards": 5,
+		"level": 9,
+		"exp": 0,
+		"equipped": {"weapon": ITEM_FINE},      # 纯路径 = 老格式
+		"bag": [],
+		"upgrade": 4,                           # 老格式的全局强化等级
+	}
+	PlayerState.load_from(old)
+	var lv := PlayerState.forge_level(ITEM_FINE)
+	var worn := PlayerState.item_at(&"weapon")
+	var lv_ok: bool = lv == 4 and worn != null and worn.id == &"iron_sword"
+
+	# 全局等级高于品质上限时要夹住 —— 精良武器上限 5，给个 9 只能是 5。
+	# 注意必须挂在**武器**槽上：旧档那个 upgrade 的语义就是「武器强化」
+	# （铁砧的提示牌上写的就是这四个字），搬到别的部位上是无中生有
+	PlayerState.reset_for_new_game()
+	PlayerState.load_from({"equipped": {"weapon": ITEM_FINE}, "upgrade": 9})
+	var clamped := PlayerState.forge_level(ITEM_FINE)
+
+	# 旧档里有强化、但当时没装备武器：那份强化无处可去，丢掉 ——
+	# 关键是【不能崩】、也不能因此把精铁弄脏
+	PlayerState.reset_for_new_game()
+	PlayerState.load_from({"equipped": {}, "bag": [], "upgrade": 6})
+	var dropped: bool = PlayerState.forge.is_empty()
+
+	_check("13", "旧档的全局强化等级搬到武器上并按品质上限夹住；没武器就丢掉",
+		lv_ok and clamped == PlayerState.forge_max(ITEM_FINE) and dropped,
+		"upgrade=4 → 精良武器 +%d（期望 4）　upgrade=9 → +%d（上限 %d）　"
+		% [lv, clamped, PlayerState.forge_max(ITEM_FINE)]
+		+ "没武器时强化表为空=%s" % str(dropped))
+
+
+## 强化加成必须真的进了伤害乘区 —— 面板写 +38% 而打出的数字没变，
+## 就是设计原则 4.1 要防的那种「游戏在骗玩家」
+func _t14_forge_atk_joins_damage_pool() -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.shards = 100
+	var uid: String = PlayerState.add_item(ITEM_FINE)
+	PlayerState.equip(uid)
+	var before: float = PlayerState.bonus_total().get("atk", 0.0)
+	PlayerState.forge_once(uid)
+	var after: float = PlayerState.bonus_total().get("atk", 0.0)
+	var gained := after - before
+	var expect := PlayerState.forge_atk_at(1)
+	_check("14", "强化加成进了伤害乘区（词条聚合里算上了）",
+		is_equal_approx(gained, expect),
+		"攻击加成 %.3f → %.3f（+%.3f，期望 +%.3f）" % [before, after, gained, expect])

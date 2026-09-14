@@ -486,14 +486,15 @@ func collect() -> Dictionary:
 			"spawn_x": sp.x,
 			"spawn_y": sp.y,
 			"shards": int(player.get("shards")),
-			"upgrade": int(player.get("upgrade_level")),
 			"level": int(player.get("level")),
 			"exp": int(player.get("exp_pts")),
 			"mp": int(player.get("mp")),
-			# 装备栏 / 背包的真相在 PlayerState（autoload），不在玩家节点上 ——
+			# 装备栏 / 背包 / 强化表的真相在 PlayerState（autoload），不在玩家节点上 ——
 			# 这里只是把它抄进快照，读档时由 player.apply_saved 抄回去
 			"equipped": PlayerState.equipped.duplicate(),
 			"bag": PlayerState.bag.duplicate(),
+			"forge": PlayerState.forge.duplicate(),
+			"next_uid": PlayerState.next_uid,
 			"skill_slots": PlayerState.skill_slots.duplicate(),
 		}
 	out.screens = {
