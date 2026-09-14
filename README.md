@@ -196,23 +196,14 @@ scripts/core/player_state.gd  skill_slots（5 个槽的真相）+ skills_changed
 这条纪律是踩过坑补的：`#10` 把角色瞬移到台上自由落体，全绿，但当时「助跑跳上高台」
 这个玩家真会做的动作其实没人验证过。
 
-### 可视化回放（demo reel）
+### 可视化回放（**已停用**）
 
-同一批机制的「可观看版」：脚本自己注入按键、自己打字幕、把 `on_floor` / `coyote` /
-`buffer` / `velocity` 实时打在画面上，再录成视频。不需要人在场，也不需要装插件。
+2026-09-14 起不再用。曾经每轮附一段「脚本自己操作、自己录制」的录像，
+交付改用**无头断言 + 截图** —— 覆盖更严、成本低一个量级，代价是可观看性丢了
+（静态截图看不出「我确实跟它打了 40 秒」，这个取舍是明确认下的）。
 
-```
-# 1. 录制（窗口模式；会在屏幕上开一个窗口，录完自动退出）
-godot --path . --write-movie build/reel/frames.png --fixed-fps 60 res://tests/demo_reel.tscn
-
-# 2. 合成 mp4（土狼/缓冲那两段 0.1 秒的窗口会被放慢 5×，否则肉眼看不出计时器在倒数）
-python "%USERPROFILE%\.workbuddy\skills\godot-headless-testing\scripts\reel_assemble.py" --reel build/reel
-```
-
-> 合成脚本属于开发工具，不在本仓库里；它随技能 `godot-headless-testing` 走。
-> 帧号对齐：录下的第 N 帧（从 0 起算）对应脚本里的 `tick = N + 1`
-> —— 已用画面上的 `tick=` 读数核对过。录制尾部会多出约 24 帧（收尾等待期），
-> 合成脚本按 `reel_meta.json` 里的总帧数裁掉。
+`tests/demo_reel.*` 与合成脚本**保留但不再使用** —— 删了就得重写。
+它怎么跑、踩过什么坑，记在技能 `godot-headless-testing` 里。
 
 画面截图（窗口模式，输出到 `build/shots/`，该目录不入库）：
 
@@ -246,5 +237,5 @@ res://
 ├── assets/          字体（含 OFL 授权）、CREDITS.md
 ├── addons/          第三方插件 + ai_bridge（AI 实时操控桥）
 ├── tools/           资源构建脚本（字体子集化等，不参与游戏运行）
-└── tests/           自动验收 / 可视化回放 / 截图（不参与游戏运行）
+└── tests/           自动验收 / 截图（不参与游戏运行）
 ```
