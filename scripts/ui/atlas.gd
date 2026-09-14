@@ -23,8 +23,19 @@ const TOWN_PATH := "res://scenes/stages/town.tscn"
 
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
-const ROW_HEIGHT := 18.0
-const FONT_SIZE := 11
+## 行高与字号。**这两条是尺寸预算的产物，不是审美选择** ——
+## 步 2 把断淬渠（4 段）、炉喉（5 段）也切进来之后，列表会有
+## 3 个副本标题 + 12 段 + 1 行回安全区 = 16 行；16 × 17 = 272px，
+## 加上标题与底部提示还能塞进 640×360。行高再大一点就装不下了
+const ROW_HEIGHT := 17.0
+const FONT_SIZE := 10
+## 面板高度按行数自适应（见 _fit_panel）。标题栏与底部提示各占这么高
+const HEAD_H := 32.0
+const FOOT_H := 30.0
+const PANEL_W := 560.0
+const PANEL_MIN_H := 120.0
+## 屏幕 360 高，上下各留 12 的边距
+const PANEL_MAX_H := 336.0
 
 const DIM := Color(0.55, 0.53, 0.5, 1)
 const NORMAL := Color(0.9, 0.88, 0.84, 1)
@@ -43,6 +54,7 @@ var _cursor := 0
 var _must_choose := false
 
 @onready var _root: Control = $Root
+@onready var _panel: Panel = $Root/Panel
 @onready var _title: Label = $Root/Panel/Title
 @onready var _tabs: VBoxContainer = $Root/Panel/Tabs
 @onready var _list: VBoxContainer = $Root/Panel/Rows
@@ -83,10 +95,23 @@ func open_after_clear(nxt: Dictionary) -> void:
 
 func _show(nxt: Dictionary) -> void:
 	_build()
+	_fit_panel()
 	_cursor = _row_of(nxt)
 	_root.visible = true
 	get_tree().paused = true
 	refresh()
+
+
+## 面板高度按行数自适应：砺场切片时只有 7 行（矮一点更好看），
+## 步 2 把 12 段全填进来之后长到 16 行，仍然要一屏装得下 ——
+## 规范里写的是「一次看全」，所以宁可面板贴着屏幕上下边，也不给列表加滚动
+func _fit_panel() -> void:
+	var rows_h := float(maxi(_rows.size(), 1)) * ROW_HEIGHT
+	var h := clampf(HEAD_H + rows_h + FOOT_H, PANEL_MIN_H, PANEL_MAX_H)
+	_panel.offset_left = -PANEL_W * 0.5
+	_panel.offset_right = PANEL_W * 0.5
+	_panel.offset_top = -h * 0.5
+	_panel.offset_bottom = h * 0.5
 
 
 func close() -> void:
@@ -248,11 +273,13 @@ func _row_text(r: Dictionary, sel: bool) -> String:
 			var st := m2.find_stage(r["dungeon"], int(r["index"])) if m2 != null else null
 			var rec := ""
 			if st != null:
-				rec = tr("UI_ATLAS_REC") % [st.rec_level, st.rec_weapon]
-			return "%s%s%s　%s" % [mark, INDENT, tr("UI_STAGE_LABEL") % (int(r["index"]) + 1), rec]
+				rec = I18n.t(&"UI_ATLAS_REC", [st.rec_level, st.rec_weapon])
+			return "%s%s%s　%s" % [
+				mark, INDENT,
+				I18n.t(&"UI_STAGE_LABEL", [int(r["index"]) + 1]), rec]
 		"locked":
 			return "%s%s%s　%s" % [INDENT, INDENT,
-				tr("UI_STAGE_LABEL") % (int(r["index"]) + 1), tr("UI_ATLAS_LOCKED")]
+				I18n.t(&"UI_STAGE_LABEL", [int(r["index"]) + 1]), tr("UI_ATLAS_LOCKED")]
 		"back":
 			return "%s%s" % [mark, tr("UI_ATLAS_BACK")]
 	return ""

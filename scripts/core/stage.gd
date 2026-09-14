@@ -125,7 +125,7 @@ func _show_cleared_banner(dungeon_id: StringName, index: int) -> void:
 	var lbl := Label.new()
 	lbl.z_index = 60
 	lbl.text = "%s · %s　%s" % [
-		place, tr("UI_STAGE_LABEL") % (index + 1), tr("UI_STAGE_CLEARED")]
+		place, I18n.t(&"UI_STAGE_LABEL", [index + 1]), tr("UI_STAGE_CLEARED")]
 	lbl.add_theme_font_size_override("font_size", 14)
 	lbl.add_theme_color_override("font_color", Color(0.98, 0.87, 0.45))
 	lbl.position = Vector2(bounds.position.x + bounds.size.x * 0.5 - 110.0,

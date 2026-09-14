@@ -48,6 +48,9 @@ var _has_player := false
 @onready var _portrait: PortraitRing = $Portrait
 @onready var _lv_label: Label = $Status/Level
 @onready var _bag_label: Label = $Bag/Count
+## 「砺场 · 第 2 段 / 共 3 段」。一屏一屏推进时玩家要随时知道自己推进到哪了 ——
+## 这是三层结构带来的新信息，HUD 上不写就只能靠舆图反复确认
+@onready var _stage_label: Label = $Stage
 @onready var _panel: Panel = $CharPanel
 @onready var _panel_text: Label = $CharPanel/Text
 @onready var _char_equip_box: VBoxContainer = $CharPanel/EquipRows
@@ -532,6 +535,7 @@ func refresh() -> void:
 	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), int(_player.get("shards"))]
 
 	refresh_skill_bar()
+	refresh_stage_label()
 
 	if _panel.visible:
 		refresh_char_panel(h)
@@ -539,6 +543,33 @@ func refresh() -> void:
 		refresh_bag()
 	if _skill_open:
 		refresh_skill_panel()
+
+
+## 段号（「砺场 · 第 2 段 / 共 3 段」）。
+##
+## 来源是**玩家所在的那个关卡节点**挂的关卡数据，不是 current_scene ——
+## 测试与截图会把关卡实例挂在别的节点下（`current_scene` 那时不是关卡），
+## 从 current_scene 取的话段号会莫名其妙地空掉。测试房间没有关卡数据，
+## 这一行就是空的，而不是显示一个假的段号。
+##
+## 文本没变就不写回：这是每帧都在跑的刷新，白写一次会让 Label 每帧重排
+func refresh_stage_label() -> void:
+	var sd: StageData = null
+	var host: Node = _player.get_parent() if _player != null else null
+	if host != null and host.get("stage_data") != null:
+		sd = host.get("stage_data") as StageData
+	var txt := ""
+	if sd != null:
+		var pos := GameProgress.locate(sd.id)
+		var m := GameProgress.map()
+		var d := m.find_dungeon(pos["dungeon"]) if (m != null and not pos.is_empty()) else null
+		if d != null:
+			txt = "%s · %s / %s" % [
+				tr(d.name_key),
+				I18n.t(&"UI_STAGE_LABEL", [int(pos["index"]) + 1]),
+				I18n.t(&"UI_STAGE_TOTAL", [d.stages.size()])]
+	if _stage_label.text != txt:
+		_stage_label.text = txt
 
 
 ## 角色面板：造梦西游式属性表，一行一项。数值全部来自「当前生效值」，

@@ -49,7 +49,7 @@ func _ready() -> void:
 	await _t9_checkpoint_moves_spawn()
 	await _t10_checkpoint_in_snapshot()
 	await _t11_level3_wired()
-	await _t12_town_portal_targets_furthest()
+	await _t12_town_entry_is_atlas()
 	await _t13_gate_hint_not_a_key()
 	await _t14_gap_is_jumpable()
 	SaveManager.current_slot = _slot_before
@@ -217,6 +217,11 @@ func _t4_boss_death_unlocks() -> void:
 
 
 ## 关底 Boss 打死就没了 —— 这条不成立的话「通关」本身就不成立
+##
+## 三层结构之后**小怪也不重生了**（revive_delay 一律 0）：过关判据是
+## 「清空关内敌人」，会重生的怪会让关卡永远打不完（docs/adr/0009 §2）。
+## 这条断言于是从「Boss 与普通怪不同」变成「谁都不重生」——
+## 防的是有人顺手把 2.0 抄回去
 func _t5_boss_never_revives() -> void:
 	var lv := LEVEL2.instantiate()
 	add_child(lv)
@@ -229,9 +234,9 @@ func _t5_boss_never_revives() -> void:
 	await _pframes(360)                    # 6 秒，远超任何重生计时
 	var still_dead: bool = h.is_dead and h.hp <= 0
 	var walker := load(WALKER_PATH) as EnemyData
-	_check("5", "关底 Boss 打死就没了：6 秒后仍不重生（小怪 2 秒就会满血站起来）",
-		died and still_dead and walker.revive_delay > 0.0,
-		"Boss 死后 6 秒：is_dead=%s　hp=%d　（对照：游荡者 %.1f 秒重生）" % [
+	_check("5", "关底 Boss 打死就没了：6 秒后仍不重生（三层结构之后小怪也不重生）",
+		died and still_dead and walker.revive_delay <= 0.0,
+		"Boss 死后 6 秒：is_dead=%s　hp=%d　（游荡者的重生间隔 %.1f 秒，0 = 不重生）" % [
 			str(still_dead), h.hp, walker.revive_delay])
 	lv.queue_free()
 	await _pframes(2)
@@ -393,18 +398,26 @@ func _t11_level3_wired() -> void:
 	await _pframes(2)
 
 
-## 回城再出来，城镇的门直接送到已解锁的最远关卡
-func _t12_town_portal_targets_furthest() -> void:
+## 城镇的入口设施：舆图台，不是传送门
+##
+## 原来是「城镇的门直接送到已解锁的最远关卡」。三层结构之后进副本改走舆图
+## （docs/adr/0009 §4），这条断言于是改成盯「城镇里到底是哪件设施在管入口」——
+## 防的是有人把传送门加回来，或者把舆图台删了
+func _t12_town_entry_is_atlas() -> void:
 	var town := TOWN.instantiate()
 	add_child(town)
 	await _pframes(3)
-	var p := town.get_node("ExitPortal")
-	var target := str(p.get("target_scene"))
-	var furthest := SaveManager.furthest_level()
-	_check("12", "回城之后再出来，城镇的门直接把你送到已解锁的最远关卡",
-		target == L3_PATH and furthest == L3_PATH,
-		"城镇出口 → %s（存档里解锁到 %s）—— 否则每次回城都要从第一关重走" % [
-			target.get_file(), furthest.get_file()])
+	var pedestal := town.get_node_or_null("AtlasPedestal")
+	var zone: CollisionShape2D = null
+	if pedestal != null:
+		zone = pedestal.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var no_portal: bool = town.get_node_or_null("ExitPortal") == null
+	var atlas := town.get_node_or_null("Player/Atlas")
+	_check("12", "城镇的入口是舆图台（走近出提示、按 P 开舆图），传送门已经退役",
+		pedestal != null and zone != null and no_portal and atlas != null,
+		"舆图台=%s（碰撞区=%s）　传送门=%s　玩家身上带舆图=%s" % [
+			str(pedestal != null), str(zone != null),
+			"已拆" if no_portal else "**还在**", str(atlas != null)])
 	town.queue_free()
 	await _pframes(2)
 

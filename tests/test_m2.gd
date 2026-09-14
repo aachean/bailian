@@ -118,7 +118,7 @@ func _t2_continue_visibility() -> void:
 func _t3_slots_isolated() -> void:
 	_wipe_all_slots()
 	SaveManager.start_new_game(1, "res://scenes/stages/town.tscn")
-	SaveManager.write_progress("res://scenes/stages/level_1.tscn",
+	SaveManager.write_progress("res://scenes/stages/lichang_1.tscn",
 		{"player": {"hp": 50, "shards": 9, "upgrade": 2}, "enemies": []})
 
 	SaveManager.start_new_game(3, "res://scenes/stages/town.tscn")
