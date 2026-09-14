@@ -26,9 +26,10 @@ func _ready() -> void:
 ## ALWAYS 模式：暂停与否都收得到
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		# 装备背包 / 对话框 / 舆图开着时不抢 Esc —— 这几个界面都要用同一批按键，
+		# 装备背包 / 对话框 / 舆图 / 死亡界面开着时不抢 Esc —— 这几个界面都要用同一批按键，
 		# 叠起来只会互相打架。先关掉手头那个，再按 Esc
-		if not _root.visible and (_bag_open() or _dialogue_open() or _atlas_open()):
+		if not _root.visible \
+				and (_bag_open() or _dialogue_open() or _atlas_open() or _death_open()):
 			return
 		toggle()
 
@@ -52,6 +53,13 @@ func _dialogue_open() -> bool:
 func _atlas_open() -> bool:
 	var at := get_parent().get_node_or_null("Atlas")
 	return at != null and at.has_method("is_open") and bool(at.call("is_open"))
+
+
+## 死亡界面同理。**它比本节点更该拿到按键** ——
+## 死的那一刻再弹一个暂停菜单出来，玩家面对的就是两层界面
+func _death_open() -> bool:
+	var dm := get_parent().get_node_or_null("DeathMenu")
+	return dm != null and dm.has_method("is_open") and bool(dm.call("is_open"))
 
 
 func toggle() -> void:

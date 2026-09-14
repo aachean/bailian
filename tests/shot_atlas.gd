@@ -1,19 +1,26 @@
 extends Node
-## 舆图、屏号、三屏推进的观感截图（输出 `build/shots/`）。
+## 舆图、屏号、分段推进、死亡界面的观感截图（输出 `build/shots/`）。
 ##     godot --path <项目根> res://tests/shot_atlas.tscn
 ##
 ## 为什么必须看图：
 ##   · 舆图的行是**代码建出来的一堆 Label**（没有 tscn 可查）—— 对齐、行距、
 ##     会不会压住右上角的精铁、「未开放」的灰看起来对不对，断言一条都抓不到。
 ##   · HUD 上那行屏号是一行小字，挤不挤只有眼睛能判。
-##   · **闸门**是一道竖着的色块：清空前后看起来差多少、挡不挡住视线，
-##     也只有看图才知道（`test_m9 #2` 只验它挡不挡人）。
+##   · **挡墙是看不见的**（这一版特意删掉了可见闸门）：玩家被什么挡住、挡住的
+##     那一刻屏幕上有没有话说，只有看图才知道（`test_m9 #2` 只验它挡不挡人）。
+##   · **一批怪凭空出现**的过程（淡入）看起来是"来了"还是"闪了一下"。
+##   · 死亡界面的两个选项排版、光标标记，断言只验得到"有没有"。
 ##
 ## 会动存档槽（要摆出「已通关」的状态）—— 所以和测试一样先备份、跑完还回去。
 
 const TOWN := preload("res://scenes/stages/town.tscn")
 const LICHANG := preload("res://scenes/stages/lichang.tscn")
 const SaveGuard := preload("res://tests/save_guard.gd")
+
+## 一屏多宽（stage.gd 的 SCREEN_WIDTH）、判"这一波清了"要等的帧数、两波间隔
+const SCREEN_W := 960.0
+const CLEAR_DELAY := 24
+const WAVE_GAP := 45
 
 var _bak: Dictionary = {}
 
@@ -26,6 +33,7 @@ func _ready() -> void:
 	await _shot_atlas_fresh()
 	await _shot_atlas_progressed()
 	await _shot_screens()
+	await _shot_death_menu()
 	SaveGuard.restore(_bak)
 	get_tree().paused = false
 	get_tree().quit()
@@ -78,8 +86,10 @@ func _shot_atlas_progressed() -> void:
 	await _frames(3)
 
 
-## 四、第 1 屏：闸门挡在右边、HUD 写「砺场 · 第 1 屏 / 共 3 屏」
-## 五、清空第 1 屏之后走到第 2 屏：闸门没了、屏号变成 2
+## 四、第 1 屏：第 1 批怪、HUD 写「砺场 · 第 1 屏 / 共 3 屏」
+## 五、跑到最右侧：被**看不见的挡墙**挡住，横幅给一句人话
+## 六、打完第 1 批：第 2 批淡入（分批出怪的观感）
+## 七、清完第 1 屏之后走进第 2 屏：屏号变成 2、挡墙没了
 func _shot_screens() -> void:
 	GameProgress.reset_progress()
 	var lv := LICHANG.instantiate()
@@ -89,23 +99,56 @@ func _shot_screens() -> void:
 		if lv.is_ancestor_of(e):
 			e.set("ai_enabled", false)
 	var p := lv.get_node("Player")
-	p.global_position = Vector2(500.0, 288.0)
+	p.global_position = Vector2(320.0, 288.0)
 	p.velocity = Vector2.ZERO
 	await _frames(20)
-	await _shot("screen_gate_locked.png")
+	await _shot("screen_batch1.png")
 
-	# 清空**第 1 屏**（只打屏 1 的怪）→ 走到第 2 屏。
-	# 不能遍历全部怪：那样副本直接通关了，拍到的就是通关横幅而不是「推进」——
-	# 第一版就是这么错的，图和标题对不上
-	var s1 := lv.get_node_or_null("Screen1")
-	for e in get_tree().get_nodes_in_group("enemy"):
-		if s1 != null and is_instance_valid(e) and s1.is_ancestor_of(e):
-			(e.get_node("Health") as Health).take_damage(9999, Vector2.ZERO, true, 1)
-	await _frames(40)
-	p.global_position = Vector2(900.0, 288.0)
+	# 贴到挡墙前：这里是**看不见的**，所以图上该看到的是"人停住了 + 一行提示"
+	p.global_position = Vector2(SCREEN_W - 40.0, 288.0)
 	p.velocity = Vector2.ZERO
-	await _frames(20)
+	await _frames(30)
+	await _shot("screen_blocked.png")
+
+	# 打死第 1 批 → 等够间隔 → 第 2 批刚淡入那一刻
+	_kill_batch(lv, 0)
+	await _frames(CLEAR_DELAY + WAVE_GAP + 6)
+	await _shot("screen_batch2.png")
+
+	# 把这一屏剩下的两批也打完，然后走进第 2 屏
+	for _i in 2:
+		_kill_batch(lv, 0)
+		await _frames(CLEAR_DELAY + WAVE_GAP + 10)
+	p.global_position = Vector2(SCREEN_W + 120.0, 288.0)
+	p.velocity = Vector2.ZERO
+	await _frames(24)
 	await _shot("screen_advanced.png")
+	lv.queue_free()
+	await _frames(3)
+
+
+## 打死第 i 屏场上**还活着**的那一批（尸体留在组里，不跳过的话会把它们数进去）
+func _kill_batch(lv: Node, i: int) -> void:
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if not is_instance_valid(e) or not lv.is_ancestor_of(e):
+			continue
+		var s := lv.get_node_or_null("Screen%d" % (i + 1))
+		if s == null or not s.is_ancestor_of(e):
+			continue
+		var h := e.get_node("Health") as Health
+		if not h.is_dead:
+			h.take_damage(9999, Vector2.ZERO, true, 1)
+
+
+## 八、倒下之后弹的二选一：两个选项、光标在「重新开始」上
+func _shot_death_menu() -> void:
+	var lv := LICHANG.instantiate()
+	add_child(lv)
+	await _frames(6)
+	var p := lv.get_node("Player")
+	(p.get_node("Health") as Health).take_damage(9999, Vector2.ZERO, true, 1)
+	await _frames(int(ceil(float(p.get("revive_delay")) * 60.0)) + 30)
+	await _shot("death_menu.png")
 	lv.queue_free()
 	await _frames(3)
 

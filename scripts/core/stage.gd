@@ -1,62 +1,94 @@
 extends Node2D
-## 关卡根节点：**一个副本 = 一条多屏的路**。四件事：
-##   1. **相机边界**（bounds）—— 多屏场景设成场景实际宽度，视野跟着玩家走
-##   2. **收集 / 恢复世界快照** —— 「继续游戏 = 回到离开那一刻」的关卡侧实现
-##   3. **分段推进** —— 清空当前屏的怪才开下一屏的闸门
+## 关卡根节点：**一个副本 = 一条多屏的路**。它负责五件事：
+##   1. **相机边界**（bounds）—— 设成场景实际宽度，视野跟着玩家平滑滚动
+##   2. **分段推进** —— 这一屏的怪没清完，右边**过不去**
+##   3. **分批出怪（波次）** —— 一屏分几批，打完一批才来下一批
 ##   4. **副本通关** —— 最后一屏清空 → 记进度 → 弹舆图
+##   5. **收集 / 恢复世界快照** —— 「继续游戏 = 回到离开那一刻」的关卡侧实现
 ##
-## ── 粒度（2026-09-14 神反馈后**重定**）──────────────────────
-## 副本 = 一条 3~4 屏的路，**进一次从头打到尾**。屏是**场景里按 x 划出来的段**
-## （`screen` 组里的 `Screen1`/`Screen2`/… 节点），不是独立场景。
+## ── 粒度（2026-09-14 神两轮反馈后**重定**）──────────────────
+## 第一版：一屏一个独立关卡，进一次打一屏，清完弹舆图选下一屏。
+## 神玩完否掉：「一关一屏不够，点进出频繁」「每段两只怪不够打」。
+## 第二版：副本 = 一条三屏的路，清一屏开一道**暗红闸门**。
+## 神又否掉三条（原话记在 docs/adr/0009 §1）：
+##   · 「每一屏幕长度不够长」          → 屏宽 640 → **960**（相机跟着走）
+##   · 「不同屏之间过渡太生硬，不需要闸门去隔离」
+##        → **删掉可见闸门**，改成关卡根节点动态建的**看不见的挡墙**：
+##          一屏没清完，走到最右侧就是走不过去（造梦西游的做法）。
+##          撞上去才给一句提示 —— 不静默。
+##   · 「一屏 3 只不够，要分批次出：打死一批接着来第二批」
+##        → **波次**：屏下挂 `wave` 分组的容器，一批全灭才出下一批。
 ##
-## 第一版做成「一屏一个独立关卡、清完弹舆图选下一屏」，神玩完给了两条反馈：
-##   · 「一关一屏不够，点进出频繁」
-##   · 「每段两只怪不够打」
-## 这一版是对那两条的回应：**一屏清空了只开闸门，不回舆图**；
-## **整个副本打完（最后一屏清空）才弹舆图**。怪的密度也上去了，
-## 因为一屏清空之前玩家只会面对这一屏的怪。
-##
-## ── 屏、闸门、通关，各自靠什么判定 ──────────────────────────
-##   屏   = `screen` 组里的节点（按 x 排序），一屏的怪挂在它下面
-##   闸门 = `screen_gate` 组里的节点（按 x 排序），第 i 道在屏 i 的右边界
-##   清空 = 这一屏的分组下**活着**的怪为 0（按出生分组算，不按当前位置 ——
-##          怪被引着跑到下一屏去，不该把上一屏判成"清了"）
-##   通关 = 最后一屏清空
+## ── 屏、波、挡墙，各自靠什么判定 ────────────────────────────
+##   屏   = `screen` 组里的节点（按 x 排序），一屏的波挂在它下面
+##   波   = 某一屏下 `wave` 组的子节点（**按声明顺序** = 出场顺序）
+##   挡墙 = 本节点**动态建**的，第 i 道在屏 i 的右边界（所以比屏少一道）
+##   清一波 = 这一波里活着的怪为 0（休眠中的不算 —— 它们还没出场）
+##   清一屏 = 这一屏的最后一波也清了
+##   通关   = 最后一屏清空
 ##
 ## **没有屏分组的场景不判推进**（测试房间、还没重切的 `level_2/3` 都是这样）：
 ## 它们只走相机与快照那两条老路。
 
 const PLAYER_PATH := "Player"
 
-## 「一屏」有多宽 = 视口宽。屏与闸门的 x 位置都按这个推
-const SCREEN_WIDTH := 640.0
+## 「一屏」有多宽。
+## 它比视口宽（640）—— 这是**刻意的**：一屏 = 一个半视口，玩家在一屏里
+## 能真的"走一段路"，相机跟着滚，屏与屏之间是连续的滚动而不是瞬移。
+const SCREEN_WIDTH := 960.0
+
+## 挡墙：宽 8px 的竖片，高得能封死整屏（含浮台与跳跃高度）
+const BARRIER_W := 8.0
+const BARRIER_H := 480.0
+## 玩家离挡墙多近才算"撞上了"（用来出提示）
+const BARRIER_HINT_DIST := 20.0
+## 撞墙提示的最小间隔（帧）：贴在墙上不动也不会刷屏
+const HINT_COOLDOWN_FRAMES := 150
 
 ## 这一关属于哪个副本（`data/stages/dungeon_*.tres`）。
 ## **留空 = 这个场景不属于三层结构** —— 测试房间、还没重切的 `level_2/3`。
-## 留空就只做相机与快照，不做任何推进或通关判定
 @export var dungeon_data: DungeonData
 
-## 相机活动范围（世界坐标）。多屏场景设成场景实际尺寸，视野跟着玩家走、到边就停。
-@export var bounds: Rect2 = Rect2(0, 0, 640, 360)
+## 相机活动范围（世界坐标）。设成场景实际尺寸，视野跟着玩家走、到边就停。
+@export var bounds: Rect2 = Rect2(0, 0, 960, 360)
 
-## 最后一只怪倒下之后，再等这么多帧才判「这一屏清空了」——
-## 让掉落、飘字、后仰演完。0.4 秒：够看清「最后一只倒了」，又不至于让人干等
+## 一波里最后一只倒之后，再等这么多帧才判「这一波清了」——
+## 让掉落、飘字、后仰演完
 const CLEAR_DELAY_FRAMES := 24
+## 两波之间的间隔帧数。**太短会让人以为是同一波**，太长会让房间空着没人知道下一步。
+## 0.75 秒：够看清"这批没了"，下一批刚好淡入
+const WAVE_GAP_FRAMES := 45
+## 新一波出场时怪淡入的时长（秒）
+const SPAWN_FADE_SEC := 0.28
 ## 通关横幅停留多久（秒），然后弹舆图
 const BANNER_SEC := 1.4
 
 ## 按 x 排序的屏分组
 var _screens: Array[Node2D] = []
-## 按 x 排序的闸门。第 i 道在屏 i 的右边界（所以比屏少一道）
-var _gates: Array[Node2D] = []
+## 第 i 屏的波次容器，按声明顺序
+var _waves: Array[Array] = []
+## 第 i 屏的挡墙（最后一道是 null —— 最后一屏右边没有下一屏）
+var _barriers: Array[Node2D] = []
+
+## 第 i 屏的怪出场了没有（玩家走到过那一屏）
+var _started: Array[bool] = []
 ## 第 i 屏清空了没有
-var _open: Array[bool] = []
-## 第 i 屏「最后一只倒下」之后的等待帧数
+var _done: Array[bool] = []
+## 第 i 屏已经清掉几波
+var _waves_done: Array[int] = []
+## 第 i 屏当前挂着的是第几波（-1 = 没有在场上的波）
+var _active: Array[int] = []
+## 第 i 屏「这一波最后一只倒下」之后的等待帧数
 var _idle: Array[int] = []
+## 第 i 屏两波之间的间隔倒计时
+var _gap: Array[int] = []
+
 ## 玩家现在在第几屏（0 起）。HUD 上显示的屏号 = 这个 +1
 var _current := 0
 ## 整个副本通关了没有（只触发一次）
 var _cleared := false
+## 撞墙提示的冷却
+var _hint_cooldown := 0
 
 var _banner_label: Label = null
 var _banner_tween: Tween = null
@@ -70,18 +102,21 @@ func _ready() -> void:
 		cam.limit_right = int(bounds.end.x)
 		cam.limit_bottom = int(bounds.end.y)
 		cam.reset_smoothing()
-	var st := SaveManager.take_pending_state()
-	if not st.is_empty():
-		_apply_state(st)
 	_collect_screens()
+	_build_barriers()
 	_build_banner()
+	_sleep_all()
 	if dungeon_data != null and _screens.is_empty():
 		push_warning("副本「%s」的场景里没有 `screen` 分组：这一关永远不会推进、也不会通关"
 			% str(dungeon_data.id))
+	# 快照恢复**必须在屏与波都建好之后** —— 它要把某一屏的某一波摆出来
+	var st := SaveManager.take_pending_state()
+	if not st.is_empty():
+		_apply_state(st)
 
 
-## 收集屏分组与闸门，都按 x 排好。**只收本场景的后代** ——
-## 组是全局的，别的场景的成员不该混进来
+## 收集屏分组，并按 x 排好；每屏再把它的波收进来（保持声明顺序）。
+## **只收本场景的后代** —— 组是全局的，别的场景的成员不该混进来
 func _collect_screens() -> void:
 	var scr: Array[Node2D] = []
 	for n in get_tree().get_nodes_in_group("screen"):
@@ -91,39 +126,91 @@ func _collect_screens() -> void:
 		return a.global_position.x < b.global_position.x)
 	_screens = scr
 
-	var gs: Array[Node2D] = []
-	for n in get_tree().get_nodes_in_group("screen_gate"):
-		if is_instance_valid(n) and n is Node2D and is_ancestor_of(n):
-			gs.append(n as Node2D)
-	gs.sort_custom(func(a: Node2D, b: Node2D) -> bool:
-		return a.global_position.x < b.global_position.x)
-	_gates = gs
+	_waves.clear()
+	for s in _screens:
+		var ws: Array = []
+		# 按**子节点顺序**收，不用 get_nodes_in_group —— 组的顺序不保证，
+		# 而波次的出场顺序正是声明顺序，乱掉就是"第三批先出来"
+		for child in s.get_children():
+			if child.is_in_group("wave"):
+				ws.append(child)
+		_waves.append(ws)
 
-	_open.resize(_screens.size())
-	_idle.resize(_screens.size())
-	for i in _screens.size():
-		_open[i] = false
+	var n := _screens.size()
+	_started.resize(n)
+	_done.resize(n)
+	_waves_done.resize(n)
+	_active.resize(n)
+	_idle.resize(n)
+	_gap.resize(n)
+	for i in n:
+		_started[i] = false
+		_done[i] = false
+		_waves_done[i] = 0
+		_active[i] = -1
 		_idle[i] = 0
+		_gap[i] = 0
 
 
-# ── 分段推进 ───────────────────────────────────────────────────
+## 屏与屏之间那道**看不见的**墙。
+##
+## 为什么不摆进场景：一是位置必须跟着 SCREEN_WIDTH 走（改一次屏宽要重摆所有墙，
+## 迟早对不上），二是**它能被误当成装饰**。这里动态建，位置永远只有一个来源。
+##
+## 层取地形层（4）：玩家与怪都撞得到 —— 怪也出不去，它本来就该待在这一屏里。
+func _build_barriers() -> void:
+	_barriers.clear()
+	for i in range(maxi(_screens.size() - 1, 0)):
+		var b := StaticBody2D.new()
+		b.name = "Barrier%d" % (i + 1)
+		b.collision_layer = 4
+		b.collision_mask = 0
+		var cs := CollisionShape2D.new()
+		# **名字要显式给**：`CollisionShape2D.new()` 加进树时 Godot 会自动起
+		# `@CollisionShape2D@N` 这种名字，`get_node_or_null("CollisionShape2D")` 找不到它。
+		# 这一条踩过：断言拿不到碰撞体，于是"实心"判成了 false，而人其实被挡在那儿
+		cs.name = "CollisionShape2D"
+		var sh := RectangleShape2D.new()
+		sh.size = Vector2(BARRIER_W, BARRIER_H)
+		cs.shape = sh
+		b.add_child(cs)
+		b.position = Vector2(float(i + 1) * SCREEN_WIDTH, bounds.position.y + bounds.size.y * 0.5)
+		add_child(b)
+		_barriers.append(b)
+
+
+# ── 推进 ───────────────────────────────────────────────────────
+
+## 开场：**所有怪先睡下**，谁出场由推进状态决定。
+##
+## 不先睡一遍的话，场景加载的那一帧三十几只怪全醒着 —— 它们会在自己的屏里
+## 巡逻、隔着一整个屏幕"看见"玩家、然后集体走过来。玩家开局的第一个画面
+## 就是被一整个副本的怪围住
+func _sleep_all() -> void:
+	for s in _screens:
+		for e in s.get_children():
+			if e.has_method("set_dormant"):
+				e.call("set_dormant", true)
+	for ws in _waves:
+		for w in ws:
+			for e in (w as Node).get_children():
+				if e.has_method("set_dormant"):
+					e.call("set_dormant", true)
+
 
 func _physics_process(_delta: float) -> void:
 	_follow_screen()
+	if _hint_cooldown > 0:
+		_hint_cooldown -= 1
+	_check_barrier_hint()
 	if _cleared or _screens.is_empty():
 		return
 	for i in _screens.size():
-		if _open[i]:
-			continue
-		if _alive_in_screen(i) > 0:
-			_idle[i] = 0
-			continue
-		_idle[i] += 1
-		if _idle[i] >= CLEAR_DELAY_FRAMES:
-			_screen_cleared(i)
+		_step_screen(i)
 
 
-## 屏号跟着玩家走：往右推进就 +1，往回走也会退回来（他确实在那儿）
+## 屏号跟着玩家走：往右推进就 +1，往回走也会退回来（他确实在那儿）。
+## 顺便把「走到过的屏」标成已开场 —— 怪从这一刻起才存在
 func _follow_screen() -> void:
 	if _screens.is_empty():
 		return
@@ -131,16 +218,65 @@ func _follow_screen() -> void:
 	if p == null:
 		return
 	_current = clampi(int(p.global_position.x / SCREEN_WIDTH), 0, _screens.size() - 1)
+	for i in range(mini(_current + 1, _screens.size())):
+		_started[i] = true
 
 
-## 这一屏还有几只活的怪。按**出生分组**算 —— 怪被引着跑到下一屏去，
-## 不该把上一屏判成「已经清了」（按当前位置算就会出这个错）
-func _alive_in_screen(i: int) -> int:
-	if i < 0 or i >= _screens.size():
+## 一屏的状态机：出下一波 → 等它被清空 → 再出下一波 → … → 这一屏清了。
+## 拆成单独一个函数是为了让"一屏"的内部节奏一眼看得完
+func _step_screen(i: int) -> void:
+	if not _started[i] or _done[i]:
+		return
+	if _gap[i] > 0:
+		_gap[i] -= 1
+		return
+	var waves: Array = _waves[i]
+	if _active[i] < 0:
+		if _waves_done[i] >= waves.size():
+			_screen_cleared(i)
+			return
+		_activate_wave(i, _waves_done[i])
+		return
+	if _alive_in_wave(i, _active[i]) > 0:
+		_idle[i] = 0
+		return
+	_idle[i] += 1
+	if _idle[i] >= CLEAR_DELAY_FRAMES:
+		_waves_done[i] = _active[i] + 1
+		_active[i] = -1
+		_idle[i] = 0
+		_gap[i] = WAVE_GAP_FRAMES
+
+
+## 把第 i 屏的第 w 波放出来。休眠中的怪在这里"活过来"：
+## 恢复处理 / 碰撞 / 回到 enemy 组，再淡入 —— 一批怪凭空出现要有过程，
+## 直接闪出来会让人以为是卡了一帧
+func _activate_wave(i: int, w: int) -> void:
+	if i < 0 or i >= _waves.size() or w < 0 or w >= _waves[i].size():
+		return
+	var node: Node = _waves[i][w]
+	for e in node.get_children():
+		if e.has_method("set_dormant"):
+			e.call("set_dormant", false)
+		if e is CanvasItem:
+			var ci := e as CanvasItem
+			ci.modulate.a = 0.0
+			var tw := ci.create_tween()
+			tw.tween_property(ci, "modulate:a", 1.0, SPAWN_FADE_SEC)
+	_active[i] = w
+	_idle[i] = 0
+
+
+## 这一波还有几只活的。**按容器归属算，不按当前位置** ——
+## 怪被引着跑到隔壁去，不该把这一波判成"清了"。
+## 休眠中的怪已经退出 `enemy` 组，所以这里天然数不到它们
+func _alive_in_wave(i: int, w: int) -> int:
+	if i < 0 or i >= _waves.size() or w < 0 or w >= _waves[i].size():
 		return 0
+	var node: Node = _waves[i][w]
 	var n := 0
 	for e in get_tree().get_nodes_in_group("enemy"):
-		if not is_instance_valid(e) or not _screens[i].is_ancestor_of(e):
+		if not is_instance_valid(e) or not node.is_ancestor_of(e):
 			continue
 		if e.has_method("is_alive") and not bool(e.call("is_alive")):
 			continue
@@ -148,33 +284,46 @@ func _alive_in_screen(i: int) -> int:
 	return n
 
 
-## 第 i 屏清空了。**最后一屏 = 副本通关**；其余只是开闸门放行，不回舆图
+## 第 i 屏清空了。**最后一屏 = 副本通关**；其余只是放行，不回舆图
 func _screen_cleared(i: int) -> void:
-	_open[i] = true
+	_done[i] = true
 	if i >= _screens.size() - 1:
 		_on_dungeon_cleared()
 		return
-	_open_gate(i)
-	_banner("%s　%s" % [
-		I18n.t(&"UI_SCREEN_CLEARED", [i + 1]), tr("UI_SCREEN_ADVANCE")])
+	_open_barrier(i)
+	_banner("%s　%s" % [I18n.t(&"UI_SCREEN_CLEARED", [i + 1]), tr("UI_SCREEN_ADVANCE")])
 
 
-## 开第 i 道闸门：关掉碰撞 + 淡出视觉。
-## **不能只淡出视觉** —— 玩家会一头撞上看不见的墙，那是最坏的一种静默失败
-func _open_gate(i: int) -> void:
-	if i < 0 or i >= _gates.size():
+## 拆掉第 i 道挡墙。**它本来就是看不见的**，所以只有关碰撞这一件事可做 ——
+## 忘掉这一步就是"撞上一堵看不见的墙"，最坏的一种静默失败
+func _open_barrier(i: int) -> void:
+	if i < 0 or i >= _barriers.size():
 		return
-	var g := _gates[i]
-	var shape := g.get_node_or_null("CollisionShape2D") as CollisionShape2D
-	if shape != null:
-		shape.disabled = true
-	else:
-		g.collision_layer = 0
-	var vis := g.get_node_or_null("Visual") as CanvasItem
-	if vis != null:
-		var tw := vis.create_tween()
-		tw.tween_property(vis, "modulate:a", 0.0, 0.45)
-		tw.tween_callback(func() -> void: vis.visible = false)
+	var b := _barriers[i]
+	if b == null:
+		return
+	for c in b.get_children():
+		if c is CollisionShape2D:
+			(c as CollisionShape2D).disabled = true
+	b.collision_layer = 0
+
+
+## 撞上还没拆的挡墙时给一句人话。
+## 挡墙是看不见的 —— 不给提示，玩家只会觉得"这里卡住了"（机器不报错，人就只能猜）
+func _check_barrier_hint() -> void:
+	if _hint_cooldown > 0 or _barriers.is_empty():
+		return
+	var p := get_node_or_null(PLAYER_PATH) as Node2D
+	if p == null:
+		return
+	for i in _barriers.size():
+		var b := _barriers[i]
+		if b == null or b.collision_layer == 0:
+			continue
+		if absf(p.global_position.x - b.global_position.x) < BARRIER_HINT_DIST:
+			_banner(tr("UI_SCREEN_BLOCKED"))
+			_hint_cooldown = HINT_COOLDOWN_FRAMES
+			return
 
 
 ## 副本通关：记进度（并拿到因此解锁的下一个副本）、给一句反馈、弹舆图
@@ -220,8 +369,10 @@ func _build_banner() -> void:
 	lbl.add_theme_constant_override("shadow_offset_x", 1)
 	lbl.add_theme_constant_override("shadow_offset_y", 1)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# 宽度用**视口**而不是屏宽：屏比视口宽了之后，写 SCREEN_WIDTH 会让字居中到屏幕外
+	var vw := get_viewport().get_visible_rect().size.x
 	lbl.position = Vector2(0.0, 92.0)
-	lbl.size = Vector2(SCREEN_WIDTH, 26.0)
+	lbl.size = Vector2(vw, 26.0)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.modulate.a = 0.0
 	cl.add_child(lbl)
@@ -256,7 +407,43 @@ func screen_count() -> int:
 
 ## 第 i 屏（0 起）放行了没有
 func is_screen_cleared(i: int) -> bool:
-	return i >= 0 and i < _open.size() and _open[i]
+	return i >= 0 and i < _done.size() and _done[i]
+
+
+## 第 i 屏有几波
+func screen_wave_count(i: int) -> int:
+	if i < 0 or i >= _waves.size():
+		return 0
+	return _waves[i].size()
+
+
+## 第 i 屏已经清掉几波
+func waves_done(i: int) -> int:
+	if i < 0 or i >= _waves_done.size():
+		return 0
+	return _waves_done[i]
+
+
+## 第 i 屏场上挂着的是第几波（-1 = 没有）。0 起
+func active_wave(i: int) -> int:
+	if i < 0 or i >= _active.size():
+		return -1
+	return _active[i]
+
+
+## 第 i 道挡墙拆了没有
+func barrier_open(i: int) -> bool:
+	if i < 0 or i >= _barriers.size():
+		return true
+	var b := _barriers[i]
+	return b == null or b.collision_layer == 0
+
+
+## 第 i 道挡墙的节点（断言要拿它的位置）
+func barrier_node(i: int) -> Node2D:
+	if i < 0 or i >= _barriers.size():
+		return null
+	return _barriers[i]
 
 
 ## 整个副本通关了没有
@@ -266,7 +453,7 @@ func is_dungeon_cleared() -> bool:
 
 # ── 重开 / 快照 ────────────────────────────────────────────────
 
-## 重开本副本（死在里面时由 player 调用）。
+## 重开本副本（死亡界面的「重新开始」调它）。
 ##
 ## 「死在副本里 → 重开副本」不回安全区、不掉进度（docs/adr/0009 §3）：
 ## 玩家的成长（等级 / 装备 / 精铁）住在 PlayerState，重载场景不会丢 ——
@@ -276,10 +463,12 @@ func restart() -> void:
 
 
 ## 收集当前世界状态。结构：
-##   player: { hp, x, y }
-##   enemies: [ { node(相对路径), hp, x, y } ]   hp<=0 表示死着，恢复时走死亡态
+##   player:  { hp, x, y, … }
+##   enemies: [ { node(相对路径), hp, x, y } ]   只含**当前在场**的那一波
+##   screens: { started, waves_done, done }      推进到哪了
+## 休眠中的怪不进 enemies —— 它们还没出场，读档时由 screens 决定该出现哪一波
 func collect() -> Dictionary:
-	var out := {"player": {}, "enemies": []}
+	var out := {"player": {}, "enemies": [], "screens": {}}
 	var player := get_node_or_null(PLAYER_PATH)
 	if player != null:
 		var h := player.get_node("Health") as Health
@@ -302,6 +491,11 @@ func collect() -> Dictionary:
 			"bag": PlayerState.bag.duplicate(),
 			"skill_slots": PlayerState.skill_slots.duplicate(),
 		}
+	out.screens = {
+		"started": _started.duplicate(),
+		"waves_done": _waves_done.duplicate(),
+		"done": _done.duplicate(),
+	}
 	var enemies: Array = []
 	for e in get_tree().get_nodes_in_group("enemy"):
 		if not is_instance_valid(e) or not e.is_inside_tree():
@@ -321,11 +515,36 @@ func collect() -> Dictionary:
 
 
 func _apply_state(st: Dictionary) -> void:
+	var scr := st.get("screens", {}) as Dictionary
+	if not scr.is_empty():
+		_restore_screens(scr)
 	var player := get_node_or_null(PLAYER_PATH)
 	if player != null and st.has("player"):
 		if player.has_method("apply_saved"):
 			player.call("apply_saved", st.player)
+	# 血量放在波次之后恢复：先让该出场的那一波站好，再按快照摆它们的血量位置
 	for d in st.get("enemies", []):
 		var e := get_node_or_null(NodePath(str(d.get("node", ""))))
 		if e != null and e.has_method("apply_saved"):
 			e.call("apply_saved", d)
+
+
+## 按快照摆回推进状态：清过的屏直接放行，没清完的屏把该出的那一波摆出来
+func _restore_screens(scr: Dictionary) -> void:
+	var started: Array = scr.get("started", [])
+	var done: Array = scr.get("done", [])
+	var wdone: Array = scr.get("waves_done", [])
+	for i in _screens.size():
+		_started[i] = bool(started[i]) if i < started.size() else false
+		_done[i] = bool(done[i]) if i < done.size() else false
+		_waves_done[i] = int(wdone[i]) if i < wdone.size() else 0
+		_active[i] = -1
+		_idle[i] = 0
+		_gap[i] = 0
+		if _done[i]:
+			_open_barrier(i)          # 已经清掉的屏：路本来就是通的
+			continue
+		if not _started[i]:
+			continue
+		if _waves_done[i] < _waves[i].size():
+			_activate_wave(i, _waves_done[i])

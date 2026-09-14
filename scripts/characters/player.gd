@@ -104,7 +104,8 @@ var skill_cooldown: int:
 @export var hurt_stun_frames: int = 14
 ## 被击中时沿受击方向弹开的速度（像素/秒）
 @export var hurt_knockback: float = 140.0
-## 死亡后过多久在出生点满血重生（秒）
+## 倒地之后过多久弹出死亡界面（秒）。**这段延迟是刻意的** ——
+## 立刻弹界面会让「我怎么死的」来不及看清，先让人躺一下
 @export var revive_delay: float = 1.2
 
 # ── 供自动验收读取的公开状态。改这些名字会让 tests/ 一起改 ──────
@@ -137,7 +138,7 @@ var _attack_queued: bool = false
 var _dodge_queued: bool = false
 var _dodge_dir: int = 1
 var _revive_t: float = 0.0
-## 已经喊过「重整旗鼓」了。重载场景是排队到帧末才发生的，
+## 已经喊过「倒下之后怎么办」了。切场景 / 弹界面都是排队到帧末才发生的，
 ## 不设这道闸的话，这一帧里会连着喊好几次
 var _reviving := false
 var _hurt_flash: float = 0.0
@@ -537,31 +538,33 @@ func _hurt_process(delta: float) -> void:
 		_end_action()
 
 
-## 死亡：锁一切输入，计时结束后按当前场景的规则重生。
+## 死亡：锁一切输入，计时结束后**弹一个二选一**。
 ##
-## 「死亡之后去哪」在 M3 从「原地满血」改成了**重开本关**：关卡变成一屏一屏之后，
-## 死在本关就重来本关，不回安全区、不掉进度（docs/adr/0009 §3）——
-## 一屏的距离不值得让玩家跑半张地图回去捡尸体。
+## 2026-09-14 神的要求：不再自动重开，而是让玩家自己选
+## ——「重新开始」（重开本副本）或「返回城镇」。理由写在 scripts/ui/death_menu.gd 顶上。
 func _dead_process(delta: float) -> void:
 	velocity.x = 0.0
 	_apply_gravity(delta)
 	_revive_t -= delta
 	if _revive_t <= 0.0 and not _reviving:
 		_reviving = true
-		_revive_or_restart()
+		_open_death_menu()
 
 
-## 重开本关。当前场景根节点会 `restart` 就交给它（关卡都是这样）；
-## 不会的（测试场景、单独跑的角色测试）退回**原地满血** ——
-## 测试要观测「死亡 → 重生」这条链，不能被中途切成另一个场景
-func _revive_or_restart() -> void:
+## 倒下之后的去处交给死亡界面（挂在玩家下，与 HUD / 暂停菜单同一套挂法）。
+##
+## 只有**关卡**才弹（它有 `restart`）—— 测试场景、单独跑的角色场景没有，
+## 那些退回**原地满血**：测试要观测「死亡 → 重生」这条链，
+## 一死就弹一个要求按键的界面等于把测试卡死在那儿
+func _open_death_menu() -> void:
+	var menu := get_node_or_null("DeathMenu")
 	var root := get_tree().current_scene
-	if root != null and root.has_method("restart"):
-		root.call("restart")
+	if menu != null and root != null and root.has_method("restart"):
+		menu.call("open")
 		return
 	global_position = _spawn_point
 	velocity = Vector2.ZERO
-	_health.heal_full()
+	_health.heal_full()          # 发 revived → _on_revived 把 _reviving 放回去
 
 
 # ─────────────────────────────────────────────────────────────

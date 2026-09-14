@@ -61,10 +61,17 @@ var _flash := 0.0
 var _alpha := 1.0
 var _target_alpha := 1.0
 var _rng := RandomNumberGenerator.new()
+## 休眠中（这一波还没轮到它出场）。见 set_dormant
+var _dormant := false
+## 场景里声明的碰撞层 / 掩码。休眠会把它们清零，醒过来要还原成这两个
+var _base_layer := 0
+var _base_mask := 0
 
 
 func _ready() -> void:
 	_rng.randomize()
+	_base_layer = collision_layer
+	_base_mask = collision_mask
 	if data == null:
 		data = load("res://data/enemies/walker.tres") as EnemyData
 	health.max_hp = data.max_hp
@@ -258,6 +265,35 @@ func apply_hitstop(frames: int) -> void:
 
 func is_alive() -> bool:
 	return not health.is_dead
+
+
+## 休眠中？清屏判定要跳过它（它都没出场，不该算这一屏的怪）
+func is_dormant() -> bool:
+	return _dormant
+
+
+## 休眠 / 唤醒 —— **分批出怪**（波次）的地基。
+##
+## 还没轮到出场的那一波必须**从世界里完全退出去**。只 `hide()` 是不够的，
+## 它会以三种方式泄漏，而且每一种都不报错：
+##   1. **挡路** —— 看不见的身子还是堵在那儿，玩家撞上去会以为地图坏了
+##   2. **挨打** —— 玩家的刀会砍到"空气"（判定框照样命中）
+##   3. **让这一屏永远清不掉** —— 清屏判定数的是 `enemy` 组，留着它就永远有活怪
+## 所以四件事一起做：看不见 / 不跑逻辑 / 不参与碰撞 / 退出 `enemy` 组。
+func set_dormant(dormant: bool) -> void:
+	if _dormant == dormant:
+		return
+	_dormant = dormant
+	visible = not dormant
+	process_mode = Node.PROCESS_MODE_DISABLED if dormant else Node.PROCESS_MODE_INHERIT
+	for node in find_children("*", "CollisionShape2D", true, false):
+		node.set_deferred("disabled", dormant)
+	set_deferred("collision_layer", 0 if dormant else _base_layer)
+	set_deferred("collision_mask", 0 if dormant else _base_mask)
+	if dormant:
+		remove_from_group("enemy")
+	else:
+		add_to_group("enemy")
 
 
 ## 读档恢复：摆回存档时的血量与位置。血空了就连死亡状态一起复现，

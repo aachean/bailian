@@ -246,9 +246,10 @@ func is_bag_open() -> bool:
 
 
 func toggle_bag() -> void:
-	# 暂停菜单 / 对话框 / 舆图开着时不叠背包：几个界面都要抢 Esc / B / J，
+	# 暂停菜单 / 对话框 / 舆图 / 死亡界面开着时不叠背包：几个界面都要抢 Esc / B / J，
 	# 叠起来只会互相打架
-	if not _bag_open and (_pause_menu_open() or _dialogue_open() or _atlas_open()):
+	if not _bag_open \
+			and (_pause_menu_open() or _dialogue_open() or _atlas_open() or _death_open()):
 		return
 	if not _bag_open and _skill_open:
 		toggle_skill_panel()            # 背包和技能面板同类，开的那个让位
@@ -267,7 +268,8 @@ func is_skill_panel_open() -> bool:
 ## 技能面板（V）：列技能池，把想带的装进 5 个槽。
 ## 与背包面板同一套机制：打开即暂停、操作类界面、共用一个光标
 func toggle_skill_panel() -> void:
-	if not _skill_open and (_pause_menu_open() or _dialogue_open() or _atlas_open()):
+	if not _skill_open \
+			and (_pause_menu_open() or _dialogue_open() or _atlas_open() or _death_open()):
 		return
 	if not _skill_open and _bag_open:
 		toggle_bag()
@@ -434,6 +436,28 @@ func _atlas_open() -> bool:
 		return false
 	var at := _player.get_node_or_null("Atlas")
 	return at != null and at.has_method("is_open") and bool(at.call("is_open"))
+
+
+## 死亡界面开着时也让路。死亡界面自己会先调 close_all_panels() 把本节点的面板收掉，
+## 这一条是**兜底**：任何路径下都不该出现"人已经躺下了，背包还摊在脸上"
+func _death_open() -> bool:
+	if _player == null:
+		return false
+	var dm := _player.get_node_or_null("DeathMenu")
+	return dm != null and dm.has_method("is_open") and bool(dm.call("is_open"))
+
+
+## 把本节点上开着的面板全收掉（死亡界面调）。
+## **必须顺手解暂停** —— 面板的可见性与 paused 是一起管的，
+## 只藏面板不解暂停，新界面一出来游戏还是停着的
+func close_all_panels() -> void:
+	if _bag_open:
+		_bag_open = false
+		_bag_panel.visible = false
+	if _skill_open:
+		_skill_open = false
+		_skill_panel.visible = false
+	get_tree().paused = false
 
 
 func refresh_bag() -> void:

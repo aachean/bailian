@@ -149,14 +149,17 @@ func _t1_scenes_wired() -> void:
 			continue
 		screens += 1
 		var n := 0
-		for e in get_tree().get_nodes_in_group("enemy"):
-			if not is_instance_valid(e) or not s.is_ancestor_of(e):
+		# 数**场景里摆着的**，不数 `enemy` 组 —— 分批出怪之后，还没轮到出场的那几批
+		# 是休眠的、已经退出了那个组，按组数只会数到第 1 批
+		for w in s.get_children():
+			if not w.is_in_group("wave"):
 				continue
-			n += 1
-			# 按数据表分种类，不按脚本 —— 疾行者继承游荡者的脚本，是数据不同
-			kinds[str(e.get("data").id)] = true
-			if str(e.get("data").id) == "boss":
-				boss_screen = screens - 1
+			for e in w.get_children():
+				n += 1
+				# 按数据表分种类，不按脚本 —— 疾行者继承游荡者的脚本，是数据不同
+				kinds[str(e.get("data").id)] = true
+				if str(e.get("data").id) == "boss":
+					boss_screen = screens - 1
 		counts.append(n)
 	var bound: Rect2 = lv.get("bounds")
 	lv.queue_free()
@@ -164,8 +167,8 @@ func _t1_scenes_wired() -> void:
 
 	_check("1", "城镇有舆图台（没有传送门了）；砺场是三屏副本：每屏有怪、Boss 在最后一屏",
 		town_ok and no_portal and screens == 3 \
-			and counts[0] >= 3 and counts[1] >= 3 and counts[2] >= 2 \
-			and boss_screen == 2 and bound.size.x >= 1920.0,
+			and counts[0] >= 9 and counts[1] >= 9 and counts[2] >= 5 \
+			and boss_screen == 2 and bound.size.x >= 2880.0,
 		"城镇：舆图台=%s 无传送门=%s　砺场 %d 屏，各屏怪数 %s，副本宽 %.0f　Boss 在第 %d 屏" % [
 			str(pedestal != null), str(no_portal), screens, str(counts),
 			bound.size.x, boss_screen + 1])
@@ -183,14 +186,14 @@ func _t2_camera_bounds() -> void:
 	await _pframes(30)
 	var left_center: float = cam.get_screen_center_position().x
 
-	player.global_position = Vector2(1860.0, 288.0)
+	player.global_position = Vector2(2820.0, 288.0)
 	await _pframes(60)
 	var right_center: float = cam.get_screen_center_position().x
 
-	# 半屏 320：左界中心 = 320，右界中心 = 1920-320 = 1600
+	# 半屏 320：左界中心 = 320，右界中心 = 副本宽 2880 - 320 = 2560
 	_check("2", "多屏副本的相机跟着玩家走，但到副本两端就停住",
-		absf(left_center - 320.0) <= 2.0 and absf(right_center - 1600.0) <= 2.0,
-		"最左时视野中心 x=%.0f（应为 320）　最右时 x=%.0f（应为 1600）" % [
+		absf(left_center - 320.0) <= 2.0 and absf(right_center - 2560.0) <= 2.0,
+		"最左时视野中心 x=%.0f（应为 320）　最右时 x=%.0f（应为 2560）" % [
 			left_center, right_center])
 	level.queue_free()
 	await _pframes(2)
@@ -202,14 +205,25 @@ func _t3_spearman_throws() -> void:
 	add_child(level)
 	await _pframes(3)
 	var player := level.get_node("Player")
-	var spear := level.get_node("Screen3/Spearman1")
-	var hp0: int = (player.get_node("Health") as Health).hp
-
-	# 站进它的警戒圈：与掷矛手相距 ~190（aggro 220 内），
-	# 同时站在同屏另外两只的圈外（Boss 在 1860，aggro 200 → 距离 450 不追；
-	# 游荡者在 1700，aggro 150 → 距离 290 不追）
-	player.global_position = Vector2(1410.0, 288.0)
+	# 掷矛手在**最后一屏的第 1 批**里。分批出怪之后，怪是按屏出场的 ——
+	# 不把玩家挪进那一屏，它一直是休眠的（这正是"分批"该有的样子）
+	player.global_position = Vector2(2500.0, 288.0)
 	player.velocity = Vector2.ZERO
+	await _pframes(10)
+	var spear := level.get_node_or_null("Screen3/Wave1/Spearman3")
+	if spear == null:
+		_check("3", "掷矛手会投矛，矛飞过去真的打得动人", false, "砺场第 3 屏第 1 批里找不到掷矛手")
+		level.queue_free()
+		await _pframes(2)
+		return
+	# 同批还有两只游荡者，AI 关掉并挪走：本用例只关心掷矛手，
+	# 它们会跑过来近身打断节奏，让"有没有被矛打中"变得不可测
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if not is_instance_valid(e) or not level.is_ancestor_of(e) or e == spear:
+			continue
+		e.set("ai_enabled", false)
+		(e as Node2D).global_position = Vector2(100.0, 288.0)
+	var hp0: int = (player.get_node("Health") as Health).hp
 
 	var threw := false
 	var hit := false
@@ -287,9 +301,9 @@ func _t7_boss_present() -> void:
 	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
-	var boss := level.get_node_or_null("Screen3/Boss")
+	var boss := level.get_node_or_null("Screen3/Wave3/Boss")
 	if boss == null:
-		_check("7", "Boss 镇守副本最后一屏", false, "砺场第 3 屏里找不到 Boss")
+		_check("7", "Boss 镇守副本最后一屏", false, "砺场第 3 屏最后一批里找不到 Boss")
 		level.queue_free()
 		await _pframes(2)
 		return

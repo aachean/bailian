@@ -49,10 +49,16 @@ var _flash := 0.0
 var _alpha := 1.0
 var _target_alpha := 1.0
 var _rng := RandomNumberGenerator.new()
+## 休眠中（这一波还没轮到它出场）。语义与 walker 完全一致，见那边的长注释
+var _dormant := false
+var _base_layer := 0
+var _base_mask := 0
 
 
 func _ready() -> void:
 	_rng.randomize()
+	_base_layer = collision_layer
+	_base_mask = collision_mask
 	if data == null:
 		data = load("res://data/enemies/spearman.tres") as EnemyData
 	health.max_hp = data.max_hp
@@ -181,6 +187,29 @@ func apply_hitstop(frames: int) -> void:
 
 func is_alive() -> bool:
 	return not health.is_dead
+
+
+## 休眠中？（清屏判定要跳过没出场的怪）
+func is_dormant() -> bool:
+	return _dormant
+
+
+## 休眠 / 唤醒 —— 分批出怪的地基，语义与 walker.set_dormant 完全一致
+## （四件事：看不见 / 不跑逻辑 / 不参与碰撞 / 退出 enemy 组）
+func set_dormant(dormant: bool) -> void:
+	if _dormant == dormant:
+		return
+	_dormant = dormant
+	visible = not dormant
+	process_mode = Node.PROCESS_MODE_DISABLED if dormant else Node.PROCESS_MODE_INHERIT
+	for node in find_children("*", "CollisionShape2D", true, false):
+		node.set_deferred("disabled", dormant)
+	set_deferred("collision_layer", 0 if dormant else _base_layer)
+	set_deferred("collision_mask", 0 if dormant else _base_mask)
+	if dormant:
+		remove_from_group("enemy")
+	else:
+		add_to_group("enemy")
 
 
 func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: int) -> void:
