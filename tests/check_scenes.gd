@@ -24,6 +24,10 @@ const SCENES := [
 	"res://scenes/enemies/brute.tscn",
 	"res://scenes/enemies/caster.tscn",
 	"res://scenes/enemies/boss2.tscn",
+	"res://scenes/enemies/walker_elite.tscn",
+	"res://scenes/enemies/dasher_elite.tscn",
+	"res://scenes/enemies/brute_elite.tscn",
+	"res://scenes/enemies/boss_luhou.tscn",
 	"res://scenes/enemies/target_dummy.tscn",
 	"res://scenes/enemies/projectile.tscn",
 	"res://scenes/core/portal.tscn",
@@ -39,8 +43,8 @@ const SCENES := [
 	"res://scenes/stages/test_room.tscn",
 	"res://scenes/stages/town.tscn",
 	"res://scenes/stages/lichang.tscn",
-	"res://scenes/stages/level_2.tscn",
-	"res://scenes/stages/level_3.tscn",
+	"res://scenes/stages/duancuiqu.tscn",
+	"res://scenes/stages/luhou.tscn",
 ]
 
 var _pass := 0

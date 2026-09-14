@@ -6,6 +6,7 @@
 script = ExtResource("1_681av")
 id = &"luhou"
 name_key = &"DUNGEON_LUHOU"
-screen_count = 0
+scene_path = "res://scenes/stages/luhou.tscn"
+screen_count = 5
 rec_level = 25
 rec_weapon = 4

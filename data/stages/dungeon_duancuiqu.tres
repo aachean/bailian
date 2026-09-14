@@ -6,6 +6,7 @@
 script = ExtResource("1_ca8sn")
 id = &"duancuiqu"
 name_key = &"DUNGEON_DUANCUIQU"
-screen_count = 0
+scene_path = "res://scenes/stages/duancuiqu.tscn"
+screen_count = 4
 rec_level = 12
 rec_weapon = 2

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/brute_swing.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"brute_elite"
+display_name = "炉前重锤"
+max_hp = 78
+revive_delay = 0.0
+hurt_stun_frames = 4
+patrol_speed = 28.0
+chase_speed = 74.0
+patrol_range = 60.0
+aggro_range = 230.0
+deaggro_range = 380.0
+attack_range = 58.0
+attack_cooldown_frames = 66
+attack_skill = ExtResource("2_skill")
+drop_shards = 5
+exp_reward = 32
+drop_item_chance = 0.34
+drop_items = Array[String](["res://data/items/iron_armor.tres", "res://data/items/iron_helm.tres", "res://data/items/iron_sword.tres"])

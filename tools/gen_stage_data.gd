@@ -36,12 +36,14 @@ func _write_all() -> bool:
 	# 内容来自线性时代的 `level_1.tscn` —— **只重切，不重做**
 	var lichang := _dungeon(&"lichang", &"DUNGEON_LICHANG",
 		"res://scenes/stages/lichang.tscn", 3, 1, 0)
-	# 断淬渠 / 炉喉：**还没开工**。scene_path 留空 + screen_count 0 ——
-	# 数据本身就说明「这里没有东西」，舆图照实标「未开放」。
-	# 步 2 把 level_2 / level_3 重切进来时各填一行就行
-	# （它们本来就是「多屏连续推进、走到底打 Boss」的形态，改动很小）
-	var duancuiqu := _dungeon(&"duancuiqu", &"DUNGEON_DUANCUIQU", "", 0, 0, 0)
-	var luhou := _dungeon(&"luhou", &"DUNGEON_LUHOU", "", 0, 0, 0)
+	# 断淬渠（渠底）：4 屏。新内容 = 掷火者（远程）与重锤兵；
+	# 屏 1 就让掷火者单独出场，屏 3 让重锤兵改用石甲卫的碎地（Boss 招式的预告）
+	var duancuiqu := _dungeon(&"duancuiqu", &"DUNGEON_DUANCUIQU",
+		"res://scenes/stages/duancuiqu.tscn", 4, 12, 2)
+	# 炉喉（炉心）：5 屏，第一章的终点。全类型 + **精英变体**（4.3）：
+	# 同一套 AI、更早发现、追得更紧、出手更密 —— 难度长在行为上而不是血条上
+	var luhou := _dungeon(&"luhou", &"DUNGEON_LUHOU",
+		"res://scenes/stages/luhou.tscn", 5, 25, 4)
 
 	var map := MapData.new()
 	map.id = &"quench_ridge"

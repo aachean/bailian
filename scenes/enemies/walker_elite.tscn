@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="1_base"]
+[ext_resource type="Resource" path="res://data/enemies/walker_elite.tres" id="2_data"]
+
+[node name="WalkerElite" instance=ExtResource("1_base")]
+data = ExtResource("2_data")
+
+[node name="Body" parent="Visuals" index="0"]
+color = Color(0.27, 0.28, 0.37, 1)
+
+[node name="Eye" parent="Visuals" index="3"]
+color = Color(0.95, 0.32, 0.28, 1)

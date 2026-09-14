@@ -1,0 +1,397 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_luhou.tres" id="2_dungeon"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker_elite.tscn" id="4_walker_elite"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/dasher_elite.tscn" id="4_dasher_elite"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/spearman.tscn" id="4_spearman"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/caster.tscn" id="4_caster"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/brute_elite.tscn" id="4_brute_elite"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/boss_luhou.tscn" id="4_boss_luhou"]
+[ext_resource type="PackedScene" path="res://scenes/core/npc.tscn" id="8_npc"]
+[ext_resource type="Resource" path="res://data/dialogue/hunter_outro.tres" id="9_dialogue"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(4800, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_step"]
+size = Vector2(160, 40)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat"]
+size = Vector2(120, 12)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat_s"]
+size = Vector2(110, 12)
+
+[node name="Luhou" type="Node2D"]
+script = ExtResource("1_stage")
+dungeon_data = ExtResource("2_dungeon")
+bounds = Rect2(0, 0, 4800, 360)
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(2400, 332)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Ground"]
+offset_left = -2400
+offset_top = -12
+offset_right = 2400
+offset_bottom = 12
+mouse_filter = 2
+color = Color(0.3, 0.24, 0.22, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="Step1" type="StaticBody2D" parent="."]
+position = Vector2(300, 292)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Step1"]
+offset_left = -80
+offset_top = -20
+offset_right = 80
+offset_bottom = 20
+mouse_filter = 2
+color = Color(0.38, 0.29, 0.26, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Step1"]
+shape = SubResource("RectangleShape2D_step")
+
+[node name="Plat1a" type="StaticBody2D" parent="."]
+position = Vector2(620, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat1a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.37, 0.28, 0.25, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat1a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat1b" type="StaticBody2D" parent="."]
+position = Vector2(880, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat1b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.34, 0.26, 0.23, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat1b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Plat2a" type="StaticBody2D" parent="."]
+position = Vector2(1580, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat2a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.37, 0.28, 0.25, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat2a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat2b" type="StaticBody2D" parent="."]
+position = Vector2(1840, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat2b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.34, 0.26, 0.23, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat2b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Plat3a" type="StaticBody2D" parent="."]
+position = Vector2(2540, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat3a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.37, 0.28, 0.25, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat3a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat3b" type="StaticBody2D" parent="."]
+position = Vector2(2800, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat3b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.34, 0.26, 0.23, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat3b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Plat4a" type="StaticBody2D" parent="."]
+position = Vector2(3500, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat4a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.37, 0.28, 0.25, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat4a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat4b" type="StaticBody2D" parent="."]
+position = Vector2(3760, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat4b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.34, 0.26, 0.23, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat4b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Plat5a" type="StaticBody2D" parent="."]
+position = Vector2(4460, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat5a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.37, 0.28, 0.25, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat5a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat5b" type="StaticBody2D" parent="."]
+position = Vector2(4720, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="ColorRect" parent="Plat5b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 6
+mouse_filter = 2
+color = Color(0.34, 0.26, 0.23, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat5b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Screen1" type="Node2D" parent="." groups=["screen"]]
+
+[node name="Wave1" type="Node2D" parent="Screen1" groups=["wave"]]
+
+[node name="WalkerElite500" parent="Screen1/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(500, 288)
+
+[node name="WalkerElite660" parent="Screen1/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(660, 288)
+
+[node name="WalkerElite820" parent="Screen1/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(820, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen1" groups=["wave"]]
+
+[node name="DasherElite520" parent="Screen1/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(520, 288)
+
+[node name="Spearman720" parent="Screen1/Wave2" instance=ExtResource("4_spearman")]
+position = Vector2(720, 288)
+
+[node name="DasherElite880" parent="Screen1/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(880, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen1" groups=["wave"]]
+
+[node name="WalkerElite560" parent="Screen1/Wave3" instance=ExtResource("4_walker_elite")]
+position = Vector2(560, 288)
+
+[node name="Spearman760" parent="Screen1/Wave3" instance=ExtResource("4_spearman")]
+position = Vector2(760, 288)
+
+[node name="Caster900" parent="Screen1/Wave3" instance=ExtResource("4_caster")]
+position = Vector2(900, 288)
+
+[node name="Screen2" type="Node2D" parent="." groups=["screen"]]
+position = Vector2(960, 0)
+
+[node name="Wave1" type="Node2D" parent="Screen2" groups=["wave"]]
+
+[node name="BruteElite1560" parent="Screen2/Wave1" instance=ExtResource("4_brute_elite")]
+position = Vector2(1560, 288)
+
+[node name="Caster1880" parent="Screen2/Wave1" instance=ExtResource("4_caster")]
+position = Vector2(1880, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen2" groups=["wave"]]
+
+[node name="WalkerElite1420" parent="Screen2/Wave2" instance=ExtResource("4_walker_elite")]
+position = Vector2(1420, 288)
+
+[node name="WalkerElite1640" parent="Screen2/Wave2" instance=ExtResource("4_walker_elite")]
+position = Vector2(1640, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen2" groups=["wave"]]
+
+[node name="BruteElite1480" parent="Screen2/Wave3" instance=ExtResource("4_brute_elite")]
+position = Vector2(1480, 288)
+
+[node name="DasherElite1700" parent="Screen2/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(1700, 288)
+
+[node name="DasherElite1860" parent="Screen2/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(1860, 288)
+
+[node name="Screen3" type="Node2D" parent="." groups=["screen"]]
+position = Vector2(1920, 0)
+
+[node name="Wave1" type="Node2D" parent="Screen3" groups=["wave"]]
+
+[node name="Caster2140" parent="Screen3/Wave1" instance=ExtResource("4_caster")]
+position = Vector2(2140, 288)
+
+[node name="Caster2500" parent="Screen3/Wave1" instance=ExtResource("4_caster")]
+position = Vector2(2500, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen3" groups=["wave"]]
+
+[node name="BruteElite2200" parent="Screen3/Wave2" instance=ExtResource("4_brute_elite")]
+position = Vector2(2200, 288)
+
+[node name="BruteElite2450" parent="Screen3/Wave2" instance=ExtResource("4_brute_elite")]
+position = Vector2(2450, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen3" groups=["wave"]]
+
+[node name="DasherElite2380" parent="Screen3/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(2380, 288)
+
+[node name="Spearman2560" parent="Screen3/Wave3" instance=ExtResource("4_spearman")]
+position = Vector2(2560, 288)
+
+[node name="BruteElite2680" parent="Screen3/Wave3" instance=ExtResource("4_brute_elite")]
+position = Vector2(2680, 288)
+
+[node name="Caster2860" parent="Screen3/Wave3" instance=ExtResource("4_caster")]
+position = Vector2(2860, 288)
+
+[node name="Screen4" type="Node2D" parent="." groups=["screen"]]
+position = Vector2(2880, 0)
+
+[node name="Hunter" parent="Screen4" instance=ExtResource("8_npc")]
+position = Vector2(3720, 300)
+name_key = &"NPC_HUNTER"
+dialogue = ExtResource("9_dialogue")
+
+[node name="Wave1" type="Node2D" parent="Screen4" groups=["wave"]]
+
+[node name="WalkerElite3200" parent="Screen4/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(3200, 288)
+
+[node name="Spearman3400" parent="Screen4/Wave1" instance=ExtResource("4_spearman")]
+position = Vector2(3400, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen4" groups=["wave"]]
+
+[node name="DasherElite3320" parent="Screen4/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(3320, 288)
+
+[node name="Caster3560" parent="Screen4/Wave2" instance=ExtResource("4_caster")]
+position = Vector2(3560, 288)
+
+[node name="DasherElite3480" parent="Screen4/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(3480, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen4" groups=["wave"]]
+
+[node name="BruteElite3380" parent="Screen4/Wave3" instance=ExtResource("4_brute_elite")]
+position = Vector2(3380, 288)
+
+[node name="Spearman3520" parent="Screen4/Wave3" instance=ExtResource("4_spearman")]
+position = Vector2(3520, 288)
+
+[node name="Caster3900" parent="Screen4/Wave3" instance=ExtResource("4_caster")]
+position = Vector2(3900, 288)
+
+[node name="Screen5" type="Node2D" parent="." groups=["screen"]]
+position = Vector2(3840, 0)
+
+[node name="Wave1" type="Node2D" parent="Screen5" groups=["wave"]]
+
+[node name="WalkerElite4280" parent="Screen5/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(4280, 288)
+
+[node name="BruteElite4380" parent="Screen5/Wave1" instance=ExtResource("4_brute_elite")]
+position = Vector2(4380, 288)
+
+[node name="Caster4240" parent="Screen5/Wave1" instance=ExtResource("4_caster")]
+position = Vector2(4240, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen5" groups=["wave"]]
+
+[node name="DasherElite4360" parent="Screen5/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(4360, 288)
+
+[node name="Spearman4460" parent="Screen5/Wave2" instance=ExtResource("4_spearman")]
+position = Vector2(4460, 288)
+
+[node name="DasherElite4520" parent="Screen5/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(4520, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen5" groups=["wave"]]
+
+[node name="Caster4600" parent="Screen5/Wave3" instance=ExtResource("4_caster")]
+position = Vector2(4600, 288)
+
+[node name="BruteElite4560" parent="Screen5/Wave3" instance=ExtResource("4_brute_elite")]
+position = Vector2(4560, 288)
+
+[node name="BossLuhou4680" parent="Screen5/Wave3" instance=ExtResource("4_boss_luhou")]
+position = Vector2(4680, 288)
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+position = Vector2(60, 280)

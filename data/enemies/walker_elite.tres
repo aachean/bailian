@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/enemy_swing.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"walker_elite"
+display_name = "渠底游荡者"
+max_hp = 34
+revive_delay = 0.0
+hurt_stun_frames = 10
+patrol_speed = 46.0
+chase_speed = 108.0
+patrol_range = 80.0
+aggro_range = 210.0
+deaggro_range = 340.0
+attack_range = 36.0
+attack_cooldown_frames = 34
+attack_skill = ExtResource("2_skill")
+drop_shards = 2
+exp_reward = 13
+drop_item_chance = 0.22
+drop_items = Array[String](["res://data/items/iron_helm.tres", "res://data/items/cloth_robe.tres", "res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres"])

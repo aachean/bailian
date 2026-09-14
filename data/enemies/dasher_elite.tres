@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/dash_slash.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"dasher_elite"
+display_name = "疾行哨"
+max_hp = 22
+revive_delay = 0.0
+hurt_stun_frames = 7
+patrol_speed = 62.0
+chase_speed = 172.0
+patrol_range = 90.0
+aggro_range = 250.0
+deaggro_range = 380.0
+attack_range = 32.0
+attack_cooldown_frames = 28
+attack_skill = ExtResource("2_skill")
+drop_shards = 2
+exp_reward = 16
+drop_item_chance = 0.24
+drop_items = Array[String](["res://data/items/leather_cap.tres", "res://data/items/cloth_robe.tres", "res://data/items/iron_sword.tres"])
