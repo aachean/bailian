@@ -44,6 +44,7 @@ func _ready() -> void:
 	await _t15_spearman_fire_rate()
 	await _t16_portrait_exp_ring()
 	await _t17_hp_mp_numbers()
+	await _t18_caps_follow_level()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -491,3 +492,42 @@ func _t17_hp_mp_numbers() -> void:
 	_check("17", "血条蓝条上写出「当前 / 上限」，并且随变化当场更新",
 		hp_ok and mp_ok,
 		"血 %s → %s　蓝 %s → %s" % [hp_before, hp_after, mp_before, mp_after])
+
+
+## **「属性管线只有一条」**：改等级之后，血上限和蓝上限**两个都要跟着变**。
+##
+## 这条是补一个真漏过的成员：`max_mp` 曾经不在 `_apply_upgrade()` 里，
+## 而是散在 `_ready` / `apply_saved` / `_on_level_up` 三处各写一遍 ——
+## 于是「等级变了但没走那三条路」的地方（测试里直接改等级、以后可能的天赋加成），
+## 蓝上限会静默停在旧值。现象是**血条涨了、蓝条不动**，而当时所有断言全绿，
+## 只有截图看得出来。断言盯的就是「两个上限都等于资源算出来的值」
+func _t18_caps_follow_level() -> void:
+	var h: Health = _player.get_node("Health")
+	var prog := PlayerState.progression
+	var lv: int = PlayerState.level
+	var hp_before := h.max_hp
+	var mp_before: int = int(_player.get("max_mp"))
+
+	# 只改等级、直接走属性管线 —— 刻意**不**走升级流程，
+	# 这样「某个上限被漏在管线外」才会暴露出来
+	var target: int = mini(lv + 10, prog.level_cap)
+	PlayerState.level = target
+	_player.set("level", target)
+	_player.call("_apply_upgrade")
+	await _pframes(2)
+
+	var hp_now := h.max_hp
+	var mp_now: int = int(_player.get("max_mp"))
+	var expect_hp: int = prog.hp_at(target)
+	var expect_mp: int = prog.mp_at(target)
+	_check("18", "等级一变，血上限与蓝上限**都**跟着变（两个上限都在属性管线里）",
+		hp_now == expect_hp and mp_now == expect_mp \
+			and hp_now != hp_before and mp_now != mp_before,
+		"Lv.%d → Lv.%d：血 %d → %d（期望 %d）　蓝 %d → %d（期望 %d）" % [
+			lv, target, hp_before, hp_now, expect_hp, mp_before, mp_now, expect_mp])
+
+	# 还原，别影响后面的用例
+	PlayerState.level = lv
+	_player.set("level", lv)
+	_player.call("_apply_upgrade")
+	await _pframes(1)
