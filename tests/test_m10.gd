@@ -57,6 +57,8 @@ func _ready() -> void:
 	await _t15_soft_cap_is_lossless_below_knee()
 	await _t16_soft_cap_diminishes_above_knee()
 	await _t17_ratio_has_hard_cap()
+	await _t18_growth_per_level_diminishes()
+	await _t19_cap_power_is_bounded()
 
 	SaveManager.current_slot = _slot_before
 	SaveGuard.restore(_bak)
@@ -125,24 +127,29 @@ func _t4_max_level_stops_exp() -> void:
 
 ## 成长数字的唯一真相在 progression.tres：改资源，结果跟着变。
 ## 代码里要是偷偷留了一份魔法数，这条立刻红
+## 成长数字的唯一真相在 progression.tres：改资源，结果跟着变。
+## 代码里要是偷偷留了一份魔法数，这条立刻红。
+##
+## 断言写成「改大 gain → 取值变大」而不是「重算一遍公式对不对」：
+## 后者等于把实现抄进测试，实现改了测试也得跟着改（而且抄错时两边一起错）
 func _t5_growth_numbers_come_from_resource() -> void:
 	var p := PlayerState.progression
-	var old_hp := p.hp_per_level
-	var old_atk := p.atk_per_level
-	var new_hp := old_hp + 7
-	var new_atk := old_atk + 0.01
-	p.hp_per_level = new_hp
-	p.atk_per_level = new_atk
-	var hp_val := p.hp_at(10)
-	var atk_val := p.atk_bonus_at(11)
-	var hp_ok := hp_val == p.base_hp + 9 * new_hp
-	var atk_ok := is_equal_approx(atk_val, new_atk * 10.0)
-	p.hp_per_level = old_hp
-	p.atk_per_level = old_atk
-	_check("5", "每级成长读的是资源：改 hp_per_level / atk_per_level 立刻反映到取值上",
-		hp_ok and atk_ok,
-		"hp_per_level %d→%d：hp_at(10) 得 %d（期望 %d）　atk %.3f（期望 %.3f）" % [
-			old_hp, new_hp, hp_val, p.base_hp + 9 * new_hp, atk_val, new_atk * 10.0])
+	var hp_before := p.hp_at(10)
+	var atk_before := p.atk_bonus_at(11)
+	var old_hp := p.hp_gain
+	var old_atk := p.atk_gain
+	var new_hp := old_hp + 500
+	var new_atk := old_atk + 1.0
+	p.hp_gain = new_hp
+	p.atk_gain = new_atk
+	var hp_after := p.hp_at(10)
+	var atk_after := p.atk_bonus_at(11)
+	p.hp_gain = old_hp
+	p.atk_gain = old_atk
+	_check("5", "每级成长读的是资源：改 hp_gain / atk_gain 立刻反映到取值上",
+		hp_after > hp_before and atk_after > atk_before,
+		"hp_gain %d→%d：hp_at(10) %d → %d　atk_gain %.2f→%.2f：atk_bonus_at(11) %.3f → %.3f" % [
+			old_hp, new_hp, hp_before, hp_after, old_atk, new_atk, atk_before, atk_after])
 
 
 ## 坏档 / 越界等级要夹回 cap —— 不夹的话 level=999 会让 exp_needed 返回 0
@@ -362,3 +369,36 @@ func _t17_ratio_has_hard_cap() -> void:
 		is_equal_approx(cap, Health.MAX_DAMAGE_REDUCTION) and is_equal_approx(unknown, 1.0),
 		"减伤 5.0 → %.2f（上限 %.2f）　未登记的 crit 3.7 → %.2f" % [
 			cap, Health.MAX_DAMAGE_REDUCTION, unknown])
+
+
+# ── 100 级那件事：等级是钥匙，不是战力轴（设计原则 3.2）────────────
+
+## 每级给的成长必须**递减**。上限抬到 100 之后这条尤其要紧 ——
+## 线性的每级增量到 100 级会变成攻击 +495%，那等于把等级做成主要战力来源。
+## 用一阶差分验形状：第 2 级给的最多，越往后越少
+func _t18_growth_per_level_diminishes() -> void:
+	var p := PlayerState.progression
+	var d1 := p.hp_at(2) - p.hp_at(1)
+	var d2 := p.hp_at(11) - p.hp_at(10)
+	var d3 := p.hp_at(51) - p.hp_at(50)
+	var a1 := p.atk_bonus_at(2) - p.atk_bonus_at(1)
+	var a2 := p.atk_bonus_at(51) - p.atk_bonus_at(50)
+	_check("18", "每级成长递减：越往后每级给得越少（等级不是战力轴）",
+		d1 > d2 and d2 > d3 and d3 > 0 and a1 > a2 and a2 > 0.0,
+		"生命增量 第2级 %d ＞ 第11级 %d ＞ 第51级 %d　攻击增量 %.4f ＞ %.4f" % [
+			d1, d2, d3, a1, a2])
+
+
+## 满级战力有上界：**趋近 gain 而到不了**。
+## 这条挡的是「以后有人把 falloff 调成 1 又忘了 cap 是 100」
+func _t19_cap_power_is_bounded() -> void:
+	var p := PlayerState.progression
+	var hp := p.hp_at(p.level_cap)
+	var atk := p.atk_bonus_at(p.level_cap)
+	var hp_ceiling := p.base_hp + p.hp_gain
+	var hp_in_range := hp > p.base_hp + int(p.hp_gain * 0.9) and hp <= hp_ceiling
+	var atk_in_range := atk > p.atk_gain * 0.9 and atk < p.atk_gain
+	_check("19", "满级战力有上界：趋近「gain」但到不了，不会无限膨胀",
+		hp_in_range and atk_in_range,
+		"Lv.%d 生命 %d（base %d + gain %d 为天花板）　攻击 %+.1f%%（上限 %+.1f%%）" % [
+			p.level_cap, hp, p.base_hp, p.hp_gain, atk * 100.0, p.atk_gain * 100.0])

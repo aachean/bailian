@@ -7,4 +7,5 @@ script = ExtResource("1_ca8sn")
 id = &"duancuiqu"
 name_key = &"DUNGEON_DUANCUIQU"
 screen_count = 0
-rec_level = 0
+rec_level = 12
+rec_weapon = 2

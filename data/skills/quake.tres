@@ -23,4 +23,4 @@ lunge_speed = 0.0
 lunge_decay_frames = 1
 cooldown_frames = 170
 mp_cost = 45
-unlock_level = 5
+unlock_level = 30

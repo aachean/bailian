@@ -4,12 +4,15 @@
 
 [resource]
 script = ExtResource("1_prog")
-level_cap = 30
+level_cap = 100
 exp_base = 20.0
 exp_exponent = 1.5
-hp_per_level = 15
-mp_per_level = 10
-atk_per_level = 0.05
+hp_gain = 750
+hp_falloff = 0.97
+mp_gain = 500
+mp_falloff = 0.97
+atk_gain = 2.1
+atk_falloff = 0.96
 base_hp = 100
 base_mp = 50
 soft_knee_atk = 1.0

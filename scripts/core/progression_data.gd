@@ -22,7 +22,7 @@ extends Resource
 
 ## 等级天花板。到顶后不再累积经验（不是「继续攒但没用」），
 ## 免得满级玩家的经验条还在涨、HUD 上显示一个永远用不到的数字
-@export var level_cap: int = 30
+@export var level_cap: int = 100
 
 @export_group("经验曲线：升到下一级所需 = exp_base × 当前等级 ^ exp_exponent")
 ## 曲线基数
@@ -30,13 +30,23 @@ extends Resource
 ## 曲线指数。1.0 = 线性，1.5 起是 RPG 的常见区间（指数越高后期越长尾）
 @export var exp_exponent: float = 1.5
 
-@export_group("每级成长")
-## 生命上限每级 +点
-@export var hp_per_level: int = 15
-## 蓝量上限每级 +点
-@export var mp_per_level: int = 10
-## 攻击倍率每级 +比例（0.05 = +5%）
-@export var atk_per_level: float = 0.05
+@export_group("每级成长（等比收敛：练到第 n 级的累计增量 = gain × (1 - falloff^(n-1))）")
+##
+## **为什么是收敛而不是每级固定加多少**：上限从 30 抬到 100（2026-09-14 神的要求：
+## 后面还有新地图，等级要留够空间），线性的每级增量到 100 级会变成
+## 生命 ×6.9、攻击 +495% —— 那等于把等级做成主要战力来源，违反 3.2；
+## 而且这条线一旦长出来，后面所有敌人的数值都要围着它重标。
+##
+## 等比收敛：第 n 级给 gain × falloff^(n-1)，累计趋近 gain 而永远到不了。
+## **参数是按「30 级时与旧曲线基本重合」反推的** —— 换曲线不打破现有敌人平衡：
+##   生命 30 级 540（旧 535）／蓝 343（旧 340）／攻击 +145%（旧 +145%）
+## 100 级则是 生命 813 / 蓝 526 / 攻击 +206% —— 长线投入有回报，但没有爆炸。
+@export var hp_gain: int = 750
+@export var hp_falloff: float = 0.97
+@export var mp_gain: int = 500
+@export var mp_falloff: float = 0.97
+@export var atk_gain: float = 2.1
+@export var atk_falloff: float = 0.96
 
 @export_group("1 级时的基础值")
 @export var base_hp: int = 100
@@ -80,19 +90,31 @@ func clamp_level(level: int) -> int:
 	return clampi(level, 1, level_cap)
 
 
+## 等比收敛的累计增量：第 n 级给 gain × falloff^(n-1)，n 级累计是这个和。
+## 1 级是 0（起点就是 base），随等级单调递增，趋近 gain 而永远到不了
+func growth(gain: float, falloff: float, level: int) -> float:
+	var n := clamp_level(level) - 1
+	if n <= 0:
+		return 0.0
+	# falloff = 1 的退化情形：等比和变成「线性铺满」，到 cap 时正好是 gain
+	if is_equal_approx(falloff, 1.0):
+		return gain * float(n) / float(maxi(level_cap - 1, 1))
+	return gain * (1.0 - pow(falloff, float(n)))
+
+
 ## 该等级的生命上限（不含装备词条）
 func hp_at(level: int) -> int:
-	return base_hp + (clamp_level(level) - 1) * hp_per_level
+	return base_hp + int(round(growth(float(hp_gain), hp_falloff, level)))
 
 
 ## 该等级的蓝量上限
 func mp_at(level: int) -> int:
-	return base_mp + (clamp_level(level) - 1) * mp_per_level
+	return base_mp + int(round(growth(float(mp_gain), mp_falloff, level)))
 
 
 ## 该等级贡献的攻击倍率加成（叠进那个唯一的伤害乘区，见设计原则 4.1）
 func atk_bonus_at(level: int) -> float:
-	return atk_per_level * float(clamp_level(level) - 1)
+	return growth(atk_gain, atk_falloff, level)
 
 
 # ── 曲线自检（给断言和「调数值时看一眼」用）────────────────────

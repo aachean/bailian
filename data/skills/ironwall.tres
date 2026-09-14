@@ -26,4 +26,4 @@ invincible_to = 33
 guard_reduction = 0.8
 cooldown_frames = 300
 mp_cost = 25
-unlock_level = 3
+unlock_level = 12

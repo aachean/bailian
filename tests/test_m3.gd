@@ -392,6 +392,7 @@ func _t9_forge_at_anvil() -> void:
 	await _pframes(6)
 	var scale0: float = (player.get_node("Hitbox") as Hitbox).damage_scale
 
+	var cost: int = PlayerState.forge_cost(uid)      # 成本从数据取，不写死
 	_press("attack")                 # 站上铁砧按 J → 开铁匠铺
 	await _pframes(4)
 	_release("attack")
@@ -417,11 +418,11 @@ func _t9_forge_at_anvil() -> void:
 	town.queue_free()
 	await _pframes(2)
 
-	_check("9", "铁匠铺：站上铁砧按 J 开面板 → 选中那件按 J 强化（倍率涨、精铁 -3）",
-		opened and picked == uid and lv == 1 and shards == 7 \
+	_check("9", "铁匠铺：站上铁砧按 J 开面板 → 选中那件按 J 强化（倍率涨、按成本扣精铁）",
+		opened and picked == uid and lv == 1 and shards == 10 - cost \
 			and is_equal_approx(scale1, expect) and closed,
-		"开面板=%s（当时暂停=%s）　光标选中=穿着的武器=%s　强化 +%d　精铁 10→%d　"
-		% [str(opened), str(paused_when_open), str(picked == uid), lv, shards]
+		"开面板=%s（当时暂停=%s）　光标选中=穿着的武器=%s　强化 +%d　精铁 10→%d（成本 %d）　"
+		% [str(opened), str(paused_when_open), str(picked == uid), lv, shards, cost]
 		+ "倍率 %.3f → %.3f（期望 %.3f）　Esc 关掉=%s" % [scale0, scale1, expect, str(closed)])
 
 
@@ -433,7 +434,8 @@ func _t10_forge_survives_snapshot() -> void:
 	PlayerState.shards = 7
 	var uid: String = PlayerState.add_item(IRON_SWORD)
 	PlayerState.equip(uid)
-	PlayerState.forge_once(uid)                  # 花掉 3，剩 4，+1 级
+	var cost: int = PlayerState.forge_cost(uid)  # 成本从数据取，不写死
+	PlayerState.forge_once(uid)                  # 花掉一次的钱，+1 级
 
 	var room := (load("res://scenes/stages/test_room.tscn") as PackedScene).instantiate()
 	add_child(room)
@@ -453,9 +455,9 @@ func _t10_forge_survives_snapshot() -> void:
 	await _pframes(2)
 
 	_check("10", "强化等级与装备实例进快照，继续游戏原样回来",
-		shards == 4 and lv == 1 and same_uid,
-		"精铁 %d（期望 4）　武器强化 +%d（期望 1）　实例 id 一致=%s" % [
-			shards, lv, str(same_uid)])
+		shards == 7 - cost and lv == 1 and same_uid,
+		"精铁 %d（期望 %d = 7 - %d）　武器强化 +%d（期望 1）　实例 id 一致=%s" % [
+			shards, 7 - cost, cost, lv, str(same_uid)])
 
 
 ## 精铁跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。

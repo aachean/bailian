@@ -194,14 +194,18 @@ func _t2_locked_by_level() -> void:
 	var at1: int = _player.call("unlocked_skill_paths").size()
 	await _set_level(4)
 	var at4: int = _player.call("unlocked_skill_paths").size()
+	await _set_level(5)
+	var at5: int = _player.call("unlocked_skill_paths").size()
 	var upcut_locked: bool = not bool(_player.call("is_skill_unlocked", UPCUT))
-	var upcut_at8: bool = false
-	await _set_level(8)
-	upcut_at8 = bool(_player.call("is_skill_unlocked", UPCUT))
-	_check("2", "技能按等级解锁：Lv1 只有一个，Lv8 才拿得到上撩斩",
-		at1 == 1 and at4 == 4 and upcut_locked and upcut_at8,
-		"Lv1 解锁 %d 个　Lv4 解锁 %d 个　Lv4 时上撩斩锁定=%s　Lv8 解锁=%s" % [
-			at1, at4, str(upcut_locked), str(upcut_at8)])
+	# 等级上限抬到 100 之后，解锁点跟着拉开了 —— 上撩斩排在最靠后的 55 级。
+	# 这里断言的是「解锁点在拉开」，不是某一个具体数字：
+	# Lv4 还没拿到第二招（它在 5 级），Lv5 拿到了，最后一招要到 Lv55
+	await _set_level(55)
+	var upcut_at55: bool = bool(_player.call("is_skill_unlocked", UPCUT))
+	_check("2", "技能按等级解锁，且解锁点被拉开（不是前几级就发完）",
+		at1 == 1 and at4 == 1 and at5 == 2 and upcut_locked and upcut_at55,
+		"Lv1 %d 个　Lv4 %d 个　Lv5 %d 个　上撩斩在 Lv4 锁定=%s　Lv55 解锁=%s" % [
+			at1, at4, at5, str(upcut_locked), str(upcut_at55)])
 
 
 ## 升级解锁的新技能会自动补进空槽
@@ -212,16 +216,19 @@ func _t3_level_up_unlocks_and_fills() -> void:
 	var filled1 := _count_carried()
 	await _set_level(5)
 	var filled5 := _count_carried()
+	# 30 级正好解锁到第 5 招（崩山击）—— 槽位满了就停在 5 个
+	await _set_level(30)
+	var filled30 := _count_carried()
 	var has_quake: bool = PlayerState.carries(QUAKE)
-	_check("3", "升级后新解锁的技能自动补进空槽",
-		filled1 == 1 and filled5 == 5 and has_quake,
-		"Lv1 带 %d 个　Lv5 带 %d 个　含崩山击=%s" % [
-			filled1, filled5, str(has_quake)])
+	_check("3", "升级后新解锁的技能自动补进空槽（槽满了就停在 5 个）",
+		filled1 == 1 and filled5 == 2 and filled30 == 5 and has_quake,
+		"Lv1 带 %d 个　Lv5 带 %d 个　Lv30 带 %d 个　含崩山击=%s" % [
+			filled1, filled5, filled30, str(has_quake)])
 
 
 ## 槽位上限 5：解锁 7 个也不会挤进来
 func _t4_only_five_carried() -> void:
-	await _set_level(12)
+	await _set_level(60)          # 7 个技能的解锁点分布在 1~55 级，60 级时全部到手
 	var unlocked: int = _player.call("unlocked_skill_paths").size()
 	var carried := _count_carried()
 	_check("4", "携带格上限就是 5：7 个全解锁了也只带 5 个",

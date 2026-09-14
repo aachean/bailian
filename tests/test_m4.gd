@@ -117,7 +117,9 @@ func _t2_level_up() -> void:
 	var ups: int = PlayerState.add_exp(999)      # 直接灌经验，必升多级
 	var lv1: int = PlayerState.level
 	var max_hp: int = (_player.get_node("Health") as Health).max_hp
-	var expect_hp: int = 100 + (lv1 - 1) * 15
+	# 期望值**从资源算**，不写死数字 —— 成长曲线已经调过两轮（线性 → 幂函数幂次 → 100 级收敛），
+	# 写死一次就得跟着改一次，而写死的那个数从来不是断言真正想验的东西
+	var expect_hp: int = PlayerState.progression.hp_at(lv1)
 	var mp_full: bool = int(_player.get("mp")) == int(_player.get("max_mp"))
 	_check("2", "经验够了就升级：血上限成长、血蓝回满",
 		ups >= 1 and lv1 > lv0 and max_hp == expect_hp and mp_full,
