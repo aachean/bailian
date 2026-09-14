@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DungeonData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/dungeon_data.gd" id="1_uq4ts"]
+[ext_resource type="Script" path="res://scripts/core/stage_data.gd" id="2_7d1j4"]
+[ext_resource type="Resource" path="res://data/stages/stage_lichang_1.tres" id="3_27ywh"]
+[ext_resource type="Resource" path="res://data/stages/stage_lichang_2.tres" id="4_6e25r"]
+[ext_resource type="Resource" path="res://data/stages/stage_lichang_3.tres" id="5_xffto"]
+
+[resource]
+script = ExtResource("1_uq4ts")
+id = &"lichang"
+name_key = &"DUNGEON_LICHANG"
+stages = Array[ExtResource("2_7d1j4")]([ExtResource("3_27ywh"), ExtResource("4_6e25r"), ExtResource("5_xffto")])

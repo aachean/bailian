@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MapData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/dungeon_data.gd" id="1_qw7h8"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_lichang.tres" id="2_od8ef"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_duancuiqu.tres" id="3_l6fjk"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_luhou.tres" id="4_apx7q"]
+[ext_resource type="Script" path="res://scripts/core/map_data.gd" id="5_60hag"]
+
+[resource]
+script = ExtResource("5_60hag")
+id = &"quench_ridge"
+name_key = &"MAP_QUENCH_RIDGE"
+dungeons = Array[ExtResource("1_qw7h8")]([ExtResource("2_od8ef"), ExtResource("3_l6fjk"), ExtResource("4_apx7q")])
