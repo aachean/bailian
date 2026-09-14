@@ -189,8 +189,9 @@ func apply_saved(d: Dictionary) -> void:
 	if d.has("skill_slots"):
 		PlayerState.skill_slots = (d.get("skill_slots", []) as Array).duplicate()
 		PlayerState.skills_changed.emit()
-	max_mp = PlayerState.progression.mp_at(level)
-	# 装备栏住在 PlayerState（存档恢复时已一并回填），这里按它重算上限与倍率。
+	# 蓝上限由下面的 _apply_upgrade 统一算（它是补差值的，所以快照里那份当前蓝
+	# 不会被上限变动改写）；装备栏住在 PlayerState（存档恢复时已一并回填），
+	# 这里按它重算上限与倍率。
 	# 血量必须在这之后再摆 —— _set_max_hp 会动 hp，
 	# 先 restore 再改上限的话，读回来的血量会被上限变动改写
 	_apply_upgrade()
@@ -246,9 +247,9 @@ func _ready() -> void:
 	# 切场景会重建玩家节点，存在节点上的东西会丢（实测丢过）
 	level = PlayerState.level
 	exp_pts = PlayerState.exp
-	# 回城即治疗：进场景满血满蓝；等级越高蓝上限越高
-	max_mp = PlayerState.progression.mp_at(level)
-	mp = max_mp
+	# 回城即治疗：进场景满血满蓝。**上限本身不在这里设** ——
+	# 它由下面的 _apply_upgrade 统一算（属性管线只有一条）
+	mp = PlayerState.progression.mp_at(level)
 	if not PlayerState.level_up.is_connected(_on_level_up):
 		PlayerState.level_up.connect(_on_level_up)
 	if not PlayerState.exp_changed.is_connected(_on_exp_changed):
@@ -329,10 +330,9 @@ func _on_exp_changed(new_exp: int) -> void:
 ## 升级就该有仪式感，没反馈的成长等于没升级（用户实测反馈）
 func _on_level_up(new_level: int) -> void:
 	level = new_level
-	max_mp = PlayerState.progression.mp_at(level)
 	# 升级可能解锁新技能：有空槽就自动补进去（槽满了不动，换哪个由玩家决定）
 	_sync_skill_slots()
-	# 血上限、攻击倍率、减伤统一由 _apply_upgrade 重算（含装备词条），
+	# 四项上限与倍率（血 / 蓝 / 攻击 / 减伤）统一由 _apply_upgrade 重算（含装备词条），
 	# 再回满 —— 升级是「上限涨了并且当场补满」，不是「上限涨了血条变短」
 	_apply_upgrade()
 	_health.heal_full()
@@ -380,6 +380,10 @@ func _apply_upgrade() -> void:
 	# 后两样都已经在 bonus 里（_recalc_bonus 把强化加成也算进去了），这里只补等级那一份
 	_hitbox.damage_scale = 1.0 + prog.atk_bonus_at(level) + float(bonus.get("atk", 0.0))
 	_set_max_hp(prog.hp_at(level) + int(bonus.get("hp", 0)))
+	# 蓝上限也归这条管线（2026-09-14 补）。它以前在 _ready / apply_saved /
+	# _on_level_up 三处各写一遍 —— 于是「等级变了但没走那三条路」的地方
+	# （测试里直接改等级、以后可能的天赋加成）蓝上限会静默停在旧值
+	_set_max_mp(prog.mp_at(level))
 	_base_reduction = float(bonus.get("def", 0.0))
 	_health.damage_reduction = _base_reduction
 	_refresh_blade()
@@ -396,6 +400,17 @@ func _refresh_blade() -> void:
 	else:
 		_blade.color = weapon.tier_color().lightened(0.2)
 		_blade.offset_right = BLADE_BASE_REACH + 4.0 * (float(weapon.tier) + 1.0)
+
+
+## 改蓝上限：与 _set_max_hp 同一套规矩 —— **补差值，不设满**。
+## 设满的话「升级」就等于免费回蓝，而回蓝本该是消耗品和技能的事
+func _set_max_mp(value: int) -> void:
+	var old := max_mp
+	max_mp = value
+	if value > old:
+		mp = mini(mp + (value - old), value)
+	else:
+		mp = mini(mp, value)
 
 
 ## 改生命上限时把新增的那截补进当前血（上限变低则把血夹回去）。
