@@ -11,7 +11,11 @@ extends Resource
 
 @export_group("存活")
 @export var max_hp: int = 30
-## 被打死之后过多久满血重生。<= 0 表示不重生
+## 被打死之后过多久满血重生。**<= 0 表示不重生。**
+##
+## 副本内的小怪一律设 0：过关判据是「清空关内敌人」，会重生的怪会让
+## 关卡永远打不完（docs/adr/0009 §2）。重生能力保留在训练房 / 测试场景，
+## 不再用于副本内 —— 所以想改回 > 0 之前先想清楚它属于哪一边
 @export var revive_delay: float = 2.0
 ## 被打中的硬直（帧 @60fps）。硬直里既不追人也不攻击
 @export var hurt_stun_frames: int = 14

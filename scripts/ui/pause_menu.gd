@@ -26,9 +26,9 @@ func _ready() -> void:
 ## ALWAYS 模式：暂停与否都收得到
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		# 装备背包 / 对话框开着时不抢 Esc —— 三个界面都要用同一批按键，
+		# 装备背包 / 对话框 / 舆图开着时不抢 Esc —— 这几个界面都要用同一批按键，
 		# 叠起来只会互相打架。先关掉手头那个，再按 Esc
-		if not _root.visible and (_bag_open() or _dialogue_open()):
+		if not _root.visible and (_bag_open() or _dialogue_open() or _atlas_open()):
 			return
 		toggle()
 
@@ -46,6 +46,12 @@ func _bag_open() -> bool:
 func _dialogue_open() -> bool:
 	var box := get_tree().get_first_node_in_group("dialogue_box")
 	return box != null and bool(box.call("is_open"))
+
+
+## 舆图开着时让路。它和本节点一样挂在玩家身上
+func _atlas_open() -> bool:
+	var at := get_parent().get_node_or_null("Atlas")
+	return at != null and at.has_method("is_open") and bool(at.call("is_open"))
 
 
 func toggle() -> void:

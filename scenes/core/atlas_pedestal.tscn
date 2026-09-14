@@ -1,0 +1,56 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/atlas_pedestal.gd" id="1_pedestal"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_zone"]
+size = Vector2(80, 80)
+
+[node name="AtlasPedestal" type="Area2D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_pedestal")
+
+[node name="Base" type="ColorRect" parent="."]
+offset_left = -16.0
+offset_top = -8.0
+offset_right = 16.0
+offset_bottom = 14.0
+mouse_filter = 2
+color = Color(0.42, 0.38, 0.32, 1)
+
+[node name="Board" type="ColorRect" parent="."]
+offset_left = -24.0
+offset_top = -40.0
+offset_right = 24.0
+offset_bottom = -12.0
+mouse_filter = 2
+color = Color(0.78, 0.72, 0.56, 1)
+
+[node name="Mark" type="ColorRect" parent="."]
+offset_left = -16.0
+offset_top = -34.0
+offset_right = 16.0
+offset_bottom = -18.0
+mouse_filter = 2
+color = Color(0.45, 0.4, 0.3, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_zone")
+
+[node name="Title" type="Label" parent="."]
+offset_left = -80.0
+offset_top = -62.0
+offset_right = 80.0
+offset_bottom = -44.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="."]
+offset_left = -90.0
+offset_top = 20.0
+offset_right = 90.0
+offset_bottom = 36.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.9, 0.9, 0.85, 1)
+horizontal_alignment = 1

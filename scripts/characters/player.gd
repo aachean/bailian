@@ -137,6 +137,9 @@ var _attack_queued: bool = false
 var _dodge_queued: bool = false
 var _dodge_dir: int = 1
 var _revive_t: float = 0.0
+## 已经喊过「重整旗鼓」了。重载场景是排队到帧末才发生的，
+## 不设这道闸的话，这一帧里会连着喊好几次
+var _reviving := false
 var _hurt_flash: float = 0.0
 ## 升级金光的标记（与受击红光共用衰减通道）
 var _level_flash := false
@@ -534,16 +537,31 @@ func _hurt_process(delta: float) -> void:
 		_end_action()
 
 
-## 死亡：锁一切输入，定时在出生点满血重来。
-## 原型阶段不搞读档/回城镇 —— M2 的存档系统会接手「死亡之后去哪」。
+## 死亡：锁一切输入，计时结束后按当前场景的规则重生。
+##
+## 「死亡之后去哪」在 M3 从「原地满血」改成了**重开本关**：关卡变成一屏一屏之后，
+## 死在本关就重来本关，不回安全区、不掉进度（docs/adr/0009 §3）——
+## 一屏的距离不值得让玩家跑半张地图回去捡尸体。
 func _dead_process(delta: float) -> void:
 	velocity.x = 0.0
 	_apply_gravity(delta)
 	_revive_t -= delta
-	if _revive_t <= 0.0:
-		global_position = _spawn_point
-		velocity = Vector2.ZERO
-		_health.heal_full()
+	if _revive_t <= 0.0 and not _reviving:
+		_reviving = true
+		_revive_or_restart()
+
+
+## 重开本关。当前场景根节点会 `restart` 就交给它（关卡都是这样）；
+## 不会的（测试场景、单独跑的角色测试）退回**原地满血** ——
+## 测试要观测「死亡 → 重生」这条链，不能被中途切成另一个场景
+func _revive_or_restart() -> void:
+	var root := get_tree().current_scene
+	if root != null and root.has_method("restart"):
+		root.call("restart")
+		return
+	global_position = _spawn_point
+	velocity = Vector2.ZERO
+	_health.heal_full()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -913,6 +931,8 @@ func _on_revived() -> void:
 	_state_frame = 0
 	_hurt_flash = 0.0
 	_visuals.modulate = Color.WHITE
+	# 这道闸要放开：原地重生的路径不走场景重载，不放开的话第二次死亡会站着不动
+	_reviving = false
 
 
 ## 受击变红 → 渐回原色。走 physics 帧的衰减，与硬直同步

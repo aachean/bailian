@@ -243,8 +243,9 @@ func is_bag_open() -> bool:
 
 
 func toggle_bag() -> void:
-	# 暂停菜单或对话框开着时不叠背包：几个界面都要抢 Esc / B / J，叠起来只会互相打架
-	if not _bag_open and (_pause_menu_open() or _dialogue_open()):
+	# 暂停菜单 / 对话框 / 舆图开着时不叠背包：几个界面都要抢 Esc / B / J，
+	# 叠起来只会互相打架
+	if not _bag_open and (_pause_menu_open() or _dialogue_open() or _atlas_open()):
 		return
 	if not _bag_open and _skill_open:
 		toggle_skill_panel()            # 背包和技能面板同类，开的那个让位
@@ -263,7 +264,7 @@ func is_skill_panel_open() -> bool:
 ## 技能面板（V）：列技能池，把想带的装进 5 个槽。
 ## 与背包面板同一套机制：打开即暂停、操作类界面、共用一个光标
 func toggle_skill_panel() -> void:
-	if not _skill_open and (_pause_menu_open() or _dialogue_open()):
+	if not _skill_open and (_pause_menu_open() or _dialogue_open() or _atlas_open()):
 		return
 	if not _skill_open and _bag_open:
 		toggle_bag()
@@ -422,6 +423,14 @@ func _pause_menu_open() -> bool:
 func _dialogue_open() -> bool:
 	var box := get_tree().get_first_node_in_group("dialogue_box")
 	return box != null and bool(box.call("is_open"))
+
+
+## 舆图开着时也一样让路。它挂在玩家身上（和本节点平级），所以直接从父节点找
+func _atlas_open() -> bool:
+	if _player == null:
+		return false
+	var at := _player.get_node_or_null("Atlas")
+	return at != null and at.has_method("is_open") and bool(at.call("is_open"))
 
 
 func refresh_bag() -> void:

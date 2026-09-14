@@ -84,8 +84,13 @@ func _slot_text(slot: int, index: int) -> String:
 	var upgrade := int(player.get("upgrade", 0))
 	var level_file := str(info.get("level", "")).get_file().get_basename()
 	var place := tr("UI_LEVEL_" + level_file.to_upper())
+	# 旧结构的档：等级 / 装备 / 精铁都在，但「打到第几关」那套记录已经作废
+	# （线性三关 → 地图/副本/关卡三层）。**不能静默** ——
+	# 玩家点进去会发现自己站在城镇、进度从头开始，得先在这里说清楚
+	var stale := SaveManager.slot_version(slot) < SaveManager.VERSION
+	var tail := tr("UI_SLOT_OLD") if stale else place
 	return "%d. %s　%s ×%d　%s Lv.%d" % [
-		index, place, tr("HUD_SHARD"), shards, tr("HUD_WEAPON"), upgrade]
+		index, tail, tr("HUD_SHARD"), shards, tr("HUD_WEAPON"), upgrade]
 
 
 # ── 按钮动作 ───────────────────────────────────────────────────
@@ -110,6 +115,8 @@ func _on_slot(slot: int) -> void:
 	if _slot_mode == SlotMode.START:
 		PlayerState.reset_for_new_game()
 		SaveManager.start_new_game(slot, LEVEL_PATH)
+		# 开局的解锁进度：只有第一个副本的第一段。其余全靠一关一关打出来
+		GameProgress.reset_progress()
 		get_tree().change_scene_to_file(LEVEL_PATH)
 	else:
 		_enter_slot(slot)
@@ -123,13 +130,25 @@ func _on_continue() -> void:
 
 ## 从槽位进入：场景 + 快照 + 玩家数据，三样都从档里来
 func _enter_slot(slot: int) -> void:
+	SaveManager.load_game(slot)
+	var st := SaveManager.read_state(slot)
+	# 旧结构的档（三层结构之前存的）：等级 / 装备 / 精铁照旧带回，
+	# 但「打到第几关」那套记录已经作废 —— 把玩家送回城镇，解锁进度重新初始化。
+	# **保留成长、只重来关卡进度**：直接作废整份档等于让玩家白玩，太粗暴
+	if SaveManager.slot_version(slot) < SaveManager.VERSION:
+		if st.has("player"):
+			PlayerState.load_from(st.player)
+		# 那份快照里的坐标是老关卡的（x 可能到 1800），套不进城镇。
+		# 撤掉恢复请求 = 只带成长数据、世界从头开始
+		SaveManager.drop_pending_restore()
+		GameProgress.reset_progress()
+		get_tree().change_scene_to_file(LEVEL_PATH)
+		return
 	var level := SaveManager.read_progress(slot)
 	if level.is_empty() or not ResourceLoader.exists(level):
 		SaveManager.erase_slot(slot)
 		_refresh_texts()
 		return
-	SaveManager.load_game(slot)
-	var st := SaveManager.read_state(slot)
 	if st.has("player"):
 		PlayerState.load_from(st.player)
 	get_tree().change_scene_to_file(level)

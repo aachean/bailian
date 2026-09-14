@@ -2,11 +2,11 @@
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
-[ext_resource type="PackedScene" path="res://scenes/core/portal.tscn" id="3_portal"]
 [ext_resource type="PackedScene" path="res://scenes/core/anvil.tscn" id="4_anvil"]
 [ext_resource type="PackedScene" path="res://scenes/core/npc.tscn" id="5_npc"]
 [ext_resource type="Resource" path="res://data/dialogue/smith_intro.tres" id="6_smith_intro"]
 [ext_resource type="Resource" path="res://data/dialogue/smith_repeat.tres" id="7_smith_repeat"]
+[ext_resource type="PackedScene" path="res://scenes/core/atlas_pedestal.tscn" id="8_pedestal"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1280, 24)
@@ -76,12 +76,10 @@ dialogue = ExtResource("6_smith_intro")
 repeat_dialogue = ExtResource("7_smith_repeat")
 
 [node name="Anvil" parent="." instance=ExtResource("4_anvil")]
-position = Vector2(900, 306)
+position = Vector2(780, 306)
 
-[node name="ExitPortal" parent="." instance=ExtResource("3_portal")]
-position = Vector2(1220, 290)
-target_scene = "res://scenes/stages/level_1.tscn"
-to_furthest = true
+[node name="AtlasPedestal" parent="." instance=ExtResource("8_pedestal")]
+position = Vector2(1080, 306)
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(120, 280)

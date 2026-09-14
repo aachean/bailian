@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/characters/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/components/hitbox.gd" id="2_hitbox"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="5_pause"]
 [ext_resource type="PackedScene" path="res://scenes/ui/dialogue_box.tscn" id="6_dlg"]
+[ext_resource type="PackedScene" path="res://scenes/ui/atlas.tscn" id="7_atlas"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(24, 32)
@@ -109,3 +110,5 @@ position_smoothing_speed = 8.0
 [node name="PauseMenu" parent="." instance=ExtResource("5_pause")]
 
 [node name="DialogueBox" parent="." instance=ExtResource("6_dlg")]
+
+[node name="Atlas" parent="." instance=ExtResource("7_atlas")]
