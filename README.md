@@ -7,7 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + 铁砧 + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，一屏的怪**分三批陆续出来**，**打完一批才出下一批**，全清了才走得过去；最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**死了弹二选一**（重新开始 / 返回城镇） |
+| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + **铁匠铺** + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，一屏的怪**分三批陆续出来**，**打完一批才出下一批**，全清了才走得过去；最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**死了弹二选一**（重新开始 / 返回城镇）。**等级上限 30**（经验走幂函数，前快后慢）；**强化逐件做，按品质封顶**（普通 3 / 精良 5 / 稀有 8），成本递增、收益递减 |
 
 > **砺场已按新结构重切**（2026-09-14，粒度重定过**两次**，两次都是玩过之后给的反馈）。
 > 第一章的结构是 **地图「淬火岭」→ 三个副本（砺场 / 断淬渠 / 炉喉）**，
@@ -89,7 +89,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。后续增量各自一组：
 
 ```
-godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（27 个场景，缺节点即红）
+godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（28 个场景，缺节点即红）
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 城镇入口 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环 / 血蓝数值（17 条）
@@ -98,6 +98,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框
 godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m8.tscn    # 第 2、3 关 / 门封印 / 复活点（14 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m9.tscn    # 更长屏 / 看不到的挡墙 / 分批出怪 / 死亡二选一（10 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m10.tscn   # 等级上限 / 经验幂函数 / 装备实例 / 逐件强化 / 软硬上限（17 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -105,6 +106,7 @@ godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # �
 
 ```
 godot --path . res://tests/shot_atlas.tscn    # 舆图台 / 舆图 / 撞上看不见的墙 / 第二批淡入 / 推进到第 2 屏 / 死亡界面
+godot --path . res://tests/shot_forge.tscn    # 铁匠铺：打开 / 强化成功 / 精铁不够 / 已到顶 / 角色面板的武器强化
 ```
 
 > 新增带 `class_name` 的脚本后，第一次跑之前要先 `godot --headless --import`：
@@ -256,6 +258,15 @@ scripts/core/player_state.gd  skill_slots（5 个槽的真相）+ skills_changed
 括号里带逗号会当场 Parse Error（要写成 `% [x, y]`）；`var b := 某个 Variant 的 and` 推不出类型。
 **改完断言先跑 3 帧做编译检查，再跑完整组** —— 省下一小时。
 
+**第四条（2026-09-14 三补）：`detail` 里的值要在**那一件事发生的时候**取，不能等到打印时再算。**
+铁匠铺那条断言把「暂停了吗」直接写在 `_check` 的参数里，而参数是 Esc 之后才求值的 ——
+于是明明「打开时暂停了」，detail 打出来的是「暂停=false」，一句与事实相反的话。
+**读 detail 的人会照着它去查错方向。** 先存进局部变量，再拼字符串。
+
+**第五条（同日）：测「组件不在场」的断言，别在 `queue_free()` 之后再读那个节点。**
+释放之后 `get()` 会报「Cannot call method on a previously freed instance」——
+不崩，但 detail 变成一句废话。**先取值，再释放。**
+
 ### 可视化回放（**已停用**）
 
 2026-09-14 起不再用。曾经每轮附一段「脚本自己操作、自己录制」的录像，
@@ -293,7 +304,9 @@ res://
 │   └── ui/          HUD / 图标绘制 / 对话框
 ├── data/            数据资源（.tres）← 内容都长在这里，脚本里不写魔法数字
 │   ├── enemies/  items/  skills/  dialogue/
-│   └── i18n/        界面文案（csv 源文件 + 导入产物）
+│   ├── i18n/        界面文案（csv 源文件 + 导入产物）
+│   ├── progression.tres  成长曲线（等级上限 / 经验公式 / 每级增量 / 软上限）
+│   └── forge.tres        强化（品质上限 / 成本递增 / 收益递减）
 ├── assets/          字体（含 OFL 授权）、CREDITS.md
 ├── addons/          第三方插件 + ai_bridge（AI 实时操控桥）
 ├── tools/           资源构建脚本（字体子集化等，不参与游戏运行）
