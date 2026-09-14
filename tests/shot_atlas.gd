@@ -25,6 +25,13 @@ const WAVE_GAP := 45
 var _bak: Dictionary = {}
 
 
+## 冒充关卡根节点：死亡界面只在 `current_scene` 有 `restart()` 时才弹
+## （没关卡可重开就退回原地满血）。截图脚本的根节点不是关卡，所以补一个空壳 ——
+## 不补的话拍到的是"原地满血站起来了"，和标题对不上
+func restart() -> void:
+	pass
+
+
 func _ready() -> void:
 	_bak = SaveGuard.backup()
 	SaveManager.current_slot = 3
@@ -104,10 +111,16 @@ func _shot_screens() -> void:
 	await _frames(20)
 	await _shot("screen_batch1.png")
 
-	# 贴到挡墙前：这里是**看不见的**，所以图上该看到的是"人停住了 + 一行提示"
-	p.global_position = Vector2(SCREEN_W - 40.0, 288.0)
+	# 贴到挡墙前：这里是**看不见的**，所以图上该看到的是"人撞住了 + 一行提示"。
+	# **得真的跑过去撞上** —— 提示的触发条件是人离墙 20px 以内，
+	# 站在 40px 外摆姿势是拍不到的（第一版就是这么拍的，图上什么都没有）
+	p.global_position = Vector2(SCREEN_W - 120.0, 288.0)
 	p.velocity = Vector2.ZERO
-	await _frames(30)
+	await _frames(6)
+	_press("move_right")
+	await _frames(45)
+	_release("move_right")
+	await _frames(12)
 	await _shot("screen_blocked.png")
 
 	# 打死第 1 批 → 等够间隔 → 第 2 批刚淡入那一刻
@@ -158,6 +171,24 @@ func _shot(name: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://build/shots"))
 	print("%s err=%d" % [name, img.save_png("res://build/shots/" + name)])
+
+
+## 注入一次「按下 / 松开」。窗口脚本里注入的输入会被整帧跳过（process 与 physics
+## 不同步），所以调用方要留够帧数，必要时循环重试到状态量真的变了
+func _press(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = true
+	ev.strength = 1.0
+	Input.parse_input_event(ev)
+
+
+func _release(action: String) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = false
+	ev.strength = 0.0
+	Input.parse_input_event(ev)
 
 
 func _frames(n: int) -> void:

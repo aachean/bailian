@@ -369,13 +369,15 @@ func _build_banner() -> void:
 	lbl.add_theme_constant_override("shadow_offset_x", 1)
 	lbl.add_theme_constant_override("shadow_offset_y", 1)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# 宽度用**视口**而不是屏宽：屏比视口宽了之后，写 SCREEN_WIDTH 会让字居中到屏幕外
-	var vw := get_viewport().get_visible_rect().size.x
-	lbl.position = Vector2(0.0, 92.0)
-	lbl.size = Vector2(vw, 26.0)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.modulate.a = 0.0
+	lbl.position = Vector2(0.0, 92.0)
 	cl.add_child(lbl)
+	# 宽度**跟着视口**（而不是写死屏宽）：屏比视口宽，写 SCREEN_WIDTH 会让字
+	# 居中到屏幕外。
+	# **别改成锚点**（set_anchors_preset）：父节点是 CanvasLayer，不是 Control，
+	# 锚点在这条路径上不生效 —— 实测框宽会停在 0，字从左边溢出屏幕（拍出来了才看见）
+	lbl.size = Vector2(get_viewport().get_visible_rect().size.x, 26.0)
 	_banner_label = lbl
 
 
@@ -384,6 +386,9 @@ func _build_banner() -> void:
 func _banner(text: String) -> void:
 	if _banner_label == null:
 		return
+	# 每写一次就校一次宽度：窗口大小与拉伸模式都可能变，"居中的那行字"
+	# 一旦框宽不对就会跑到屏幕外，而且不报错
+	_banner_label.size = Vector2(get_viewport().get_visible_rect().size.x, 26.0)
 	_banner_label.text = text
 	_banner_label.modulate.a = 1.0
 	if _banner_tween != null and _banner_tween.is_valid():
