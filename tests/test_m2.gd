@@ -1,5 +1,5 @@
 extends Node
-## 《百炼》M2 自动验收 —— 主菜单 / 槽位存档 / 语言入口
+## 《百炼》M2 自动验收 —— 主菜单 / 槽位存档 / 设置入口
 ##
 ## 跑法（无头）：
 ##     godot --headless --fixed-fps 60 --path <项目根> res://tests/test_m2.tscn
@@ -25,7 +25,7 @@ func _ready() -> void:
 	await _t1_menu_buttons()
 	await _t2_continue_visibility()
 	await _t3_slots_isolated()
-	await _t4_language_button()
+	await _t4_settings_entry()
 	await _t5_world_snapshot_roundtrip()
 	await _t6_snapshot_survives_file()
 	SaveGuard.restore(_bak)          # 玩家原来的存档原样放回去
@@ -66,7 +66,8 @@ func _t1_menu_buttons() -> void:
 
 	var missing := PackedStringArray()
 	for node_path in ["Panel/Box/Start", "Panel/Box/Continue", "Panel/Box/Load",
-			"Panel/Box/Language", "Panel/Box/Quit", "Slots/Box/Slot1", "Slots/Box/Slot3"]:
+			"Panel/Box/Settings", "Panel/Box/Quit", "Slots/Box/Slot1", "Slots/Box/Slot3",
+			"SettingsPanel"]:
 		if menu.get_node_or_null(node_path) == null:
 			missing.append(node_path)
 	var title := (menu.get_node("Title") as Label).text
@@ -140,14 +141,29 @@ func _t3_slots_isolated() -> void:
 			str(s2_empty), str(s3_player.get("shards"))])
 
 
-## 语言按钮：点一下切到下一个语言，按钮文案跟着换，再点能绕回来
-func _t4_language_button() -> void:
+## 设置入口：主菜单上那行「语言」换成了「设置」（2026-09-14）。
+##
+## 改的不只是文字 —— 那行按钮只干得了语言一件事，音量、以后的操作/画面
+## 选项没地方放。现在语言住在**设置面板**里，而那块面板与游戏内暂停菜单
+## 是同一个场景（两边的默认值不会各漂一套）。这条断言盯三件事：
+##   1. 主菜单上**不再**有 Language 节点（否则等于留了两个入口，迟早漂）
+##   2. 点「设置」真的把面板叫出来了
+##   3. 面板里的语言控件换个来回，TranslationServer 跟着动
+func _t4_settings_entry() -> void:
 	var menu := MENU.instantiate()
 	add_child(menu)
-	await _steps(2)
-	var lang_btn := menu.get_node("Panel/Box/Language") as Button
+	await _steps(3)
+
+	var stray := menu.get_node_or_null("Panel/Box/Language") != null
+	var settings_btn := menu.get_node("Panel/Box/Settings") as Button
+	var sp := menu.get_node("SettingsPanel")
+	var lang_btn := sp.get_node("Root/Panel/Rows/LangRow/Lang") as Button
+
 	var original := GameSettings.language
 	var original_text := lang_btn.text
+	settings_btn.pressed.emit()
+	await _steps(2)
+	var opened: bool = bool(sp.call("is_open"))
 
 	lang_btn.pressed.emit()
 	await _steps(2)
@@ -160,11 +176,16 @@ func _t4_language_button() -> void:
 
 	var codes := GameSettings.SUPPORTED.keys()
 	var expected_next := str(codes[(codes.find(original) + 1) % codes.size()])
-	_check("4", "语言按钮循环切换，按钮文案即时刷新",
-		switched == expected_next and switched != original and back == original
-			and switched_text != original_text,
-		"%s → %s → %s　按钮文案「%s」→「%s」" % [
-			original, switched, back, original_text, switched_text])
+	sp.call("close")
+	await _steps(1)
+	var closed: bool = not bool(sp.call("is_open"))
+
+	_check("4", "设置入口：主菜单不再单列语言；「设置」打开面板，面板里换语言当场生效",
+		(not stray) and opened and switched == expected_next and switched != original \
+			and back == original and switched_text != original_text and closed,
+		"主菜单上还留着 Language 节点=%s　面板打开=%s　%s → %s → %s　文案「%s」→「%s」　关掉=%s" % [
+			str(stray), str(opened), original, switched, back,
+			original_text, switched_text, str(closed)])
 	menu.queue_free()
 	await _steps(2)
 

@@ -1,5 +1,5 @@
 extends Control
-## 主菜单：开始 / 继续 / 读取存档 / 语言 / 退出 + 存档槽位面板。
+## 主菜单：开始 / 继续 / 读取存档 / **设置** / 退出 + 存档槽位面板。
 ##
 ## 存档模型（用户验收定的）：3 个槽位。「开始游戏」先选槽（选中有档的槽 = 覆盖），
 ## 「读取存档」列槽挑一个进；「继续游戏」直接回最近一次玩的槽。
@@ -16,7 +16,8 @@ var _slot_mode: int = SlotMode.START
 @onready var _start_btn: Button = $Panel/Box/Start
 @onready var _continue_btn: Button = $Panel/Box/Continue
 @onready var _load_btn: Button = $Panel/Box/Load
-@onready var _lang_btn: Button = $Panel/Box/Language
+@onready var _settings_btn: Button = $Panel/Box/Settings
+@onready var _settings: Node = $SettingsPanel
 @onready var _quit_btn: Button = $Panel/Box/Quit
 @onready var _title: Label = $Title
 @onready var _slots: Panel = $Slots
@@ -29,7 +30,7 @@ func _ready() -> void:
 	_start_btn.pressed.connect(_on_start)
 	_continue_btn.pressed.connect(_on_continue)
 	_load_btn.pressed.connect(_on_load)
-	_lang_btn.pressed.connect(_on_language)
+	_settings_btn.pressed.connect(_on_settings)
 	_quit_btn.pressed.connect(_on_quit)
 	_back_btn.pressed.connect(_close_slots)
 	for i in _slot_btns.size():
@@ -51,7 +52,7 @@ func _refresh_texts(_locale: String = "") -> void:
 	_continue_btn.text = tr("UI_MENU_CONTINUE")
 	_load_btn.text = tr("UI_MENU_LOAD")
 	_quit_btn.text = tr("UI_MENU_QUIT")
-	_lang_btn.text = "%s：%s" % [tr("UI_MENU_LANGUAGE"), GameSettings.SUPPORTED[GameSettings.language]]
+	_settings_btn.text = tr("UI_MENU_SETTINGS")
 	_slots_title.text = tr("UI_SLOTS_TITLE_NEW") if _slot_mode == SlotMode.START else tr("UI_SLOTS_TITLE_LOAD")
 	_refresh_continue()
 	_refresh_slot_buttons()
@@ -158,10 +159,16 @@ func _enter_slot(slot: int) -> void:
 	get_tree().change_scene_to_file(level)
 
 
-func _on_language() -> void:
-	var codes := GameSettings.SUPPORTED.keys()
-	var i := codes.find(GameSettings.language)
-	GameSettings.set_language(str(codes[(i + 1) % codes.size()]))
+## 设置：**语言从主菜单挪进这里了**（2026-09-14）。
+## 挪的理由不是「少一行」，是那行按钮**只干得了语言一件事**：
+## 音量、以后的操作/画面选项都没地方放。设置面板是暂停菜单与主菜单
+## 共用的同一份场景，两边的默认值不会各漂一套。
+##
+## 本节点**不管设置面板的暂停** —— 主菜单本来就没在跑游戏，
+## 谁开的面板谁管暂停（同 hud.close_all_panels 那次的教训）
+func _on_settings() -> void:
+	if _settings != null:
+		_settings.call("open")
 
 
 func _on_quit() -> void:

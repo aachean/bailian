@@ -635,6 +635,7 @@ func _start_cast(slot: int) -> void:
 		return
 	mp -= sk.mp_cost
 	_current = sk
+	_swing_sfx(sk)
 	_state_frame = 0
 	attack_index = -1
 	_attack_queued = false
@@ -713,6 +714,7 @@ func _start_attack(index: int) -> void:
 		return
 	attack_index = index
 	_current = attack_combo[index]
+	_swing_sfx(_current)
 	state = State.ATTACK
 	_state_frame = 0
 	_attack_queued = false
@@ -896,6 +898,27 @@ func _overlaps_enemy() -> bool:
 	params.collide_with_areas = false
 	params.exclude = [get_rid()]
 	return not get_world_2d().direct_space_state.intersect_shape(params, 1).is_empty()
+
+
+## 空挥的声音（玩家口中的「空 A」）。
+##
+## ── 为什么响在**出招那一刻**，不是命中那一刻 ────────────────────
+## 玩家抱怨的原话是「没有打到怪之前，普攻的音效没了」。也就是说
+## **空砍一刀是完全静音的** —— 而那是玩家做得最多的一个动作。
+## 声音必须跟着「挥」走：出招就响，砍到东西了再叠一声「命中」（见 _on_hit_landed）。
+## 于是两件事在听感上分得开：**只有一声 = 挥空了，两声 = 打中了**。
+## 这同时补上设计原则 6.1 要的第二项反馈（在此之前打中只有顿帧一项，
+## 而挥空连一项都没有）。
+##
+## ── 为什么不是所有技能都响 ────────────────────────────────────
+## 回血（breathe）和格挡（ironwall）的判定框是 1×1 的占位，**它们不挥武器**，
+## 配一声挥砍音是在说假话。判据就看判定框：比 4px 大的是真的挥出去了
+func _swing_sfx(sk: SkillData) -> void:
+	if sk == null or sk.kind != SkillData.Kind.ATTACK:
+		return
+	if sk.hitbox_size.x <= 4.0:
+		return
+	Audio.play(&"swing")
 
 
 ## 命中时把双方一起冻住几帧。打击感主要来自这里，不是来自数值

@@ -35,6 +35,7 @@ const SCENES := [
 	"res://scenes/ui/atlas.tscn",
 	"res://scenes/ui/death_menu.tscn",
 	"res://scenes/ui/forge_panel.tscn",
+	"res://scenes/ui/settings_panel.tscn",
 	"res://scenes/stages/test_room.tscn",
 	"res://scenes/stages/town.tscn",
 	"res://scenes/stages/lichang.tscn",

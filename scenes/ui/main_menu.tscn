@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings_panel.tscn" id="2_settings"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -46,10 +47,10 @@ custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "读取存档"
 
-[node name="Language" type="Button" parent="Panel/Box"]
+[node name="Settings" type="Button" parent="Panel/Box"]
 custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
-text = "语言：中文"
+text = "设置"
 
 [node name="Quit" type="Button" parent="Panel/Box"]
 custom_minimum_size = Vector2(180, 28)
@@ -114,3 +115,5 @@ text = "3."
 custom_minimum_size = Vector2(400, 32)
 layout_mode = 2
 text = "返回"
+
+[node name="SettingsPanel" parent="." instance=ExtResource("2_settings")]

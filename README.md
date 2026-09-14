@@ -7,7 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + **铁匠铺** + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，一屏的怪**分三批陆续出来**，**打完一批才出下一批**，全清了才走得过去；最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**死了弹二选一**（重新开始 / 返回城镇）。**等级上限 100**（经验走幂函数，前快后慢；每级成长递减 —— 等级是解锁内容的钥匙，不是战力轴）；**强化逐件做，按品质封顶**（普通 3 / 精良 5 / 稀有 8），成本递增、收益递减；**有声音了**（命中 / 受击 / 拾取三声） |
+| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + **铁匠铺** + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，一屏的怪**分三批陆续出来**，**打完一批才出下一批**，全清了才走得过去；最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**死了弹二选一**（重新开始 / 返回城镇）。**等级上限 100**（经验走幂函数，前快后慢；每级成长递减 —— 等级是解锁内容的钥匙，不是战力轴）；**强化逐件做，按品质封顶**（普通 3 / 精良 5 / 稀有 8），成本递增、收益递减；**有声音了**（空挥 / 命中 / 受击 / 拾取四声）；**有设置了**（背景音乐 / 音效 / 语言，暂停菜单与主菜单共用一块面板） |
 
 > **砺场已按新结构重切**（2026-09-14，粒度重定过**两次**，两次都是玩过之后给的反馈）。
 > 第一章的结构是 **地图「淬火岭」→ 三个副本（砺场 / 断淬渠 / 炉喉）**，
@@ -89,7 +89,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。后续增量各自一组：
 
 ```
-godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（28 个场景，缺节点即红）
+godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（29 个场景，缺节点即红）
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 城镇入口 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环 / 血蓝数值（17 条）
@@ -99,7 +99,8 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树
 godot --headless --fixed-fps 60 --path . res://tests/test_m8.tscn    # 第 2、3 关 / 门封印 / 复活点（14 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m9.tscn    # 更长屏 / 看不到的挡墙 / 分批出怪 / 死亡二选一（10 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m10.tscn   # 等级上限 / 经验幂函数 / 装备实例 / 逐件强化 / 软硬上限（19 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m11.tscn   # 音效三声：命中 / 受击 / 拾取（5 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m11.tscn   # 音效四声：空挥 / 命中 / 受击 / 拾取（7 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m12.tscn   # 暂停菜单两项 + 设置面板（10 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -108,6 +109,7 @@ godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # �
 ```
 godot --path . res://tests/shot_atlas.tscn    # 舆图台 / 舆图 / 撞上看不见的墙 / 第二批淡入 / 推进到第 2 屏 / 死亡界面
 godot --path . res://tests/shot_forge.tscn    # 铁匠铺：打开 / 强化成功 / 精铁不够 / 已到顶 / 角色面板的武器强化
+godot --path . res://tests/shot_pause.tscn    # 暂停菜单五项 / 设置面板 / 静音那一行 / 主菜单（会重出 menu.png）
 ```
 
 > 跑带战斗的测试（`test_m1` / `test_m4` / `test_m11`）时，末尾可能有一行

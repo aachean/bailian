@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_pause"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings_panel.tscn" id="2_settings"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.09, 0.09, 0.12, 0.97)
@@ -37,10 +38,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -110.0
-offset_top = -95.0
-offset_right = 110.0
-offset_bottom = 95.0
+offset_left = -180.0
+offset_top = -138.0
+offset_right = 180.0
+offset_bottom = 138.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="Title" type="Label" parent="Root/Panel"]
@@ -59,23 +60,53 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 30.0
+offset_left = 24.0
 offset_top = 48.0
-offset_right = -30.0
-offset_bottom = -18.0
+offset_right = -24.0
+offset_bottom = -44.0
 theme_override_constants/separation = 10
 
 [node name="Continue" type="Button" parent="Root/Panel/Box"]
-custom_minimum_size = Vector2(160, 28)
+custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
+focus_mode = 0
 text = "继续游戏"
 
 [node name="Save" type="Button" parent="Root/Panel/Box"]
-custom_minimum_size = Vector2(160, 28)
+custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
+focus_mode = 0
 text = "保存游戏"
 
-[node name="Menu" type="Button" parent="Root/Panel/Box"]
-custom_minimum_size = Vector2(160, 28)
+[node name="Town" type="Button" parent="Root/Panel/Box"]
+custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
+focus_mode = 0
+text = "回到城镇（放弃本趟）"
+
+[node name="Settings" type="Button" parent="Root/Panel/Box"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
+focus_mode = 0
+text = "设置"
+
+[node name="Menu" type="Button" parent="Root/Panel/Box"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
+focus_mode = 0
 text = "回主菜单"
+
+[node name="Hint" type="Label" parent="Root/Panel"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -36.0
+offset_bottom = -12.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.6, 0.58, 0.54, 1)
+horizontal_alignment = 1
+text = "↑↓ 选择　·　J 确认　·　Esc 返回游戏"
+
+[node name="SettingsPanel" parent="." instance=ExtResource("2_settings")]
