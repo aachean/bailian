@@ -3,11 +3,12 @@ extends CanvasLayer
 ##
 ## ── 两个入口，同一个界面 ──────────────────────────────────────
 ##   1. 安全区的**舆图台**：走近出提示 → 按 `P` 打开（术语见 docs/CONTEXT.md「舆图台」）
-##   2. **清空一关之后自动打开** —— 关卡里没有舆图台，但那时玩家总得有个去处
+##   2. **通关一个副本之后自动打开** —— 副本里没有舆图台，但那时玩家总得有个去处
 ##
-## 第 2 个入口是本界面的关键设计点：过关之后玩家站在一个空关卡里，
-## 按 P 没反应（不在舆图台旁）、Esc 只能回主菜单 —— 那是死路。
-## 所以过关后自动把它弹出来，并且**必须选一个去处**（J 进下一段 / Esc 回安全区）。
+## ── 粒度（2026-09-14 重定后**只有副本这一层是可选的**）──────────
+## 第一版把副本展开成一串「一屏关卡」让玩家挑，神玩完的反馈是「点进点出频繁」。
+## 现在**副本就是一条 3~4 屏的路，进一次从头打到尾**（推进由关卡根节点负责），
+## 所以舆图上**一行一个副本**，不再展开屏 —— 屏是副本内部的事，不是玩家的选择题。
 ##
 ## ── 打开即真暂停 ──────────────────────────────────────────────
 ## 操作类界面（要上下选、要决定去哪），与 B 装备背包同类：
@@ -15,42 +16,40 @@ extends CanvasLayer
 ## 并且与暂停菜单 / 背包 / 技能面板 / 对话框互相查 `is_open()` 让路。
 ##
 ## ── 布局（docs/design-conventions.md「舆图与关卡推进」）────────────
-## 左边地图页签，右边该地图的副本 + 展开的关卡，一次看全，**选关即进**。
-## 未解锁的关卡**不隐藏**：锁 + 灰字 —— 玩家要看得见「前面还有几关」。
+## 左边地图页签，右边该地图的副本列表，一次看全，**选副本即进**。
+## 没开的副本**不隐藏**：锁 + 灰字 —— 玩家要看得见「前面还有什么」。
 ## 实力可能不够的写推荐等级 / 武器强化并标红，**但不禁止进入**。
 
 const TOWN_PATH := "res://scenes/stages/town.tscn"
 
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
-## 行高与字号。**这两条是尺寸预算的产物，不是审美选择** ——
-## 步 2 把断淬渠（4 段）、炉喉（5 段）也切进来之后，列表会有
-## 3 个副本标题 + 12 段 + 1 行回安全区 = 16 行；16 × 17 = 272px，
-## 加上标题与底部提示还能塞进 640×360。行高再大一点就装不下了
+## 行高与字号。**尺寸预算的产物**：3 个副本 + 一行回安全区 = 4 行，
+## 将来副本变多（每张地图 5~6 个）也还装得下 640×360
 const ROW_HEIGHT := 17.0
 const FONT_SIZE := 10
-## 面板高度按行数自适应（见 _fit_panel）。标题栏与底部提示各占这么高
+## 面板高度按行数自适应（见 _fit_panel）
 const HEAD_H := 32.0
 const FOOT_H := 30.0
 const PANEL_W := 560.0
-const PANEL_MIN_H := 120.0
+const PANEL_MIN_H := 110.0
 ## 屏幕 360 高，上下各留 12 的边距
 const PANEL_MAX_H := 336.0
 
 const DIM := Color(0.55, 0.53, 0.5, 1)
 const NORMAL := Color(0.9, 0.88, 0.84, 1)
 const BRIGHT := Color(1, 1, 1, 1)
-const HEAD := Color(0.93, 0.84, 0.6, 1)
+const GOLD := Color(0.93, 0.84, 0.6, 1)
 const WARN := Color(0.95, 0.52, 0.45, 1)
 
 ## 每一行是什么。kind 取值：
-##   head   副本标题（不可选）
-##   stage  已解锁的关卡（可选，J 进入）
-##   locked 未解锁的关卡（不可选，灰 + 锁）
-##   back   回安全区（可选）
+##   dungeon 开了的副本（可选，J 进入）
+##   locked  还没开（前一个副本没通关）
+##   shut    还没开工（没有场景）
+##   back    回安全区（可选）
 var _rows: Array[Dictionary] = []
 var _cursor := 0
-## 这一关刚打完弹出来的？true = 必须选一个去处，Esc 变成「回安全区」
+## 这一份是通关之后弹出来的？true = 必须选一个去处，Esc 变成「回安全区」
 var _must_choose := false
 
 @onready var _root: Control = $Root
@@ -83,35 +82,23 @@ func is_open() -> bool:
 ## 舆图台调用：正常打开，Esc = 关闭
 func open() -> void:
 	_must_choose = false
-	_show({})
+	_show(null)
 
 
-## 清空一关之后自动打开：光标落在**新解锁的那一段**上，Esc = 回安全区。
-## nxt 为空（整张地图打完）时落在第一行
-func open_after_clear(nxt: Dictionary) -> void:
+## 通关一个副本之后自动打开：光标落在**因此解锁的下一个副本**上，Esc = 回安全区。
+## next_d 为 null（整张地图打完了）时落在第一行
+func open_after_clear(next_d: DungeonData) -> void:
 	_must_choose = true
-	_show(nxt)
+	_show(next_d)
 
 
-func _show(nxt: Dictionary) -> void:
+func _show(next_d: DungeonData) -> void:
 	_build()
 	_fit_panel()
-	_cursor = _row_of(nxt)
+	_cursor = _row_of(next_d)
 	_root.visible = true
 	get_tree().paused = true
 	refresh()
-
-
-## 面板高度按行数自适应：砺场切片时只有 7 行（矮一点更好看），
-## 步 2 把 12 段全填进来之后长到 16 行，仍然要一屏装得下 ——
-## 规范里写的是「一次看全」，所以宁可面板贴着屏幕上下边，也不给列表加滚动
-func _fit_panel() -> void:
-	var rows_h := float(maxi(_rows.size(), 1)) * ROW_HEIGHT
-	var h := clampf(HEAD_H + rows_h + FOOT_H, PANEL_MIN_H, PANEL_MAX_H)
-	_panel.offset_left = -PANEL_W * 0.5
-	_panel.offset_right = PANEL_W * 0.5
-	_panel.offset_top = -h * 0.5
-	_panel.offset_bottom = h * 0.5
 
 
 func close() -> void:
@@ -126,7 +113,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _root.visible:
 		return
 	if event.is_action_pressed("ui_cancel"):
-		# 「打完这一关」弹出来的舆图不给关掉 —— 关掉就是站在一个空关卡里发呆。
+		# 「通关了」弹出来的舆图不给关掉 —— 关掉就是站在一个打空了的副本里发呆。
 		# 这时 Esc 是「回安全区」，另一条去处。**不静默**：底部提示写着这一条
 		if _must_choose:
 			_go_home()
@@ -143,7 +130,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_activate()
 
 
-## 光标只在可选行之间走 —— 未解锁的关卡与副本标题只是「看得见的路标」，
+## 光标只在可选行之间走 —— 没开 / 没开工的副本只是「看得见的路标」，
 ## 落在上面会让玩家以为选了它就能进
 func _move(dir: int) -> void:
 	var n := _rows.size()
@@ -163,22 +150,21 @@ func _activate() -> void:
 		return
 	var r := _rows[_cursor]
 	match str(r.get("kind", "")):
-		"stage":
-			_enter_stage(r["dungeon"], int(r["index"]))
+		"dungeon":
+			_enter_dungeon(r["dungeon"])
 		"back":
 			_go_home()
 
 
-func _enter_stage(dungeon_id: StringName, index: int) -> void:
-	var m := GameProgress.map()
-	var st := m.find_stage(dungeon_id, index) if m != null else null
-	if st == null or st.scene_path.is_empty():
-		push_error("舆图：第 %d 段没有场景路径" % (index + 1))
+func _enter_dungeon(id: StringName) -> void:
+	var d := GameProgress.dungeon(id)
+	if d == null or not d.is_ready():
+		push_error("舆图：副本 %s 没有可进的场景" % str(id))
 		return
-	if not ResourceLoader.exists(st.scene_path):
-		push_error("舆图：关卡场景不存在 %s" % st.scene_path)
+	if not ResourceLoader.exists(d.scene_path):
+		push_error("舆图：副本场景不存在 %s" % d.scene_path)
 		return
-	_leave_to(st.scene_path)
+	_leave_to(d.scene_path)
 
 
 func _go_home() -> void:
@@ -197,8 +183,8 @@ func _leave_to(path: String) -> void:
 
 # ── 构建与刷新 ─────────────────────────────────────────────────
 
-## 按三层结构数据建行。内容不会在界面开着的时候变（关卡表是静态数据），
-## 所以只在打开时建一次，之后刷新只改文字
+## 按地图数据建行。内容不会在界面开着的时候变，所以只在打开时建一次，
+## 之后刷新只改文字
 func _build() -> void:
 	for c in _list.get_children():
 		c.queue_free()
@@ -209,19 +195,19 @@ func _build() -> void:
 	var m := GameProgress.map()
 	if m == null:
 		return
-	_tabs.add_child(_make_label(tr(m.name_key), HEAD, true))
+	_tabs.add_child(_make_label(tr(m.name_key), GOLD, true))
 	for d in m.dungeons:
 		if d == null:
 			continue
-		_rows.append({"kind": "head", "dungeon": d.id})
-		for i in d.stages.size():
-			var unlocked := GameProgress.is_stage_unlocked(d.id, i)
-			_rows.append({
-				"kind": "stage" if unlocked else "locked",
-				"dungeon": d.id,
-				"index": i,
-				"sel": unlocked,
-			})
+		var kind := "shut"
+		var selectable := false
+		if d.is_ready():
+			if GameProgress.is_dungeon_unlocked(d.id):
+				kind = "dungeon"
+				selectable = true
+			else:
+				kind = "locked"
+		_rows.append({"kind": kind, "dungeon": d.id, "sel": selectable})
 	_rows.append({"kind": "back", "sel": true})
 	for r in _rows:
 		_list.add_child(_make_label("", NORMAL, bool(r.get("sel", false))))
@@ -240,6 +226,18 @@ func _make_label(text: String, color: Color, selectable: bool) -> Label:
 	# 可选行给一点亮度差：不看光标标记也能看出「这几行能选」
 	lbl.modulate = NORMAL if selectable else Color(1, 1, 1, 0.75)
 	return lbl
+
+
+## 面板高度按行数自适应：砺场切片时只有 4 行（矮一点更好看），
+## 副本多了会长高，但仍然要一屏装得下 —— 规范里写的是「一次看全」，
+## 所以宁可面板贴着屏幕上下边，也不给列表加滚动
+func _fit_panel() -> void:
+	var rows_h := float(maxi(_rows.size(), 1)) * ROW_HEIGHT
+	var h := clampf(HEAD_H + rows_h + FOOT_H, PANEL_MIN_H, PANEL_MAX_H)
+	_panel.offset_left = -PANEL_W * 0.5
+	_panel.offset_right = PANEL_W * 0.5
+	_panel.offset_top = -h * 0.5
+	_panel.offset_bottom = h * 0.5
 
 
 func refresh() -> void:
@@ -261,74 +259,60 @@ func refresh() -> void:
 
 func _row_text(r: Dictionary, sel: bool) -> String:
 	var mark := CURSOR_MARK if sel else INDENT
+	# 「回安全区」那一行没有副本 id —— 先判它，别去取不存在的键
+	if str(r.get("kind", "")) == "back":
+		return "%s%s" % [mark, tr("UI_ATLAS_BACK")]
+	var d := GameProgress.dungeon(r["dungeon"])
+	if d == null:
+		return "?"
 	match str(r.get("kind", "")):
-		"head":
-			var m := GameProgress.map()
-			var d := m.find_dungeon(r["dungeon"]) if m != null else null
-			if d == null:
-				return "?"
-			return "%s　%s" % [tr(d.name_key), _dungeon_state(d)]
-		"stage":
-			var m2 := GameProgress.map()
-			var st := m2.find_stage(r["dungeon"], int(r["index"])) if m2 != null else null
-			var rec := ""
-			if st != null:
-				rec = I18n.t(&"UI_ATLAS_REC", [st.rec_level, st.rec_weapon])
-			return "%s%s%s　%s" % [
-				mark, INDENT,
-				I18n.t(&"UI_STAGE_LABEL", [int(r["index"]) + 1]), rec]
+		"dungeon":
+			var parts := PackedStringArray()
+			parts.append(tr(d.name_key))
+			parts.append(I18n.t(&"UI_DUNGEON_SCREENS", [d.screen_count]))
+			if SaveManager.is_cleared(d.id):
+				parts.append(tr("UI_ATLAS_CLEARED"))
+			parts.append(I18n.t(&"UI_ATLAS_REC", [d.rec_level, d.rec_weapon]))
+			return "%s%s" % [mark, "　".join(parts)]
 		"locked":
-			return "%s%s%s　%s" % [INDENT, INDENT,
-				I18n.t(&"UI_STAGE_LABEL", [int(r["index"]) + 1]), tr("UI_ATLAS_LOCKED")]
-		"back":
-			return "%s%s" % [mark, tr("UI_ATLAS_BACK")]
-	return ""
-
-
-## 副本的状态后缀。**不能静默**：没开工的副本必须写出来，
-## 否则玩家看到「断淬渠」下面空空如也，分不清是没做还是没开
-func _dungeon_state(d: DungeonData) -> String:
-	if d.stages.is_empty():
-		return tr("UI_ATLAS_NOT_READY")
-	if SaveManager.is_cleared(d.id):
-		return tr("UI_ATLAS_CLEARED")
+			return "%s%s　%s" % [INDENT, tr(d.name_key), tr("UI_ATLAS_LOCKED")]
+		"shut":
+			return "%s%s　%s" % [INDENT, tr(d.name_key), tr("UI_ATLAS_NOT_READY")]
 	return ""
 
 
 func _row_color(r: Dictionary, sel: bool) -> Color:
 	if sel:
 		return BRIGHT
+	if str(r.get("kind", "")) == "back":
+		return NORMAL
+	var d := GameProgress.dungeon(r["dungeon"])
 	match str(r.get("kind", "")):
-		"head":
-			return HEAD
-		"locked":
-			return DIM
-		"stage":
-			# 推荐实力不够 → 标红，但**照样能进**（软压力，不是门票）
-			var m := GameProgress.map()
-			var st := m.find_stage(r["dungeon"], int(r["index"])) if m != null else null
-			if st != null and _too_weak(st):
+		"dungeon":
+			# 已通关 → 金字；推荐实力不够 → 标红，但**照样能进**（软压力，不是门票）
+			if d != null and SaveManager.is_cleared(d.id):
+				return GOLD
+			if d != null and _too_weak(d):
 				return WARN
 			return NORMAL
+		"locked", "shut":
+			return DIM
 	return NORMAL
 
 
-## 玩家现在的等级 / 武器强化够不够这一关的推荐值。**只用来上色**，
+## 玩家现在的等级 / 武器强化够不够这个副本的推荐值。**只用来上色**，
 ## 任何地方都不拿它拦人 —— 硬门槛会把「刷」变成义务（docs/adr/0009 §5）
-func _too_weak(st: StageData) -> bool:
-	if PlayerState.level < st.rec_level:
+func _too_weak(d: DungeonData) -> bool:
+	if PlayerState.level < d.rec_level:
 		return true
-	return PlayerState.upgrade_level < st.rec_weapon
+	return PlayerState.upgrade_level < d.rec_weapon
 
 
-## 某个关卡坐标在行表里的下标。给不到就退回第一行可选行
-func _row_of(nxt: Dictionary) -> int:
-	if not nxt.is_empty():
+## 某个副本在行表里的下标。给不到就退回第一行可选行
+func _row_of(next_d: DungeonData) -> int:
+	if next_d != null:
 		for i in _rows.size():
-			var r := _rows[i]
-			if str(r.get("kind", "")) == "stage" \
-					and String(r.get("dungeon", "")) == String(nxt.get("dungeon", "")) \
-					and int(r.get("index", -1)) == int(nxt.get("index", -2)):
+			if String(_rows[i].get("dungeon", "")) == String(next_d.id):
 				return i
 	for i in _rows.size():
 		if bool(_rows[i].get("sel", false)):

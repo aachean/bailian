@@ -545,29 +545,25 @@ func refresh() -> void:
 		refresh_skill_panel()
 
 
-## 段号（「砺场 · 第 2 段 / 共 3 段」）。
+## 屏号（「砺场 · 第 2 屏 / 共 3 屏」）。
 ##
-## 来源是**玩家所在的那个关卡节点**挂的关卡数据，不是 current_scene ——
-## 测试与截图会把关卡实例挂在别的节点下（`current_scene` 那时不是关卡），
-## 从 current_scene 取的话段号会莫名其妙地空掉。测试房间没有关卡数据，
-## 这一行就是空的，而不是显示一个假的段号。
+## 来源是**玩家所在的那个关卡节点**（它是副本场景的根）——
+## 不从这个副本数据直接取，因为「第几屏」是**动态**的：玩家走到哪一屏，
+## 这个数字就跟着变。关卡根节点是唯一知道这件事的人。
 ##
-## 文本没变就不写回：这是每帧都在跑的刷新，白写一次会让 Label 每帧重排
+## 没有副本数据的场景（测试房间、还没重切的 `level_2/3`）这一行是空的，
+## 而不是显示一个假的屏号。文本没变就不写回：这是每帧都在跑的刷新
 func refresh_stage_label() -> void:
-	var sd: StageData = null
 	var host: Node = _player.get_parent() if _player != null else null
-	if host != null and host.get("stage_data") != null:
-		sd = host.get("stage_data") as StageData
 	var txt := ""
-	if sd != null:
-		var pos := GameProgress.locate(sd.id)
-		var m := GameProgress.map()
-		var d := m.find_dungeon(pos["dungeon"]) if (m != null and not pos.is_empty()) else null
-		if d != null:
+	if host != null and host.has_method("current_screen") and host.has_method("screen_count"):
+		var total: int = host.call("screen_count")
+		var d: DungeonData = host.get("dungeon_data") as DungeonData
+		if total > 0 and d != null:
 			txt = "%s · %s / %s" % [
 				tr(d.name_key),
-				I18n.t(&"UI_STAGE_LABEL", [int(pos["index"]) + 1]),
-				I18n.t(&"UI_STAGE_TOTAL", [d.stages.size()])]
+				I18n.t(&"UI_SCREEN_LABEL", [host.call("current_screen")]),
+				I18n.t(&"UI_SCREEN_TOTAL", [total])]
 	if _stage_label.text != txt:
 		_stage_label.text = txt
 

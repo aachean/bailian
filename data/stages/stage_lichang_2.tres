@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="StageData" format=3]
-
-[ext_resource type="Script" path="res://scripts/core/stage_data.gd" id="1_e20ao"]
-
-[resource]
-script = ExtResource("1_e20ao")
-id = &"lichang_2"
-scene_path = "res://scenes/stages/lichang_2.tscn"
-rec_level = 2

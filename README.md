@@ -7,13 +7,14 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + 铁砧 + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**的三段一屏关卡（**清空关内敌人即过关**，逐段解锁，死在本关就重开本关）→ 打通第三段打**磨刀石守卫**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；存档记着逐段解锁到哪 |
+| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + 铁砧 + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，**清空一屏才开下一屏的闸门**，一屏一屏往右打，最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线 |
 
-> **砺场已按新结构重切**（2026-09-14）。第一章的结构是
-> **地图「淬火岭」→ 三个副本（砺场 / 断淬渠 / 炉喉）→ 若干一屏关卡**，
+> **砺场已按新结构重切**（2026-09-14，粒度重定过一次）。第一章的结构是
+> **地图「淬火岭」→ 三个副本（砺场 / 断淬渠 / 炉喉）**，
+> 而**副本 = 一条 3~4 屏的路**：进一次从头打到尾，清完一屏往右推进，最后一屏出 Boss。
 > 进副本的唯一入口是**安全区的舆图台**（`P`）。
 >
-> 目前只有**砺场**做完（3 段），断淬渠与炉喉在数据里是空壳（舆图上标「未开放」）；
+> 目前只有**砺场**做完（三屏），断淬渠与炉喉在数据里是空壳（舆图上标「未开放」）；
 > `level_2/3.tscn` 仍在仓库里，**仍在使用门封印与复活点** —— 切它们时那两项机制一并退役。
 > **设计与决策文档不在本仓库** —— 所以别在代码里找「为什么」。
 
@@ -85,7 +86,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 它测不了「爽不爽」——那只能靠人玩；其余全部由它兜底。后续增量各自一组：
 
 ```
-godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（28 个场景，缺节点即红）
+godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（26 个场景，缺节点即红）
 godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 城镇入口 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环 / 血蓝数值（17 条）
@@ -93,14 +94,14 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉
 godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框 / NPC / 主线推进（8 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m8.tscn    # 第 2、3 关 / 门封印 / 复活点（14 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m9.tscn    # 三层结构：砺场三段 / 清空过关 / 逐段解锁 / 舆图（9 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m9.tscn    # 副本粒度：闸门 / 分段推进 / 通关才回舆图（9 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
 截图（要开窗口，输出到 `build/shots/`）：
 
 ```
-godot --path . res://tests/shot_atlas.tscn    # 舆图台 / 舆图（开局与打通后）/ 关卡里的段号
+godot --path . res://tests/shot_atlas.tscn    # 舆图台 / 舆图 / 闸门挡路 / 推进到第 2 屏
 ```
 
 > 新增带 `class_name` 的脚本后，第一次跑之前要先 `godot --headless --import`：
@@ -145,38 +146,38 @@ scripts/ui/skill_icon.gd     技能图标：每个技能一个手画形状 + 固
 
 ### 三层结构（地图 → 副本 → 关卡）落在哪
 
-> **砺场已按这套结构重切**（3 段一屏关卡）。断淬渠、炉喉还没切 ——
-> 它们在数据里是空壳，切的时候只是往数据里加关卡 + 建场景，界面与流程不用动。
+> **砺场已按这套结构做完**：一条 1920 宽（三屏）的副本场景，清空一屏开下一屏的闸门。
+> 断淬渠、炉喉还没切 —— 它们本来就是「多屏连续推进、走到底打 Boss」的形态，
+> 切起来主要是加屏分组与闸门，比砺场容易。
 
 ```
 data/stages/map_quench_ridge.tres   地图：淬火岭 → 三个副本（顺序即解锁顺序）
-data/stages/dungeon_*.tres          副本：砺场（3 段）/ 断淬渠 / 炉喉（后两个暂时为空）
-data/stages/stage_*.tres            关卡：场景路径 + 推荐等级 / 推荐武器强化
-scripts/core/map_data.gd            MapData：find_stage / next_stage（跨副本的下一段是谁）
-scripts/core/dungeon_data.gd        DungeonData：一个副本的关卡表
-scripts/core/stage_data.gd          StageData：一屏关卡
-scripts/core/game_progress.gd       GameProgress（autoload）：**唯一**算「下一段是谁」的地方，
+data/stages/dungeon_*.tres          副本：砺场（三屏）/ 断淬渠 / 炉喉（后两个是空壳）
+scripts/core/map_data.gd            MapData：find_dungeon / dungeon_after / dungeon_before
+scripts/core/dungeon_data.gd        DungeonData：场景路径 + 屏数 + 推荐实力 + is_ready()
+scripts/core/game_progress.gd       GameProgress（autoload）：**唯一**算「副本开没开」的地方，
                                     也是唯一把「内容结构」和「存档进度」凑起来的地方
-scripts/core/save_manager.gd        unlocked（副本 id → 已解锁段数）+ cleared（已清空的副本）
-scripts/core/stage.gd               关卡根节点：清空过关判定 + restart()（死在本关重开本关）
-scenes/ui/atlas.tscn + scripts/ui/atlas.gd  舆图界面（P 键 / 过关后自动弹出）
+scripts/core/save_manager.gd        cleared：已通关的副本列表（就这一张表）
+scripts/core/stage.gd               副本根节点：**分段推进**（屏/闸门/通关判定）+ restart()
+scenes/stages/lichang.tscn          砺场：Screen1/2/3 三个分组装各屏的怪，两道 Gate 挡在屏界
+scenes/ui/atlas.tscn + scripts/ui/atlas.gd  舆图界面（P 键 / 通关后自动弹出，一行一个副本）
 scenes/core/atlas_pedestal.tscn     安全区的舆图台（走近 → 提示 → 按 P）
+tools/gen_stage_data.gd             生成上面那些 .tres（**不手写**，见下）
 ```
 
-四条一眼看不出、但少一条就出问题的规矩：
+五条一眼看不出、但少一条就出问题的规矩：
 
-- **「下一段是谁」只有一处算法**（`MapData.next_stage`）。关卡根节点、舆图界面、
-  主菜单初始化三处都调它 —— 有第二套算法的那天，就是「打完了却解锁错关卡」的出生时刻。
-- **过关判据是「清空关内敌人」**，所以**小怪一律不重生**（`revive_delay = 0`）。
-  重生是训练场的设计，在「清空过关」下会让关卡永远打不完。
-  想改回 > 0 之前先想清楚它属于哪一边（训练房还是副本）。
-- **死在本关 → 重开本关**。成长数据（等级 / 装备 / 精铁）住在 `PlayerState`，
-  重载场景不会丢 —— 丢的只有这一关的世界状态，而那正是要重置的东西。
+- **屏与闸门靠分组找，不靠硬编码坐标**。场景里给屏分组挂 `screen` 组、闸门挂
+  `screen_gate` 组，关卡根节点按 x 排序自己认。加一屏 = 加一个分组 + 一道闸门，不改代码。
+- **清空判定按「出生分组」算，不按当前位置**。怪被引着跑到下一屏去，
+  按当前位置算会把上一屏判成「已经清了」——那门就白开了。
+- **闸门要既关碰撞又淡出视觉**。只淡出视觉的话，玩家会一头撞上看不见的墙（最坏的一种静默失败）。
+- **小怪一律不重生**（`revive_delay = 0`）。清空才放行，会重生的怪让屏永远清不掉。
+  重生能力保留在训练房，不再用于副本内。
 - **读档复现尸体不能重放掉落**。`_on_died()` 拆成 `_dead_pose()`（摆尸）+
-  「掉落 + 经验」，读档只走前半 —— **否则反复读档就能刷掉落**。
-  关卡可以反复进出之后，危害面比线性时代更大（每一段的每一个怪都能刷）。
+  「掉落 + 经验」，读档只走前半 —— **否则反复读档就能刷掉落**（副本可以反复进，危害更大）。
 
-### 仍然活着、但新关卡不再使用的两样（等断淬渠 / 炉喉切完一并退役）
+### 仍然活着、但新副本不再使用的两样（等断淬渠 / 炉喉切完一并退役）
 
 ```
 scripts/core/portal.gd       传送门：locked_by（被 Boss 封印）/ to_furthest（送到解锁到的最远那关）
@@ -184,17 +185,16 @@ scripts/core/checkpoint.gd   中途复活点：踩过就把「死后回到哪」
 scenes/stages/level_2/3.tscn 还没重切的两关（4.5 屏 / 5 屏），它们仍在使用上面两样
 ```
 
-四条一眼看不出、但少一条就出问题的规矩（**对上面那两关仍然成立**）：
+两条对它们仍然成立的规矩：
 
 - **关底 Boss 不重生**。Boss 重生的话「通关」这件事根本不成立。
-  新结构下这条扩展成「所有怪都不重生」。
 - **封印要学会复查**：门的解锁不能只靠 `Health.died` 信号。读档是关卡根在自己
   `_ready` 里把 Boss 摆成尸体的，信号早响过了，门会永远锁着。
 - **地形要在跳跃预算之内**：抬升 ≤ 60px（跳跃高度约 73）、断口 ≤ 90px
   （跳跃距离约 113）。`test_m8 #14` 用**助跑跳实测**断口，算几何预算只是兜底 ——
   瞬移过对岸只能证明那边有地面，证明不了玩家跳得到。
-- **一屏关卡不做断口**：640px 里助跑距离不够，掉下去就是死。砺场三段都是
-  「平地 + 浮台」，纵向变化只有浮台一种。
+- **一屏内不做断口**：640px 里助跑距离不够，掉下去就是死。砺场每屏是
+  「平地 + 台阶/浮台」，跨屏的障碍是闸门而不是沟。
 
 ### 剧情落在哪
 

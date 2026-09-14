@@ -35,9 +35,7 @@ const SCENES := [
 	"res://scenes/ui/atlas.tscn",
 	"res://scenes/stages/test_room.tscn",
 	"res://scenes/stages/town.tscn",
-	"res://scenes/stages/lichang_1.tscn",
-	"res://scenes/stages/lichang_2.tscn",
-	"res://scenes/stages/lichang_3.tscn",
+	"res://scenes/stages/lichang.tscn",
 	"res://scenes/stages/level_2.tscn",
 	"res://scenes/stages/level_3.tscn",
 ]

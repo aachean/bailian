@@ -9,10 +9,11 @@ extends Node
 ## 快照的收集 / 恢复由关卡根节点（stage.gd）负责，这里只管序列化与槽位。
 
 const SECTION := "progress"
-## 6：三层结构（地图 → 副本 → 关卡）带来的逐关解锁进度。
-## 旧档（< 6）不作废：等级 / 装备 / 精铁照旧带回，只把「打到第几关」重来 ——
+## 7：副本粒度重定（副本 = 一条 3~4 屏的路，不再切成独立的一屏关卡）。
+## 存档里只剩「哪些副本通关了」这一张表。
+## 旧档（< 7）不作废：等级 / 装备 / 精铁照旧带回，只把「打到哪」重来 ——
 ## 见 main_menu._enter_slot 的旧档分支
-const VERSION := 6
+const VERSION := 7
 const SLOT_COUNT := 3
 const LAST_SLOT_PATH := "user://last_slot.cfg"
 
@@ -50,11 +51,10 @@ func _remember_slot(slot: int) -> void:
 func start_new_game(slot: int, level_path: String) -> void:
 	current_slot = slot
 	_remember_slot(slot)
-	# 新游戏要从头走：先清掉「解锁到哪」。
+	# 新游戏要从头走：先清掉「打到哪」。
 	# 必须单独清一次 —— write_progress 为了保住附加字段会先读旧档
 	var cfg := ConfigFile.new()
 	cfg.set_value(SECTION, "furthest", "")
-	cfg.set_value(SECTION, "unlocked", {})
 	cfg.set_value(SECTION, "cleared", [])
 	cfg.save(slot_path(slot))
 	write_progress(level_path, {})
@@ -119,46 +119,18 @@ func furthest_level() -> String:
 	return str(cfg.get_value(SECTION, "furthest", ""))
 
 
-# ── 逐关解锁（三层结构用）──────────────────────────────────────
+# ── 副本进度（三层结构用）──────────────────────────────────────
 #
-# 存的是一张表：**副本 id → 已经解锁到第几段**（1 = 第 1 段可进，缺失 = 这个副本没开）。
-# 加上一个「已清空的副本 id」列表，供舆图打勾。
+# 只有一张表：**已经通关的副本 id**。
 #
-# 为什么按 id + 段号而不是场景路径：路径会随重命名而变（重切关卡时改过一次），
-# id 不会。这里只存**事实**；「清完这一关之后解锁谁」是玩法规则 ——
-# 那条在 scripts/core/game_progress.gd（它读三层结构数据，本文件不读内容和规则）。
+# 为什么只剩这一张：粒度重定之后（副本 = 一条 3~4 屏的路），
+# 副本内部按屏推进、进去就从头开始打 —— 没有「解锁到第几屏」这种需要记的东西。
+# 副本之间的解锁由**顺序**推：「前一个副本通关了没有」就决定这个副本开没开
+# （规则在 scripts/core/game_progress.gd，本文件只存事实）。
+#
+# 为什么按 id 而不是场景路径：路径会随重命名而变（重切时改过一次），id 不会。
 
-## 解锁进度表：副本 id（字符串）→ 已解锁段数。无档返回空表
-func unlocked_table() -> Dictionary:
-	var cfg := ConfigFile.new()
-	if cfg.load(slot_path(current_slot)) != OK:
-		return {}
-	var d = cfg.get_value(SECTION, "unlocked", {})
-	return d if d is Dictionary else {}
-
-
-## 这个副本已经开出来几段。0 = 没开
-func unlocked_stages(dungeon_id: StringName) -> int:
-	return int(unlocked_table().get(String(dungeon_id), 0))
-
-
-## 解锁到第 index 段（0 起）。**只增不减**，重复调用无副作用、不落盘。
-## index 为负时忽略 —— 调用方传错不该把存档写坏
-func unlock_stage(dungeon_id: StringName, index: int) -> void:
-	if dungeon_id == &"" or index < 0:
-		return
-	var key := String(dungeon_id)
-	var table := unlocked_table()
-	if int(table.get(key, 0)) >= index + 1:
-		return
-	table[key] = index + 1
-	var cfg := ConfigFile.new()
-	cfg.load(slot_path(current_slot))
-	cfg.set_value(SECTION, "unlocked", table)
-	cfg.save(slot_path(current_slot))
-
-
-## 已清空的副本 id 列表（舆图上打勾用）
+## 已通关的副本 id 列表（舆图上打勾用）
 func cleared_dungeons() -> Array:
 	var cfg := ConfigFile.new()
 	if cfg.load(slot_path(current_slot)) != OK:
@@ -171,7 +143,7 @@ func is_cleared(dungeon_id: StringName) -> bool:
 	return cleared_dungeons().has(String(dungeon_id))
 
 
-## 记下「这个副本清完了」。重复调用无副作用
+## 记下「这个副本通关了」。重复调用无副作用
 func mark_cleared(dungeon_id: StringName) -> void:
 	if dungeon_id == &"":
 		return
@@ -185,12 +157,11 @@ func mark_cleared(dungeon_id: StringName) -> void:
 	cfg.save(slot_path(current_slot))
 
 
-## 清空解锁进度（新游戏时用）。**必须单独清一次** ——
+## 清空副本通关记录（新游戏时用）。**必须单独清一次** ——
 ## write_progress 为了保住附加字段会先读旧档，指望它顺手清是清不掉的
-func clear_unlock_progress() -> void:
+func clear_progress() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(slot_path(current_slot))
-	cfg.set_value(SECTION, "unlocked", {})
 	cfg.set_value(SECTION, "cleared", [])
 	cfg.save(slot_path(current_slot))
 

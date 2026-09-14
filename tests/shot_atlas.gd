@@ -1,17 +1,18 @@
 extends Node
-## 舆图与关卡段号的观感截图（输出 `build/shots/`）。
+## 舆图、屏号、三屏推进的观感截图（输出 `build/shots/`）。
 ##     godot --path <项目根> res://tests/shot_atlas.tscn
 ##
-## 为什么必须看图：舆图的行是**代码建出来的一堆 Label**（没有 tscn 可查），
-## 段号是 HUD 上一行小字 —— 对齐、行距、会不会压住右上角的精铁、
-## 「锁」与「未开放」两种灰看起来分不分得清，断言一条都抓不到。
-## tests/test_m9 的 #7 只锁得住「这些行存在、且不是翻译 key」。
+## 为什么必须看图：
+##   · 舆图的行是**代码建出来的一堆 Label**（没有 tscn 可查）—— 对齐、行距、
+##     会不会压住右上角的精铁、「未开放」的灰看起来对不对，断言一条都抓不到。
+##   · HUD 上那行屏号是一行小字，挤不挤只有眼睛能判。
+##   · **闸门**是一道竖着的色块：清空前后看起来差多少、挡不挡住视线，
+##     也只有看图才知道（`test_m9 #2` 只验它挡不挡人）。
 ##
-## 会动存档槽（要摆出「已通关」「未解锁」两种状态）——
-## 所以和测试一样先备份、跑完原样还回去。
+## 会动存档槽（要摆出「已通关」的状态）—— 所以和测试一样先备份、跑完还回去。
 
 const TOWN := preload("res://scenes/stages/town.tscn")
-const LICHANG_1 := preload("res://scenes/stages/lichang_1.tscn")
+const LICHANG := preload("res://scenes/stages/lichang.tscn")
 const SaveGuard := preload("res://tests/save_guard.gd")
 
 var _bak: Dictionary = {}
@@ -24,7 +25,7 @@ func _ready() -> void:
 	await _shot_pedestal()
 	await _shot_atlas_fresh()
 	await _shot_atlas_progressed()
-	await _shot_stage_hud()
+	await _shot_screens()
 	SaveGuard.restore(_bak)
 	get_tree().paused = false
 	get_tree().quit()
@@ -45,7 +46,7 @@ func _shot_pedestal() -> void:
 	await _frames(3)
 
 
-## 二、刚开局打开舆图：只有第 1 段可进，后两段锁着，另外两个副本「未开放」
+## 二、刚开局打开舆图：砺场可进，另外两个副本「未开放」
 func _shot_atlas_fresh() -> void:
 	GameProgress.reset_progress()
 	var town := TOWN.instantiate()
@@ -61,9 +62,8 @@ func _shot_atlas_fresh() -> void:
 	await _frames(3)
 
 
-## 三、打完之后：三段都开了，砺场标「已通关」，光标停在列表里
+## 三、通关之后：砺场那行变「已通关」，光标停在那儿
 func _shot_atlas_progressed() -> void:
-	SaveManager.unlock_stage(&"lichang", 2)
 	SaveManager.mark_cleared(&"lichang")
 	var town := TOWN.instantiate()
 	add_child(town)
@@ -78,16 +78,34 @@ func _shot_atlas_progressed() -> void:
 	await _frames(3)
 
 
-## 四、关卡里的 HUD：右上那行段号「砺场 · 第 2 段 / 共 3 段」够不够清楚、
-## 会不会和上面的精铁计数挤在一起
-func _shot_stage_hud() -> void:
-	var lv := LICHANG_1.instantiate()
+## 四、第 1 屏：闸门挡在右边、HUD 写「砺场 · 第 1 屏 / 共 3 屏」
+## 五、清空第 1 屏之后走到第 2 屏：闸门没了、屏号变成 2
+func _shot_screens() -> void:
+	GameProgress.reset_progress()
+	var lv := LICHANG.instantiate()
 	add_child(lv)
 	await _frames(6)
-	lv.get_node("Walker1").ai_enabled = false
-	lv.get_node("Walker2").ai_enabled = false
-	await _frames(8)
-	await _shot("stage_hud.png")
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if lv.is_ancestor_of(e):
+			e.set("ai_enabled", false)
+	var p := lv.get_node("Player")
+	p.global_position = Vector2(500.0, 288.0)
+	p.velocity = Vector2.ZERO
+	await _frames(20)
+	await _shot("screen_gate_locked.png")
+
+	# 清空**第 1 屏**（只打屏 1 的怪）→ 走到第 2 屏。
+	# 不能遍历全部怪：那样副本直接通关了，拍到的就是通关横幅而不是「推进」——
+	# 第一版就是这么错的，图和标题对不上
+	var s1 := lv.get_node_or_null("Screen1")
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if s1 != null and is_instance_valid(e) and s1.is_ancestor_of(e):
+			(e.get_node("Health") as Health).take_damage(9999, Vector2.ZERO, true, 1)
+	await _frames(40)
+	p.global_position = Vector2(900.0, 288.0)
+	p.velocity = Vector2.ZERO
+	await _frames(20)
+	await _shot("screen_advanced.png")
 	lv.queue_free()
 	await _frames(3)
 

@@ -13,7 +13,11 @@ extends Resource
 ##
 ## ── 副本之间的解锁 ───────────────────────────────────────────
 ## 清完一个副本 → 解锁**下一个副本**（不做首通奖励，见 docs/adr/0009 §8）。
-## 「下一个是谁」由本类的 dungeons 顺序决定，所以这张表就是副本推进的顺序表。
+## 「下一个是谁」「前一个是谁」都由本类的 dungeons 顺序决定。
+##
+## **这里没有「关卡」这一层的方法**（2026-09-14 重定粒度之后）：
+## 副本内部是按屏推进的（见 DungeonData 的注释），
+## 屏不是可寻址的独立单元 —— 外面没有任何地方需要「下一屏是谁」这种查询。
 
 @export_group("标识")
 @export var id: StringName = &""
@@ -41,19 +45,20 @@ func first_dungeon() -> DungeonData:
 	return null
 
 
-## 副本里的第 index 个关卡（越界返回 null）
-func find_stage(dungeon_id: StringName, index: int) -> StageData:
-	var d := find_dungeon(dungeon_id)
-	if d == null or index < 0 or index >= d.stages.size():
-		return null
-	return d.stages[index]
-
-
 ## 下一个副本。最后一个副本之后再没有（返回 null）
 func dungeon_after(id: StringName) -> DungeonData:
 	for i in dungeons.size():
 		if dungeons[i] != null and dungeons[i].id == id:
 			return dungeons[i + 1] if i + 1 < dungeons.size() else null
+	return null
+
+
+## 上一个副本。第一个副本之前没有（返回 null）。
+## 「这个副本开了没有」= 上一个副本通关了没有（第一个副本天生就开）
+func dungeon_before(id: StringName) -> DungeonData:
+	for i in dungeons.size():
+		if dungeons[i] != null and dungeons[i].id == id:
+			return dungeons[i - 1] if i > 0 else null
 	return null
 
 
@@ -65,28 +70,10 @@ func dungeon_order(id: StringName) -> int:
 	return -1
 
 
-## 关卡坐标（副本 id + 段号）的下一个关卡坐标。
-## 返回 {} = 已经是这张地图的最后一关（清完它就没有下一个了）。
-##
-## 跨副本时**落到下一个副本的第 0 段** —— 清完一个副本的最后一关，
-## 下一个副本的第一关就是「下一关」。这是 docs/adr/0009 §8 那条规则的具体形状：
-## 清完一个副本，结果是下一个副本解锁（而不是凭空多出一份奖励）。
-func next_stage(dungeon_id: StringName, index: int) -> Dictionary:
-	var d := find_dungeon(dungeon_id)
-	if d == null:
-		return {}
-	if index + 1 < d.stages.size():
-		return {"dungeon": d.id, "index": index + 1}
-	var nd := dungeon_after(d.id)
-	if nd != null and not nd.stages.is_empty():
-		return {"dungeon": nd.id, "index": 0}
-	return {}
-
-
-## 关卡总数（摆在数据里的，不含还没开工的副本）
-func stage_count() -> int:
+## 所有副本的屏数合计（「这一章有多少东西可打」的一个粗刻度）
+func total_screens() -> int:
 	var n := 0
 	for d in dungeons:
 		if d != null:
-			n += d.stages.size()
+			n += d.screen_count
 	return n

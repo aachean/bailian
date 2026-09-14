@@ -9,9 +9,7 @@ extends Node
 ## 传送门验证「武装逻辑」（玩家站在门里不触发），真实穿越走人工验收。
 
 const TOWN := preload("res://scenes/stages/town.tscn")
-const LICHANG_1 := preload("res://scenes/stages/lichang_1.tscn")
-const LICHANG_2 := preload("res://scenes/stages/lichang_2.tscn")
-const LICHANG_3 := preload("res://scenes/stages/lichang_3.tscn")
+const LICHANG := preload("res://scenes/stages/lichang.tscn")
 
 var _pass := 0
 var _fail := 0
@@ -119,11 +117,13 @@ func _t6_town_walkable() -> void:
 	await _pframes(2)
 
 
-## 城镇与砺场的三个一屏关卡都摆得出来：入口是舆图台、三关各就位
+## 城镇与砺场都摆得出来：入口是舆图台；砺场是**一个三屏的副本**
 ##
-## 线性三关时代这条测的是「门对门」；三层结构之后**城镇没有传送门了** ——
-## 进副本的唯一入口是舆图（docs/adr/0009 §4），所以断言跟着改成
-## 「城镇有舆图台、且没有传送门」（防有人把门加回来）
+## 这条断言跟着粒度改过三次，每次都是产品决策变了：
+##   线性三关时代 → 测「门对门」
+##   三层结构第一版（一屏一个独立关卡）→ 测「三段各自是独立场景」
+##   粒度重定（副本 = 一条多屏的路）→ 测「一个场景里三个屏分组、
+##   每屏都有怪、Boss 只在最后一屏」
 func _t1_scenes_wired() -> void:
 	var town := TOWN.instantiate()
 	add_child(town)
@@ -136,35 +136,44 @@ func _t1_scenes_wired() -> void:
 	town.queue_free()
 	await _pframes(2)
 
-	var stage_scenes: Array[PackedScene] = [LICHANG_1, LICHANG_2, LICHANG_3]
+	var lv := LICHANG.instantiate()
+	add_child(lv)
+	await _pframes(3)
+	var screens := 0
 	var counts: Array[int] = []
 	var kinds := {}
-	for sc in stage_scenes:
-		var lv := sc.instantiate()
-		add_child(lv)
-		await _pframes(3)
+	var boss_screen := -1
+	for i in 4:
+		var s := lv.get_node_or_null("Screen%d" % (i + 1))
+		if s == null:
+			continue
+		screens += 1
 		var n := 0
 		for e in get_tree().get_nodes_in_group("enemy"):
-			if lv.is_ancestor_of(e):
-				n += 1
-				# 按数据表分种类，不按脚本 —— 疾行者继承游荡者的脚本，是数据不同
-				kinds[str(e.get("data").id)] = true
+			if not is_instance_valid(e) or not s.is_ancestor_of(e):
+				continue
+			n += 1
+			# 按数据表分种类，不按脚本 —— 疾行者继承游荡者的脚本，是数据不同
+			kinds[str(e.get("data").id)] = true
+			if str(e.get("data").id) == "boss":
+				boss_screen = screens - 1
 		counts.append(n)
-		lv.queue_free()
-		await _pframes(2)
+	var bound: Rect2 = lv.get("bounds")
+	lv.queue_free()
+	await _pframes(2)
 
-	_check("1", "城镇有舆图台（没有传送门了），砺场三段都摆得出来、怪各就位",
-		town_ok and no_portal and counts[0] >= 2 and counts[1] >= 2 and counts[2] >= 2 \
-			and kinds.size() >= 4 and kinds.has("boss"),
-		"城镇：舆图台=%s 无传送门=%s　三段怪数 %s（合计 %d）　种类 %d 种（含 boss）" % [
-			str(pedestal != null), str(no_portal), str(counts),
-			counts[0] + counts[1] + counts[2], kinds.size()])
+	_check("1", "城镇有舆图台（没有传送门了）；砺场是三屏副本：每屏有怪、Boss 在最后一屏",
+		town_ok and no_portal and screens == 3 \
+			and counts[0] >= 3 and counts[1] >= 3 and counts[2] >= 2 \
+			and boss_screen == 2 and bound.size.x >= 1920.0,
+		"城镇：舆图台=%s 无传送门=%s　砺场 %d 屏，各屏怪数 %s，副本宽 %.0f　Boss 在第 %d 屏" % [
+			str(pedestal != null), str(no_portal), screens, str(counts),
+			bound.size.x, boss_screen + 1])
 
 
-## 一屏关卡视野钉死：bounds 与视口同大，相机不跟着玩家走
-## （多屏时代这里测的是「到边就停」，单屏之后没有「边」可言）
+## 多屏副本：相机跟着玩家走，但到两端就停（一屏时代这里测的是「视野钉死」）
 func _t2_camera_bounds() -> void:
-	var level := LICHANG_1.instantiate()
+	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
 	var player := level.get_node("Player")
@@ -174,30 +183,32 @@ func _t2_camera_bounds() -> void:
 	await _pframes(30)
 	var left_center: float = cam.get_screen_center_position().x
 
-	player.global_position = Vector2(580.0, 288.0)
+	player.global_position = Vector2(1860.0, 288.0)
 	await _pframes(60)
 	var right_center: float = cam.get_screen_center_position().x
 
-	# 一屏 = 640 宽，视野中心恒在 320
-	_check("2", "一屏关卡视野钉死：玩家走到两头，视野中心都是 320",
-		absf(left_center - 320.0) <= 1.0 and absf(right_center - 320.0) <= 1.0,
-		"最左时视野中心 x=%.1f　最右时 x=%.1f（都应为 320）" % [left_center, right_center])
+	# 半屏 320：左界中心 = 320，右界中心 = 1920-320 = 1600
+	_check("2", "多屏副本的相机跟着玩家走，但到副本两端就停住",
+		absf(left_center - 320.0) <= 2.0 and absf(right_center - 1600.0) <= 2.0,
+		"最左时视野中心 x=%.0f（应为 320）　最右时 x=%.0f（应为 1600）" % [
+			left_center, right_center])
 	level.queue_free()
 	await _pframes(2)
 
 
 ## 掷矛手真的会投矛且矛真的打得动人 —— 数据驱动的新怪不能只「存在」
 func _t3_spearman_throws() -> void:
-	var level := LICHANG_3.instantiate()
+	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
 	var player := level.get_node("Player")
-	var spear := level.get_node("Spearman1")
+	var spear := level.get_node("Screen3/Spearman1")
 	var hp0: int = (player.get_node("Health") as Health).hp
 
 	# 站进它的警戒圈：与掷矛手相距 ~190（aggro 220 内），
-	# 同时站在 Boss 的警戒圈外（Boss 在 560，距离 350 > aggro 200）
-	player.global_position = Vector2(210.0, 288.0)
+	# 同时站在同屏另外两只的圈外（Boss 在 1860，aggro 200 → 距离 450 不追；
+	# 游荡者在 1700，aggro 150 → 距离 290 不追）
+	player.global_position = Vector2(1410.0, 288.0)
 	player.velocity = Vector2.ZERO
 
 	var threw := false
@@ -271,15 +282,14 @@ func _t5_pedestal_prompts_when_near() -> void:
 	await _pframes(2)
 
 
-## Boss 在关底，且是真 Boss：血厚、一击沉重（重击）
-## M3 之后「关底」= 砺场的第 3 段（原来是一条 5 屏长路的尽头）
+## Boss 在副本最后一屏，且是真 Boss：血厚、一击沉重（重击）
 func _t7_boss_present() -> void:
-	var level := LICHANG_3.instantiate()
+	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
-	var boss := level.get_node_or_null("Boss")
+	var boss := level.get_node_or_null("Screen3/Boss")
 	if boss == null:
-		_check("7", "Boss 镇守关底", false, "砺场第 3 段里找不到 Boss")
+		_check("7", "Boss 镇守副本最后一屏", false, "砺场第 3 屏里找不到 Boss")
 		level.queue_free()
 		await _pframes(2)
 		return
@@ -407,7 +417,7 @@ func _t11_shards_survive_scene_change() -> void:
 
 	var wrote_back: bool = PlayerState.shards == 5 and PlayerState.upgrade_level == 1
 
-	var level := LICHANG_1.instantiate()
+	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
 	var level_player := level.get_node("Player")
