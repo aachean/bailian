@@ -112,6 +112,14 @@ godot --path . res://tests/shot_forge.tscn    # 铁匠铺：打开 / 强化成�
 godot --path . res://tests/shot_pause.tscn    # 暂停菜单五项 / 设置面板 / 静音那一行 / 主菜单（会重出 menu.png）
 ```
 
+节奏与曲线的量级随时可打，不用进游戏：
+
+```bash
+godot --headless --fixed-fps 60 --path . res://tools/probe_pacing.tscn       # 副本形状 + 实测 DPS + 预计清怪时间
+godot --headless --path . --script res://tools/probe_progression.gd          # 成长曲线（上限 / 经验 / 每级增量）
+```
+```
+
 > 跑带战斗的测试（`test_m1` / `test_m4` / `test_m11`）时，末尾可能有一行
 > `WARNING: N ObjectDB instances were leaked at exit`。**已知且已排查**：
 > 是引擎的退出顺序问题（SceneTree 先于 AudioServer 清理），只在退出时出现，
