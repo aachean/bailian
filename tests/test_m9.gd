@@ -419,22 +419,38 @@ func _t8_atlas_rows() -> void:
 	var leaks := PackedStringArray()
 	for m in re.search_all(joined):
 		leaks.append(m.get_string())
-	var shut := 0
+	# 舆图有三种行状态，**别把后两种混起来**：
+	#   `locked`    = 副本数据齐了、只是还没解锁（前一个没通关）
+	#   `not_ready` = 数据里根本没有这个副本（scene_path 是空的）
+	# 重切完断淬渠/炉喉之后，后两个从「数据没有」变成了「还没解锁」——
+	# 这两种在画面上都灰，但含义完全不同（一个是「等着你打」，一个是「我们还没做」）
+	var locked := 0
+	var not_ready := 0
 	for t in texts:
+		if t.contains(tr("UI_ATLAS_LOCKED")):
+			locked += 1
 		if t.contains(tr("UI_ATLAS_NOT_READY")):
-			shut += 1
+			not_ready += 1
 	var has_lichang := joined.contains(tr("DUNGEON_LICHANG"))
 	var has_screens := joined.contains(I18n.t(&"UI_DUNGEON_SCREENS", [3]))
 	var has_rec := joined.contains("Lv.1")
 	var has_back := joined.contains(tr("UI_ATLAS_BACK"))
 	# 3 个副本各一行 + 回安全区。**副本不再展开屏** —— 屏是副本内部的事
 	var right_rows := texts.size() == 4
-	_check("8", "舆图一行一个副本：三个副本都在、没开工的标「未开放」、写着屏数与推荐实力、有回安全区",
-		leaks.is_empty() and shut == 2 and has_lichang and has_screens and has_rec \
-			and has_back and right_rows,
-		"行数 %d（应为 4 = 3 副本 + 回安全区）　未开放 %d 行　砺场=%s　「3 屏」=%s　推荐=%s\n              回安全区=%s　文案泄漏: %s" % [
-			texts.size(), shut, str(has_lichang), str(has_screens), str(has_rec),
-			str(has_back), "无" if leaks.is_empty() else ", ".join(leaks)])
+	# 跑到这一条时**砺场已经被前面几条打通了**，所以断淬渠应当是「已解锁」、
+	# 炉喉仍锁着。这比「两个都锁着」是更强的断言 ——
+	# 它顺手验了「解锁链真的会反映到界面上」，而不只是「灰的那两行画出来了」
+	var duan_unlocked := false
+	for t in texts:
+		if t.contains(tr("DUNGEON_DUANCUIQU")) and not t.contains(tr("UI_ATLAS_LOCKED")):
+			duan_unlocked = true
+	_check("8", "舆图一行一个副本：砺场通关后断淬渠解锁、炉喉仍锁着，且没通关那行不写死「未开放」",
+		leaks.is_empty() and locked == 1 and not_ready == 0 and duan_unlocked \
+			and has_lichang and has_screens and has_rec and has_back and right_rows,
+		"行数 %d（应为 4 = 3 副本 + 回安全区）　未解锁 %d 行（炉喉）　数据未就绪 %d 行（应为 0 —— 三个副本都填了场景）\n              砺场=%s　断淬渠已解锁=%s　「3 屏」=%s　推荐=%s　回安全区=%s　文案泄漏: %s" % [
+			texts.size(), locked, not_ready, str(has_lichang), str(duan_unlocked),
+			str(has_screens), str(has_rec), str(has_back),
+			"无" if leaks.is_empty() else ", ".join(leaks)])
 
 
 ## 死亡 → **弹二选一**（重开 / 回城），第一个选项真的能重开

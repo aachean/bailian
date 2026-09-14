@@ -40,6 +40,7 @@ ENEMY_SCENES = {
     "dasher":        "res://scenes/enemies/dasher.tscn",
     "spearman":      "res://scenes/enemies/spearman.tscn",
     "brute":         "res://scenes/enemies/brute.tscn",
+    "brute_heavy":   "res://scenes/enemies/brute_heavy.tscn",
     "caster":        "res://scenes/enemies/caster.tscn",
     "boss":          "res://scenes/enemies/boss.tscn",
     "boss2":         "res://scenes/enemies/boss2.tscn",
@@ -49,6 +50,11 @@ ENEMY_SCENES = {
     "boss_luhou":    "res://scenes/enemies/boss_luhou.tscn",
 }
 
+# ── 坐标系：规格表用**绝对坐标**，落盘转成**屏内相对坐标** ────────
+# 两者差一个坑的距离：砺场里 `Screen2` 摆在 x=960，它下面的怪写的是 480（屏内相对）。
+# 规格表如果也写相对坐标，读到「第 3 屏的 1200」得心算 +1920 才知道在哪儿；
+# 所以**表里一律写绝对**（「第 3 屏在 1920~2880，这只放 2200」），
+# 落盘时减掉屏偏移。两套坐标叠起来用过一次 —— 表现是「怪全跑到后面几屏去了」
 SCREEN_W = 960.0
 GROUND_TOP = 320.0          # 地面顶面（中心 y=332，厚 24）
 ENEMY_Y = 288.0             # 小怪站位：站上去会落一点点，与砺场一致
@@ -150,7 +156,8 @@ def _emit(spec):
         if si == spec.get("npc_screen", -1) and spec.get("npc"):
             nkey, nx, ny, dlg = spec["npc"]
             parts.append('[node name="%s" parent="%s" instance=ExtResource("8_npc")]' % ("Hunter", sname))
-            parts.append("position = Vector2(%s, %s)" % (_num(nx), _num(ny)))
+            parts.append("position = Vector2(%s, %s)" % (
+                _num(nx - SCREEN_W * si), _num(ny)))
             parts.append('name_key = &"%s"' % nkey)
             parts.append('dialogue = ExtResource("9_dialogue")\n')
         for wi, wave in enumerate(scr):
@@ -161,7 +168,8 @@ def _emit(spec):
                 nname = "%s%d" % (_camel(key), x)
                 parts.append('[node name="%s" parent="%s/%s" instance=ExtResource("%s")]'
                              % (nname, sname, wname, enemy_ids[key]))
-                parts.append("position = Vector2(%s, %s)\n" % (_num(x), _num(ENEMY_Y)))
+                parts.append("position = Vector2(%s, %s)\n" % (
+                    _num(float(x) - SCREEN_W * si), _num(ENEMY_Y)))
 
     parts.append('[node name="Player" parent="." instance=ExtResource("3_player")]')
     parts.append("position = Vector2(60, 280)")
@@ -204,15 +212,16 @@ DUANCUIQU = {
         ],
         # 屏 2 —— 练习：重锤兵首次出现（一批只有一只，压力低）；第 2 批是喘息点
         [
-            [("brute", 560), ("walker", 760), ("walker", 880)],
-            [("walker", 500), ("walker", 760)],                      # ← 喘息
-            [("brute", 540), ("spearman", 700), ("dasher", 840), ("dasher", 900)],
+            [("brute", 1260), ("walker", 1460), ("walker", 1600)],
+            [("walker", 1180), ("walker", 1440)],                    # ← 喘息
+            [("brute", 1240), ("spearman", 1400), ("dasher", 1560), ("dasher", 1700)],
         ],
-        # 屏 3 —— 转折：两只掷火者分站两处（逼你来回跑），重锤兵改用 Boss 的招式
+        # 屏 3 —— 转折：两只掷火者分站两处（逼你来回跑），
+        # 碎地重锤出场 —— 它挥的就是屏 4 那只 Boss 的招式（**教学屏**）
         [
-            [("caster", 1240), ("caster", 1900)],
-            [("brute", 1360), ("brute", 1700)],
-            [("walker", 1400), ("dasher", 1580), ("spearman", 1760), ("caster", 1880)],
+            [("caster", 2200), ("caster", 2700)],
+            [("brute_heavy", 2360), ("brute_heavy", 2620)],
+            [("walker", 2120), ("dasher", 2300), ("spearman", 2480), ("caster", 2760)],
         ],
         # 屏 4 —— 考核：石甲卫 + 掷火者（远程与近身同时压）
         [
@@ -262,7 +271,7 @@ LUHOU = {
         [
             [("walker_elite", 3200), ("spearman", 3400)],
             [("dasher_elite", 3320), ("caster", 3560), ("dasher_elite", 3480)],
-            [("brute_elite", 3380), ("spearman", 3520), ("caster", 3900)],
+            [("brute_elite", 3380), ("spearman", 3520), ("caster", 3780)],
         ],
         # 屏 5 —— 考核：炉心守卫
         [
@@ -276,7 +285,32 @@ LUHOU = {
 SPECS = [DUANCUIQU, LUHOU]
 
 
+def _check_placement(spec):
+    """怪必须落在自己那一屏的 x 区间里。
+
+    写规格表时最容易犯的错：把「屏内相对坐标」（第 3 屏的第 1200）当成绝对坐标
+    写下去 —— 于是那一屏的怪全挤在别处。按分组数怪的断言**完全看不出来**
+    （分组是对的、数量是对的），只有截图或者真的玩才发现。
+    """
+    bad = []
+    for si, scr in enumerate(spec["screens"]):
+        lo, hi = SCREEN_W * si, SCREEN_W * (si + 1)
+        for wi, wave in enumerate(scr):
+            for key, x in wave:
+                if not (lo <= float(x) < hi):
+                    bad.append("第%d屏第%d批 %s@%s（应在 %.0f~%.0f）" % [
+                        si + 1, wi + 1, key, x, lo, hi])
+    return bad
+
+
 def main():
+    problems = 0
+    for spec in SPECS:
+        for msg in _check_placement(spec):
+            print("  ✗ %s %s" % (spec["id"], msg))
+            problems += 1
+    if problems:
+        raise SystemExit("规格表里有 %d 只怪长到了别人的屏里，先修再生成" % problems)
     for spec in SPECS:
         path = os.path.join(OUT_DIR, "%s.tscn" % spec["id"])
         text = _emit(spec)

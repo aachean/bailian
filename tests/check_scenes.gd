@@ -27,6 +27,7 @@ const SCENES := [
 	"res://scenes/enemies/walker_elite.tscn",
 	"res://scenes/enemies/dasher_elite.tscn",
 	"res://scenes/enemies/brute_elite.tscn",
+	"res://scenes/enemies/brute_heavy.tscn",
 	"res://scenes/enemies/boss_luhou.tscn",
 	"res://scenes/enemies/target_dummy.tscn",
 	"res://scenes/enemies/projectile.tscn",

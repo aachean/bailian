@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/brute.tscn" id="1_base"]
+[ext_resource type="Resource" path="res://data/enemies/brute_heavy.tres" id="2_data"]
+
+[node name="BruteHeavy" instance=ExtResource("1_base")]
+data = ExtResource("2_data")
+
+[node name="Body" parent="Visuals" index="0"]
+color = Color(0.3, 0.26, 0.34, 1)
+
+[node name="Swipe" parent="Visuals" index="3"]
+color = Color(0.72, 0.62, 0.82, 1)
