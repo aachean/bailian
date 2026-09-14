@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameSettings="*res://scripts/core/game_settings.gd"
+Audio="*res://scripts/core/audio.gd"
 SaveManager="*res://scripts/core/save_manager.gd"
 PlayerState="*res://scripts/core/player_state.gd"
 GameProgress="*res://scripts/core/game_progress.gd"

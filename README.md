@@ -7,7 +7,7 @@
 | 引擎 | Godot **4.7.x** |
 | 平台 | PC（Windows） |
 | 界面语言 | 中文（默认），主菜单可切换英文 |
-| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + **铁匠铺** + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，一屏的怪**分三批陆续出来**，**打完一批才出下一批**，全清了才走得过去；最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**死了弹二选一**（重新开始 / 返回城镇）。**等级上限 100**（经验走幂函数，前快后慢；每级成长递减 —— 等级是解锁内容的钥匙，不是战力轴）；**强化逐件做，按品质封顶**（普通 3 / 精良 5 / 稀有 8），成本递增、收益递减 |
+| 现在能玩到 | 主菜单 → 城镇（**老铁匠会给你第一把剑** + **铁匠铺** + **舆图台**）→ 走近舆图台按 `P` 开舆图 → 进**砺场**：一条**三屏**的路，一屏的怪**分三批陆续出来**，**打完一批才出下一批**，全清了才走得过去；最后一屏打**磨刀石守卫**；**打完整个副本才回舆图**。5 种小怪、2 个 Boss、7 个技能带 5 个、打怪掉装备（四部位词条 + 图标）、对话与主线；**死了弹二选一**（重新开始 / 返回城镇）。**等级上限 100**（经验走幂函数，前快后慢；每级成长递减 —— 等级是解锁内容的钥匙，不是战力轴）；**强化逐件做，按品质封顶**（普通 3 / 精良 5 / 稀有 8），成本递增、收益递减；**有声音了**（命中 / 受击 / 拾取三声） |
 
 > **砺场已按新结构重切**（2026-09-14，粒度重定过**两次**，两次都是玩过之后给的反馈）。
 > 第一章的结构是 **地图「淬火岭」→ 三个副本（砺场 / 断淬渠 / 炉喉）**，
@@ -98,7 +98,8 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m6.tscn    # 对话框
 godot --headless --fixed-fps 60 --path . res://tests/test_m7.tscn    # 技能树 / 携带格 / 技能面板（15 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m8.tscn    # 第 2、3 关 / 门封印 / 复活点（14 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m9.tscn    # 更长屏 / 看不到的挡墙 / 分批出怪 / 死亡二选一（10 条）
-godot --headless --fixed-fps 60 --path . res://tests/test_m10.tscn   # 等级上限 / 经验幂函数 / 装备实例 / 逐件强化 / 软硬上限（17 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m10.tscn   # 等级上限 / 经验幂函数 / 装备实例 / 逐件强化 / 软硬上限（19 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m11.tscn   # 音效三声：命中 / 受击 / 拾取（5 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 
@@ -109,6 +110,11 @@ godot --path . res://tests/shot_atlas.tscn    # 舆图台 / 舆图 / 撞上看�
 godot --path . res://tests/shot_forge.tscn    # 铁匠铺：打开 / 强化成功 / 精铁不够 / 已到顶 / 角色面板的武器强化
 ```
 
+> 跑带战斗的测试（`test_m1` / `test_m4` / `test_m11`）时，末尾可能有一行
+> `WARNING: N ObjectDB instances were leaked at exit`。**已知且已排查**：
+> 是引擎的退出顺序问题（SceneTree 先于 AudioServer 清理），只在退出时出现，
+> 不影响运行。别重复查它 —— 排查过程写在 `scripts/core/audio.gd` 的 `stop_all()` 上。
+>
 > 新增带 `class_name` 的脚本后，第一次跑之前要先 `godot --headless --import`：
 > 全局类缓存是在导入阶段写的，autoload 比它先加载，会报「Could not find type X」。
 

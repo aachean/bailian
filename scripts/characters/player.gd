@@ -434,6 +434,7 @@ func _on_equipment_changed() -> void:
 func collect_item(path: String) -> void:
 	if PlayerState.add_item(path).is_empty():
 		return
+	Audio.play(&"pickup")
 	var it := load(path) as ItemData
 	if it != null:
 		_item_pickup_fx(it)
@@ -490,6 +491,7 @@ func _refresh_hud() -> void:
 ## 强化完了还显示旧数（截图抓到的）。两份真相的账早晚要付，这次一起付清
 func collect_shard() -> void:
 	PlayerState.shards += 1
+	Audio.play(&"pickup")
 	_refresh_hud()
 
 
@@ -898,6 +900,9 @@ func _overlaps_enemy() -> bool:
 
 ## 命中时把双方一起冻住几帧。打击感主要来自这里，不是来自数值
 func _on_hit_landed(target: Node2D, _damage: int, _point: Vector2, _heavy: bool) -> void:
+	# 音效放在最前面 —— 下面「没顿帧就 return」那条早退不该把声音一起吞掉。
+	# 设计原则 6.1：有效命中至少给两项反馈（顿帧 + 声音 + 伤害数字）
+	Audio.play(&"hit")
 	var frames := 0
 	if _current != null:
 		frames = _current.hitstop_frames
@@ -919,6 +924,9 @@ func apply_hitstop(frames: int) -> void:
 ## 硬直帧数比无敌窗口长，所以连招惩罚依然成立 —— 这是有意的。
 func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir: int) -> void:
 	hurts_taken += 1
+	# 挨打是负反馈 —— 玩家必须**立刻**知道自己中招了（6.2 的首响应）。
+	# 这声比命中更响：命中有连招会响好几下，挨打才是要命的那个
+	Audio.play(&"hurt")
 	_level_flash = false
 	if state == State.ATTACK or state == State.DODGE:
 		_end_action()
