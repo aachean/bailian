@@ -356,11 +356,11 @@ func _t8_drop_and_pickup() -> void:
 	var player := (load("res://scenes/characters/player.tscn") as PackedScene).instantiate()
 	add_child(player)
 	await _pframes(1)
-	player.set("shards", 0)
+	PlayerState.shards = 0
 	if target != null:
 		player.global_position = target.global_position
 	await _pframes(20)
-	var got: int = int(player.get("shards"))
+	var got: int = PlayerState.shards
 	walker.queue_free()
 	player.queue_free()
 	await _pframes(2)
@@ -458,40 +458,35 @@ func _t10_forge_survives_snapshot() -> void:
 			shards, lv, str(same_uid)])
 
 
-## 碎片跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。
-## 根因：碎片存在玩家节点上，切场景玩家整个重建。现在住在 PlayerState（autoload），
-## 玩家 _exit_tree 写回、_ready 读出。这条测试模拟完整的「城镇 → 关卡」重建。
-## 碎片跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。
-## 根因：碎片存在玩家节点上，切场景玩家整个重建。现在住在 PlayerState（autoload），
-## 玩家 _exit_tree 写回、_ready 读出。这条测试模拟完整的「城镇 → 关卡」重建。
+## 精铁跨场景保持 —— 用户实测：在关卡里捡的碎片，回城镇全没了。
+##
+## 根因（当时）：碎片存在玩家节点上，切场景玩家整个重建，东西就丢了。
+## 2026-09-14 起**玩家节点上那份删掉了**，精铁只住在 PlayerState ——
+## 所以这条测试换了个问法：不是「有没有写回」，而是「根本不依赖节点」。
+## 关卡里捡到 5 块，切到另一个场景，数字照样是 5
 func _t11_shards_survive_scene_change() -> void:
 	PlayerState.reset_for_new_game()
-
-	var town := TOWN.instantiate()
-	add_child(town)
-	await _pframes(3)
-	var town_player := town.get_node("Player")
-	town_player.set("shards", 5)
-	town.queue_free()               # 触发 _exit_tree 写回 PlayerState
-	await _pframes(3)
-
-	var wrote_back: bool = PlayerState.shards == 5
 
 	var level := LICHANG.instantiate()
 	add_child(level)
 	await _pframes(3)
 	var level_player := level.get_node("Player")
-	# 先把值取出来再释放 —— 释放之后再 get() 就是「对已释放实例调方法」，
-	# 报错而不崩，但 detail 会变成一句废话
-	var carried_shards: int = int(level_player.get("shards"))
-	var carried: bool = carried_shards == 5
+	for _i in 5:
+		level_player.call("collect_shard")
+	var in_level: int = PlayerState.shards
 	level.queue_free()
+	await _pframes(3)
+
+	var town := TOWN.instantiate()
+	add_child(town)
+	await _pframes(3)
+	var after_switch: int = PlayerState.shards
+	town.queue_free()
 	await _pframes(2)
 
-	_check("11", "关卡里捡的碎片，回城镇还在（跨场景不丢）",
-		wrote_back and carried,
-		"写回 autoload=%s　新场景带过来=%s（%d）" % [
-			str(wrote_back), str(carried), carried_shards])
+	_check("11", "关卡里捡的精铁，切场景之后还在（不依赖玩家节点）",
+		in_level == 5 and after_switch == 5,
+		"关卡里捡到 %d 块　切到城镇之后 %d 块" % [in_level, after_switch])
 	PlayerState.shards = 0
 
 
@@ -507,7 +502,7 @@ func _t12_hud_shows_player_state() -> void:
 		await _pframes(2)
 		return
 
-	player.set("shards", 4)
+	PlayerState.shards = 4
 	hud.call("refresh")
 	await _pframes(2)
 	var bag: String = (hud.get_node("Bag/Count") as Label).text

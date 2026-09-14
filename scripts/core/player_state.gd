@@ -432,6 +432,17 @@ func set_equipment(e: Dictionary, b: Array, f: Dictionary = {}) -> void:
 	equipment_changed.emit()
 
 
+## 比例类属性的硬上限（设计原则 4.2）。**所有比例属性都必须从这儿过一道** ——
+## 将来加暴击 / 闪避 / 穿透时，把上限加进这个 match，别在各自的计算里各写一份。
+## 未知的比例属性一律夹到 [0, 1]：宁可保守，也不要一个没设上限的百分比流出去
+func clamp_ratio(key: StringName, value: float) -> float:
+	match key:
+		&"def":
+			return clampf(value, 0.0, Health.MAX_DAMAGE_REDUCTION)
+		_:
+			return clampf(value, 0.0, 1.0)
+
+
 func _recalc_bonus() -> void:
 	var atk := 0.0
 	var hp := 0
@@ -444,7 +455,14 @@ func _recalc_bonus() -> void:
 		atk += it.atk_bonus + forge_atk(uid)     # 强化加成叠进同一个乘区（设计原则 4.1）
 		hp += it.hp_bonus
 		def += it.def_bonus
-	_bonus = {"atk": atk, "hp": hp, "def": def}
+	# 加总类属性走软上限（3.4）：堆过头之后每点越不值钱
+	var prog := progression
+	_bonus = {
+		"atk": prog.soften(atk, prog.soft_knee_atk, prog.soft_cap_atk),
+		"hp": int(round(prog.soften(float(hp), float(prog.soft_knee_hp), float(prog.soft_cap_hp)))),
+		# 比例类属性走硬上限（4.2）：界面上写 -60% 就必须真的一分不多
+		"def": clamp_ratio(&"def", def),
+	}
 
 
 # ── 升级 ───────────────────────────────────────────────────────

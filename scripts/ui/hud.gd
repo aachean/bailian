@@ -573,7 +573,7 @@ func refresh() -> void:
 	_portrait.set_exp(1.0 if needed <= 0 else float(exp_pts) / float(needed))
 	# 等级带上限：等级是「解锁内容的钥匙」，玩家得看得见离顶还有多远
 	_lv_label.text = "Lv.%d/%d" % [level, PlayerState.level_cap]
-	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), int(_player.get("shards"))]
+	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), PlayerState.shards]
 
 	refresh_skill_bar()
 	refresh_stage_label()
@@ -685,5 +685,7 @@ func refresh_skill_bar() -> void:
 			cd.visible = false
 
 
+## 精铁数量。**只认 PlayerState 那一份** —— 玩家节点上没有第二份
+## （曾经有，代价是「强化扣了钱、HUD 还显示旧数」，截图抓到的）
 func shards_of() -> int:
-	return int(_player.get("shards")) if _player != null and is_instance_valid(_player) else 0
+	return PlayerState.shards

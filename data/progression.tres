@@ -12,3 +12,7 @@ mp_per_level = 10
 atk_per_level = 0.05
 base_hp = 100
 base_mp = 50
+soft_knee_atk = 1.0
+soft_cap_atk = 1.0
+soft_knee_hp = 300
+soft_cap_hp = 300

@@ -54,6 +54,9 @@ func _ready() -> void:
 	await _t12_forge_survives_save()
 	await _t13_legacy_upgrade_migrates()
 	await _t14_forge_atk_joins_damage_pool()
+	await _t15_soft_cap_is_lossless_below_knee()
+	await _t16_soft_cap_diminishes_above_knee()
+	await _t17_ratio_has_hard_cap()
 
 	SaveManager.current_slot = _slot_before
 	SaveGuard.restore(_bak)
@@ -315,3 +318,47 @@ func _t14_forge_atk_joins_damage_pool() -> void:
 	_check("14", "强化加成进了伤害乘区（词条聚合里算上了）",
 		is_equal_approx(gained, expect),
 		"攻击加成 %.3f → %.3f（+%.3f，期望 +%.3f）" % [before, after, gained, expect])
+
+
+# ── 3.4 软上限 / 4.2 硬上限 ────────────────────────────────────
+
+## 软上限不能误伤「正常装备量级」：几件装备的词条加起来还在 knee 以内时，
+## 生效值必须**一分不少**。这条守的是 4.1（面板 +15% 就得真 +15%）——
+## 一条一上来就递减的曲线会让单件装备当场对不上账
+func _t15_soft_cap_is_lossless_below_knee() -> void:
+	PlayerState.reset_for_new_game()
+	var uid: String = PlayerState.add_item(ITEM_FINE)       # 攻 +15%
+	PlayerState.equip(uid)
+	var bonus: float = PlayerState.bonus_total().get("atk", 0.0)
+	var raw := (load(ITEM_FINE) as ItemData).atk_bonus       # 0.15，远在 knee(1.0) 以内
+	_check("15", "软上限在 knee 以内无损：单件装备的词条原样生效",
+		is_equal_approx(bonus, raw),
+		"装备词条 +%.3f → 生效 +%.3f（knee=%.1f，一分没少）" % [
+			raw, bonus, PlayerState.progression.soft_knee_atk])
+
+
+## 超出 knee 之后才开始递减：边际收益一次比一次少，而且**永远到不了** knee+cap。
+## 用一阶差分验形状 —— 只看总量的话「还在涨」这件事骗得过眼睛
+func _t16_soft_cap_diminishes_above_knee() -> void:
+	var p := PlayerState.progression
+	var k := p.soft_knee_atk
+	var c := p.soft_cap_atk
+	var g1 := p.soften(k + 0.5, k, c) - p.soften(k, k, c)
+	var g2 := p.soften(k + 1.0, k, c) - p.soften(k + 0.5, k, c)
+	var far := p.soften(1000.0, k, c)
+	_check("16", "软上限：超出 knee 后边际收益递减，且总效果永远到不了 knee+cap",
+		g1 > g2 and g2 > 0.0 and far < k + c and far > k + c * 0.99,
+		"Δ(+0.5)=%.3f ＞ Δ(再 +0.5)=%.3f　无限堆到 %.3f（上限 %.3f，够不着）" % [
+			g1, g2, far, k + c])
+
+
+## 比例类属性必须有硬上限（4.2）。减伤现在的天花板是 0.6 ——
+## 「堆防御到无敌」不能成为解，这条是那个天花板的守门人。
+## 未知的比例属性也得被夹住，否则以后加暴击忘了设上限就会漏出去
+func _t17_ratio_has_hard_cap() -> void:
+	var cap := PlayerState.clamp_ratio(&"def", 5.0)
+	var unknown := PlayerState.clamp_ratio(&"crit", 3.7)
+	_check("17", "比例属性走硬上限：减伤夹在 0.6，未登记的比例属性夹在 [0,1]",
+		is_equal_approx(cap, Health.MAX_DAMAGE_REDUCTION) and is_equal_approx(unknown, 1.0),
+		"减伤 5.0 → %.2f（上限 %.2f）　未登记的 crit 3.7 → %.2f" % [
+			cap, Health.MAX_DAMAGE_REDUCTION, unknown])

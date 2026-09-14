@@ -121,8 +121,6 @@ var dodge_cooldown: int = 0
 ## 累计挨打 / 死亡次数（自动验收用）
 var hurts_taken: int = 0
 var deaths: int = 0
-## 精铁碎片（强化素材）与武器强化等级 —— 进存档，随快照恢复
-var shards: int = 0
 ## 等级 / 经验跨场景住在 PlayerState；蓝量是场景内资源（回城满蓝）
 var level: int = 1
 var exp_pts: int = 0
@@ -170,11 +168,12 @@ const FALL_KILL_Y := 800.0
 ## 状态一律回到 FREE —— 存档瞬间可能在闪避/硬直里，那些不该被「续」上。
 func apply_saved(d: Dictionary) -> void:
 	_end_action()
-	shards = int(d.get("shards", shards))
 	level = PlayerState.progression.clamp_level(int(d.get("level", level)))
 	exp_pts = int(d.get("exp", exp_pts))
 	mp = int(d.get("mp", max_mp))
-	PlayerState.shards = shards
+	# 精铁 / 等级 / 经验都只住在 PlayerState —— 玩家节点不存第二份，
+	# 所以这里是「把它摆回 PlayerState」，不是「抄到自己身上再写回去」
+	PlayerState.shards = int(d.get("shards", PlayerState.shards))
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
 	# 装备栏 / 背包 / 强化表也在快照里，先摆回 PlayerState 再算属性。
@@ -245,7 +244,6 @@ func _ready() -> void:
 	_health.hp_changed.connect(_update_hp_bar)
 	# 碎片 / 强化 / 等级经验是「属于玩家」的数据，住在 PlayerState（autoload）里 ——
 	# 切场景会重建玩家节点，存在节点上的东西会丢（实测丢过）
-	shards = PlayerState.shards
 	level = PlayerState.level
 	exp_pts = PlayerState.exp
 	# 回城即治疗：进场景满血满蓝；等级越高蓝上限越高
@@ -315,7 +313,6 @@ func is_skill_unlocked(p: String) -> bool:
 func _exit_tree() -> void:
 	# 离开场写回：下一次进任何场景，碎片和等级都还在。
 	# 装备栏 / 背包不在这里写回 —— 它们本来就住在 PlayerState，玩家节点只是读者
-	PlayerState.shards = shards
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
 
@@ -470,10 +467,14 @@ func _refresh_hud() -> void:
 		hud.call("refresh")
 
 
-## 拾取碎片（Pickup 组件调）。满 3 块可去城镇铁砧强化一次
+## 拾取精铁（Pickup 组件调）。去城镇铁匠铺花掉。
+##
+## **精铁只住在 PlayerState**（2026-09-14 统一）。以前玩家节点上也有一份，
+## 于是「强化扣的是 PlayerState 那份、捡碎片加的是节点那份」——
+## 下一次捡碎片会把刚扣掉的精铁整个覆盖回去（白扣），而且 HUD 读节点那份，
+## 强化完了还显示旧数（截图抓到的）。两份真相的账早晚要付，这次一起付清
 func collect_shard() -> void:
-	shards += 1
-	PlayerState.shards = shards
+	PlayerState.shards += 1
 	_refresh_hud()
 
 

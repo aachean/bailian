@@ -485,7 +485,7 @@ func collect() -> Dictionary:
 			# 复活点：踩过的 checkpoint 存在这里，读档后不会退回关卡开头
 			"spawn_x": sp.x,
 			"spawn_y": sp.y,
-			"shards": int(player.get("shards")),
+			"shards": PlayerState.shards,
 			"level": int(player.get("level")),
 			"exp": int(player.get("exp_pts")),
 			"mp": int(player.get("mp")),

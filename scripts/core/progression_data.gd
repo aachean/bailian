@@ -42,6 +42,27 @@ extends Resource
 @export var base_hp: int = 100
 @export var base_mp: int = 50
 
+@export_group("软上限：加总类属性（设计原则 3.4）")
+## knee 以内**全额**，超出部分才走饱和曲线 —— 总效果趋近 knee + cap，永远到不了。
+##
+## 为什么不做成「一上来就递减」（raw / (1 + raw/cap)）：那会让**单件装备**的
+## 显示值当场对不上（面板写 +15%、实际生效 +13.9%），直接违反 4.1
+## 「界面显示的加成必须等于打出的数字」。带 knee 的曲线在正常装备量级下无损，
+## 只在堆叠过头时才开始压 —— 那才是「防止无限线性堆叠」真正要防的地方。
+@export var soft_knee_atk: float = 1.0
+@export var soft_cap_atk: float = 1.0
+@export var soft_knee_hp: int = 300
+@export var soft_cap_hp: int = 300
+
+
+## 边际递减（设计原则 3.4）：knee 以内原样返回，超出部分按饱和曲线追加。
+## 折到 knee 以内是刻意的 —— 见上面那段「为什么不做成一上来就递减」
+func soften(raw: float, knee: float, cap: float) -> float:
+	if raw <= knee or cap <= 0.0:
+		return raw
+	var over := raw - knee
+	return knee + over / (1.0 + over / cap)
+
 
 ## 升到下一级需要多少经验。**满级返回 0** —— 用之前一律先问 is_max()，
 ## 拿 0 去和当前经验比较会让「够了就升级」的循环空转成死循环

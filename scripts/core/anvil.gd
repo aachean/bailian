@@ -82,4 +82,4 @@ func _refresh(_locale: String = "") -> void:
 		return
 	_label.text = "%s  %s ×%d  %s" % [
 		tr("UI_ANVIL_TITLE"), tr("HUD_SHARD"),
-		int(_player.get("shards")), tr("UI_ANVIL_HINT")]
+		PlayerState.shards, tr("UI_ANVIL_HINT")]

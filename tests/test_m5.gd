@@ -124,7 +124,7 @@ func _reset_stats() -> void:
 	_player.set("level", 1)
 	_player.set("exp_pts", 0)
 	PlayerState.set_equipment(PlayerState.equipped, PlayerState.bag, {})   # 强化钉回基线（逐件之后没有全局等级了）
-	_player.set("shards", 0)
+	PlayerState.shards = 0
 	_player.call("_apply_upgrade")
 	_player.get_node("Health").heal_full()
 
