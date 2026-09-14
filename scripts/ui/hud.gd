@@ -554,8 +554,10 @@ func refresh() -> void:
 		_hp_text.text = "%d / %d" % [h.hp, h.max_hp]
 	_mp_fill.scale.x = 0.0 if max_mp <= 0 else clampf(float(mp) / float(max_mp), 0.0, 1.0)
 	_mp_text.text = "%d / %d" % [mp, max_mp]
-	_portrait.set_exp(float(exp_pts) / float(needed))
-	_lv_label.text = "Lv.%d" % level
+	# 满级时 needed = 0 —— 环填满，不是除零。除零会得到 NaN，环整个会消失
+	_portrait.set_exp(1.0 if needed <= 0 else float(exp_pts) / float(needed))
+	# 等级带上限：等级是「解锁内容的钥匙」，玩家得看得见离顶还有多远
+	_lv_label.text = "Lv.%d/%d" % [level, PlayerState.level_cap]
 	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), int(_player.get("shards"))]
 
 	refresh_skill_bar()
@@ -592,6 +594,14 @@ func refresh_stage_label() -> void:
 		_stage_label.text = txt
 
 
+## 经验那一行。满级时写「已满」而不是「0 / 0」——
+## 后者会被读成「经验全丢了」，而实际上是「不需要了」
+func _exp_line(level: int, exp_pts: int) -> String:
+	if PlayerState.progression.is_max(level):
+		return "%s %s" % [tr("PANEL_EXP"), tr("UI_EXP_MAX")]
+	return "%s %d / %d" % [tr("PANEL_EXP"), exp_pts, PlayerState.exp_needed(level)]
+
+
 ## 角色面板：造梦西游式属性表，一行一项。数值全部来自「当前生效值」，
 ## 不是来自某一个来源 —— 玩家在这儿看到的攻击加成必须等于实际打到怪身上的倍率
 func refresh_char_panel(h: Health) -> void:
@@ -604,8 +614,8 @@ func refresh_char_panel(h: Health) -> void:
 	var dmg: float = _player.get_node("Hitbox").damage_scale
 	var red: float = 0.0 if h == null else h.damage_reduction
 	var lines: Array[String] = [
-		"%s %d" % [tr("PANEL_LEVEL"), level],
-		"%s %d / %d" % [tr("PANEL_EXP"), exp_pts, PlayerState.exp_needed(level)],
+		"%s %d / %d" % [tr("PANEL_LEVEL"), level, PlayerState.level_cap],
+		_exp_line(level, exp_pts),
 		"%s %d / %d" % [tr("PANEL_HP"), hp, max_hp],
 		"%s %d / %d" % [tr("PANEL_MP"), mp, max_mp],
 		"%s +%d%%" % [tr("PANEL_ATK"), int(round((dmg - 1.0) * 100.0))],

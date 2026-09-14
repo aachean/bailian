@@ -30,9 +30,23 @@ signal equipment_changed
 ## 槽位 id，顺序与 ItemData.Slot 枚举一致
 const SLOT_IDS: Array[StringName] = [&"weapon", &"helm", &"armor", &"trinket"]
 
-## 升到下一级需要的经验：线性增长，原型期手感友好
+## 成长曲线的唯一真相（等级上限 / 经验幂函数 / 每级给多少）。
+## 和 ItemData / EnemyData 同一套路：数字在 .tres，代码只读它 —— 调曲线不改代码
+const PROGRESSION_PATH := "res://data/progression.tres"
+
+@onready var progression: ProgressionData = load(PROGRESSION_PATH) as ProgressionData
+
+## 等级上限（给界面用，省得到处 PlayerState.progression.level_cap）
+@onready var level_cap: int = progression.level_cap
+
+
+## 升到下一级需要的经验。**满级返回 0**，所以调用方比较之前先问 is_max()
 func exp_needed(level: int) -> int:
-	return 20 + (level - 1) * 15
+	return progression.exp_needed(level)
+
+
+func is_max_level() -> bool:
+	return progression.is_max(level)
 
 
 var shards: int = 0
@@ -85,7 +99,7 @@ func reset_for_new_game() -> void:
 func load_from(d: Dictionary) -> void:
 	shards = int(d.get("shards", shards))
 	upgrade_level = int(d.get("upgrade", upgrade_level))
-	level = int(d.get("level", level))
+	level = progression.clamp_level(int(d.get("level", level)))
 	exp = int(d.get("exp", exp))
 	equipped = (d.get("equipped", {}) as Dictionary).duplicate()
 	bag = (d.get("bag", []) as Array).duplicate()
@@ -279,16 +293,21 @@ func _recalc_bonus() -> void:
 
 # ── 升级 ───────────────────────────────────────────────────────
 
-## 加经验，够数就升级（可连升）。返回升了几级
+## 加经验，够数就升级（可连升）。返回升了几级。
+##
+## **满级之后不再累积经验**（直接丢），不是「攒着但没用」——
+## 后者会让 HUD 上的经验条在满级后继续涨，玩家以为还能升。
 func add_exp(amount: int) -> int:
-	if amount <= 0:
+	if amount <= 0 or is_max_level():
 		return 0
 	exp += amount
 	var ups := 0
-	while exp >= exp_needed(level):
+	while not is_max_level() and exp >= exp_needed(level):
 		exp -= exp_needed(level)
 		level += 1
 		ups += 1
 		level_up.emit(level)
+	if is_max_level():
+		exp = 0
 	exp_changed.emit(exp)
 	return ups

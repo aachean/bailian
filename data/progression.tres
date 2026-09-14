@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ProgressionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/progression_data.gd" id="1_prog"]
+
+[resource]
+script = ExtResource("1_prog")
+level_cap = 30
+exp_base = 20.0
+exp_exponent = 1.5
+hp_per_level = 15
+mp_per_level = 10
+atk_per_level = 0.05
+base_hp = 100
+base_mp = 50

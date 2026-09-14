@@ -173,7 +173,7 @@ func apply_saved(d: Dictionary) -> void:
 	_end_action()
 	shards = int(d.get("shards", shards))
 	upgrade_level = int(d.get("upgrade", upgrade_level))
-	level = int(d.get("level", level))
+	level = PlayerState.progression.clamp_level(int(d.get("level", level)))
 	exp_pts = int(d.get("exp", exp_pts))
 	mp = int(d.get("mp", max_mp))
 	PlayerState.shards = shards
@@ -187,7 +187,7 @@ func apply_saved(d: Dictionary) -> void:
 	if d.has("skill_slots"):
 		PlayerState.skill_slots = (d.get("skill_slots", []) as Array).duplicate()
 		PlayerState.skills_changed.emit()
-	max_mp = 50 + (level - 1) * 10
+	max_mp = PlayerState.progression.mp_at(level)
 	# 装备栏住在 PlayerState（存档恢复时已一并回填），这里按它重算上限与倍率。
 	# 血量必须在这之后再摆 —— _set_max_hp 会动 hp，
 	# 先 restore 再改上限的话，读回来的血量会被上限变动改写
@@ -247,7 +247,7 @@ func _ready() -> void:
 	level = PlayerState.level
 	exp_pts = PlayerState.exp
 	# 回城即治疗：进场景满血满蓝；等级越高蓝上限越高
-	max_mp = 50 + (level - 1) * 10
+	max_mp = PlayerState.progression.mp_at(level)
 	mp = max_mp
 	if not PlayerState.level_up.is_connected(_on_level_up):
 		PlayerState.level_up.connect(_on_level_up)
@@ -331,7 +331,7 @@ func _on_exp_changed(new_exp: int) -> void:
 ## 升级就该有仪式感，没反馈的成长等于没升级（用户实测反馈）
 func _on_level_up(new_level: int) -> void:
 	level = new_level
-	max_mp = 50 + (level - 1) * 10
+	max_mp = PlayerState.progression.mp_at(level)
 	# 升级可能解锁新技能：有空槽就自动补进去（槽满了不动，换哪个由玩家决定）
 	_sync_skill_slots()
 	# 血上限、攻击倍率、减伤统一由 _apply_upgrade 重算（含装备词条），
@@ -365,10 +365,9 @@ func _update_hp_bar(_hp: int, _max_hp: int) -> void:
 	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
 
 
-## 武器强化每级 +20%；角色等级每级 +5%；装备的攻击词条直接相加（同一个乘区）。
+## 武器强化每级 +20%。角色等级那一份从 ProgressionData 取（不再是写死的常量）——
 ## 改的是 Hitbox 的伤害倍率，技能表（招式本身）不动 —— 强化的是人，不是招
 const UPGRADE_STEP := 0.2
-const LEVEL_ATK_STEP := 0.05
 
 ## 手里那把刀的样子。攻击时挥出的光刃跟着【当前武器】走：换了武器，
 ## 刃的颜色（品质色）和长度都跟着变 —— 装备变强必须看得见，光看面板数字不够
@@ -382,9 +381,10 @@ const BLADE_BASE_REACH := 42.0
 ## anvil.gd / HUD / 测试里，改名的收益小于风险。
 func _apply_upgrade() -> void:
 	var bonus := PlayerState.bonus_total()
+	var prog := PlayerState.progression
 	_hitbox.damage_scale = 1.0 + UPGRADE_STEP * float(upgrade_level) \
-		+ LEVEL_ATK_STEP * float(level - 1) + float(bonus.get("atk", 0.0))
-	_set_max_hp(100 + (level - 1) * 15 + int(bonus.get("hp", 0)))
+		+ prog.atk_bonus_at(level) + float(bonus.get("atk", 0.0))
+	_set_max_hp(prog.hp_at(level) + int(bonus.get("hp", 0)))
 	_base_reduction = float(bonus.get("def", 0.0))
 	_health.damage_reduction = _base_reduction
 	_refresh_blade()
