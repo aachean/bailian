@@ -359,6 +359,8 @@ const SKIN_HEIGHT := 64.0
 var _skin: Sprite2D = null
 var _skin_frames: Dictionary = {}
 var _skin_base_scale := Vector2.ONE
+## 走路步频时钟（_update_skin_motion 推进）
+var _walk_clock := 0.0
 
 
 func _setup_skin() -> void:
@@ -381,6 +383,11 @@ func _setup_skin() -> void:
 		&"windup": load(character.sprite_dir + "/atk_windup.png"),
 		&"strike": load(character.sprite_dir + "/atk_strike.png"),
 	}
+	# 移动帧：存在才进表（缺帧 _set_skin_frame 自动回退当前帧，不崩）
+	for pair in [["walk_a", "walk_a.png"], ["walk_b", "walk_b.png"], ["jump", "jump.png"]]:
+		var p: String = character.sprite_dir + "/" + str(pair[1])
+		if ResourceLoader.exists(p):
+			_skin_frames[StringName(pair[0])] = load(p)
 	_skin.visible = true
 	_skin.texture = _skin_frames[&"idle"]
 	var tex_h := float(_skin.texture.get_height())
@@ -706,8 +713,28 @@ func _physics_process(delta: float) -> void:
 			_dead_process(delta)
 
 	_update_hurt_flash(delta)
+	_update_skin_motion(delta)
 	_update_facing()
 	move_and_slide()
+
+
+## 移动帧（ADR-0015 补间法的移动侧）：地面两帧走路交替（步频随速度），
+## 空中跳帧（上升/下落共用一帧——下落另配一张是全量铺开时的可选项）。
+## 只管 FREE 状态：攻击/受击的帧由各自流程负责，别在这里抢
+func _update_skin_motion(delta: float) -> void:
+	if not _skin_active() or state != State.FREE:
+		return
+	if not is_on_floor():
+		_set_skin_frame(&"jump")
+		return
+	var speed := absf(velocity.x)
+	if speed < 20.0:
+		_set_skin_frame(&"idle")
+		_walk_clock = 0.0
+		return
+	# 步频随速度：满速约每秒三步（一个周期两帧）
+	_walk_clock += delta * clampf(speed / 140.0, 0.7, 1.6) * 6.0
+	_set_skin_frame(&"walk_a" if fmod(_walk_clock, 2.0) < 1.0 else &"walk_b")
 
 
 ## 受击硬直：输入全部无效，只剩击退的惯性 + 重力。
