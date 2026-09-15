@@ -761,12 +761,15 @@ func _update_skin_motion(delta: float) -> void:
 		return
 	var speed := absf(velocity.x)
 	if speed < 20.0:
-		_set_skin_anim(&"idle", 6.0)
+		_set_skin_anim(&"idle", 8.0)
 		_walk_clock = 0.0
 		return
 	_walk_clock += delta
-	# 帧率随速度：满速约 12fps 的跑步循环（run 6 帧 = 每秒两个完整步周期）
-	_set_skin_anim(&"run", clampf(6.0 + speed / 140.0 * 6.0, 6.0, 12.0))
+	# 慢走 / 跑两档，帧率都随速度微调（8 帧 walk、8 帧 run）
+	if speed < 90.0:
+		_set_skin_anim(&"walk", clampf(7.0 + speed / 90.0 * 3.0, 7.0, 10.0))
+	else:
+		_set_skin_anim(&"run", clampf(8.0 + speed / 140.0 * 4.0, 8.0, 12.0))
 
 ## 受击硬直：输入全部无效，只剩击退的惯性 + 重力。
 ## 「挨打要停一拍」是动作游戏的基本代价，它让敌人的攻击真的构成威胁。
