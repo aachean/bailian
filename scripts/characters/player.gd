@@ -390,7 +390,8 @@ func _setup_skin() -> void:
 	}
 	# 移动帧：存在才进表（缺帧 _set_skin_frame 自动回退当前帧，不崩）
 	for pair in [["walk_a", "walk_a.png"], ["walk_b", "walk_b.png"],
-			["walk_pass", "walk_pass.png"], ["jump", "jump.png"]]:
+			["walk_b2", "walk_b2.png"], ["walk_pass", "walk_pass.png"],
+			["jump", "jump.png"]]:
 		var p: String = character.sprite_dir + "/" + str(pair[1])
 		if ResourceLoader.exists(p):
 			_skin_frames[StringName(pair[0])] = load(p)
@@ -741,14 +742,13 @@ func _update_skin_motion(delta: float) -> void:
 		_walk_clock = 0.0
 		_skin_pose_relax(delta)
 		return
-	# 步频随速度（满速约每秒两步）。两拍循环「B 大跨步 ↔ Pass 收腿」：
-	# walk_b 用纯文生图重做（图生图会把姿势原样抄过去，下半身差分自检 5.4 = 没交替），
-	# 新 B 与 walk_a 有真·交替（自检 55）但渲染风格略亮 —— 全套统一见 ADR-0015 后续
+	# 步频随速度（满速约每秒两步）。四拍循环「跨步1 ↔ 收腿 ↔ 跨步2 ↔ 收腿」：
+	# 两个跨步帧左右腿真正交替（walk_b2 纯文生图 + 特征词表，双自检过线：
+	# 下半身差分 61 = 姿势真交替 / 亮度差 9 = 风格一致）
 	_walk_clock += delta * clampf(speed / 140.0, 0.7, 1.6) * 4.0
-	var beat := int(floor(_walk_clock)) % 2
-	match beat:
-		0: _set_skin_frame(&"walk_b")
-		1: _set_skin_frame(&"walk_pass")
+	match int(floor(_walk_clock)) % 4:
+		0, 2: _set_skin_frame(&"walk_b")
+		1, 3: _set_skin_frame(&"walk_pass")
 	# 步颠：换拍（脚触地）时最低、迈步中间最高，幅度 3px；
 	# 前倾 4°——素材面朝右，visuals.scale.x 翻转时倾角自动跟着镜像，方向永远正确
 	var bob := absf(sin(_walk_clock * PI)) * 3.0

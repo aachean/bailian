@@ -140,6 +140,9 @@ locale/translations=PackedStringArray("res://data/i18n/ui.zh_CN.translation", "r
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+
+# 相机平滑是亚像素浮点，全屏会被重采成虚像 —— 绘制时统一对齐整像素格
+2d/snap/snap_2d_transforms_to_pixel=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.102, 0.106, 0.129, 1)
