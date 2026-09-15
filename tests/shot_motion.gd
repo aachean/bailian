@@ -16,15 +16,15 @@ func _ready() -> void:
 	player.global_position = Vector2(400.0, 288.0)
 	await _frames(10)
 
-	# 1) 走路：注入向右，跑到步频稳定后抓 B 帧所在瞬间
+	# 1) 走路：注入向右，等步频稳定后抓 pass 过渡帧（四拍循环的收腿拍）
 	Input.action_press("move_right")
 	for i in 40:
 		await get_tree().physics_frame
 		var skin: Sprite2D = player.get_node("Visuals/Skin")
-		if skin.texture.resource_path.contains("walk_b"):
+		if skin.texture.resource_path.contains("walk_pass"):
 			break
-	await _shot("motion_walk_b.png")
-	# 紧接着抓 A 帧
+	await _shot("motion_walk_pass.png")
+	# 紧接着抓 A 帧（迈步）
 	for i in 30:
 		await get_tree().physics_frame
 		var skin: Sprite2D = player.get_node("Visuals/Skin")

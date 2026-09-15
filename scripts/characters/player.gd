@@ -359,6 +359,8 @@ const SKIN_HEIGHT := 64.0
 var _skin: Sprite2D = null
 var _skin_frames: Dictionary = {}
 var _skin_base_scale := Vector2.ONE
+## Skin 的基准纵向位置（脚底对齐用；走路颠步在它上下浮动）
+var _skin_base_y := 0.0
 ## 走路步频时钟（_update_skin_motion 推进）
 var _walk_clock := 0.0
 
@@ -384,7 +386,8 @@ func _setup_skin() -> void:
 		&"strike": load(character.sprite_dir + "/atk_strike.png"),
 	}
 	# 移动帧：存在才进表（缺帧 _set_skin_frame 自动回退当前帧，不崩）
-	for pair in [["walk_a", "walk_a.png"], ["walk_b", "walk_b.png"], ["jump", "jump.png"]]:
+	for pair in [["walk_a", "walk_a.png"], ["walk_b", "walk_b.png"],
+			["walk_pass", "walk_pass.png"], ["jump", "jump.png"]]:
 		var p: String = character.sprite_dir + "/" + str(pair[1])
 		if ResourceLoader.exists(p):
 			_skin_frames[StringName(pair[0])] = load(p)
@@ -394,7 +397,8 @@ func _setup_skin() -> void:
 	_skin_base_scale = Vector2.ONE * (SKIN_HEIGHT / tex_h)
 	_skin.scale = _skin_base_scale
 	# 素材的脚在图底：底边对齐旧色块的脚底（Visuals 原点在身体中心，脚底 +16）
-	_skin.position = Vector2(0.0, 16.0 - SKIN_HEIGHT * 0.5)
+	_skin_base_y = 16.0 - SKIN_HEIGHT * 0.5
+	_skin.position = Vector2(0.0, _skin_base_y)
 
 
 func _skin_active() -> bool:
@@ -718,23 +722,41 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
-## 移动帧（ADR-0015 补间法的移动侧）：地面两帧走路交替（步频随速度），
-## 空中跳帧（上升/下落共用一帧——下落另配一张是全量铺开时的可选项）。
-## 只管 FREE 状态：攻击/受击的帧由各自流程负责，别在这里抢
+## 移动帧（ADR-0015 补间法的移动侧）：地面四拍循环 walk_a → pass → walk_b → pass
+## （造梦西游式：收腿过渡消除两帧硬切的滑步感），身体随步频上下起伏 + 躯干前倾；
+## 空中跳帧（上升/下落共用）。只管 FREE 状态：攻击/受击的帧由各自流程负责
 func _update_skin_motion(delta: float) -> void:
 	if not _skin_active() or state != State.FREE:
 		return
 	if not is_on_floor():
 		_set_skin_frame(&"jump")
+		_skin_pose_relax(delta)
 		return
 	var speed := absf(velocity.x)
 	if speed < 20.0:
 		_set_skin_frame(&"idle")
 		_walk_clock = 0.0
+		_skin_pose_relax(delta)
 		return
-	# 步频随速度：满速约每秒三步（一个周期两帧）
-	_walk_clock += delta * clampf(speed / 140.0, 0.7, 1.6) * 6.0
-	_set_skin_frame(&"walk_a" if fmod(_walk_clock, 2.0) < 1.0 else &"walk_b")
+	# 步频随速度（满速约每秒两步），四拍一循环
+	_walk_clock += delta * clampf(speed / 140.0, 0.7, 1.6) * 4.0
+	var beat := int(floor(_walk_clock)) % 4
+	match beat:
+		0: _set_skin_frame(&"walk_a")
+		1: _set_skin_frame(&"walk_pass")
+		2: _set_skin_frame(&"walk_b")
+		3: _set_skin_frame(&"walk_pass")
+	# 步颠：换拍（脚触地）时最低、迈步中间最高，幅度 3px；
+	# 前倾 4°——素材面朝右，visuals.scale.x 翻转时倾角自动跟着镜像，方向永远正确
+	var bob := absf(sin(_walk_clock * PI)) * 3.0
+	_skin.position.y = _skin_base_y - bob
+	_skin.rotation = lerpf(_skin.rotation, 0.07, minf(delta * 10.0, 1.0))
+
+
+## 非走路状态把姿态收回基准（站直、回正）
+func _skin_pose_relax(delta: float) -> void:
+	_skin.position.y = lerpf(_skin.position.y, _skin_base_y, minf(delta * 12.0, 1.0))
+	_skin.rotation = lerpf(_skin.rotation, 0.0, minf(delta * 12.0, 1.0))
 
 
 ## 受击硬直：输入全部无效，只剩击退的惯性 + 重力。
