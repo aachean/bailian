@@ -78,7 +78,18 @@ func _ready() -> void:
 	_build_rows()
 	_build_skill_bar()
 	_build_skill_panel()
+	_apply_portrait()
 	refresh()
+
+
+## 头像跟随角色：有立绘（sprite_dir 非空）画照片，否则维持程序化小人。
+## 「左上角那个人必须和屏幕中央那个人长得一样」—— 色块时代靠同色，现在靠同图
+func _apply_portrait() -> void:
+	var def := PlayerState.character_def()
+	if def != null and not def.sprite_dir.is_empty():
+		var path := def.sprite_dir + "/portrait.png"
+		if ResourceLoader.exists(path):
+			_portrait.set_face_texture(load(path))
 
 
 func _process(_delta: float) -> void:

@@ -23,6 +23,12 @@ extends Resource
 ## 身体主色。脸是固定的白 —— 只换衣服颜色，轮廓不变，一眼「同一个人的两个流派」
 @export var body_color: Color = Color(0.847, 0.353, 0.188)
 
+@export_group("精灵图（AI 生图管线，ADR-0015）")
+## 精灵图目录。空 = 维持程序化色块视觉（还没生图的角色）。
+## 约定文件：idle.png / atk_windup.png / atk_strike.png / portrait.png，
+## 全部由 tools/process_art.py 后处理产出（透明底、脚在图底）
+@export var sprite_dir: String = ""
+
 @export_group("初始装备（res:// 路径）")
 ## 初始武器。老铁匠的见面礼按它发货（对话 give_item 写的是剑客的铁剑，
 ## dialogue_box 发奖时按当前角色换成这里这份）—— 弓手不该背着铁剑出门

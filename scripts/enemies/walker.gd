@@ -34,6 +34,9 @@ const RECOIL_KICK_HEAVY := 1.6
 @onready var bar_fill: ColorRect = $HealthBar/Fill
 @onready var _hitbox: Hitbox = $Hitbox
 
+## 精灵模式下的贴图节点（_setup_skin 建；空 sprite_path 时保持 null）
+var _skin: Sprite2D = null
+
 ## 掉到这条线以下就是掉出世界，走各自的善后流程。
 ## 场景高 360，地面在 320 附近 —— 800 已经是「肯定出世界」的深度
 const FALL_KILL_Y := 800.0
@@ -83,6 +86,28 @@ func _ready() -> void:
 	health.revived.connect(_on_revived)
 	_home_x = global_position.x
 	_refresh_bar()
+	_setup_skin()
+
+
+## 精灵模式（ADR-0015）：data.sprite_path 非空时色块退位。
+## 素材面朝左，而 visuals.scale.x 的 +1 是朝右 —— 给 skin 恒定 -1，
+## 两个镜像相互抵消：怪朝右时正好露出素材的右向。精英变体没配图，维持色块
+func _setup_skin() -> void:
+	if data.sprite_path.is_empty():
+		return
+	_skin = Sprite2D.new()
+	_skin.name = "Skin"
+	visuals.add_child(_skin)
+	visuals.move_child(_skin, 0)
+	for n in ["Body", "Head", "Eye", "Flash"]:
+		var n2 := visuals.get_node_or_null(n)
+		if n2 != null:
+			n2.visible = false
+	_skin.texture = load(data.sprite_path)
+	var tex_h := float(_skin.texture.get_height())
+	var s := 52.0 / tex_h          # 小怪比玩家（64）矮一头
+	_skin.scale = Vector2(-s, s)
+	_skin.position = Vector2(0.0, 20.0 - 52.0 * 0.5)   # 底边对齐旧色块脚底（+20）
 
 
 func _physics_process(delta: float) -> void:
@@ -440,6 +465,10 @@ func _on_revived() -> void:
 func _process(delta: float) -> void:
 	_flash = move_toward(_flash, 0.0, 7.0 * delta)
 	flash.modulate.a = _flash
+	# 精灵模式下旧 Flash 色块已藏，受击闪白改走 self_modulate 提亮（>1 过饱和发白）
+	if _skin != null:
+		var f := minf(_flash, 1.0)
+		_skin.self_modulate = Color(1.0 + f, 1.0 + f, 1.0 + f)
 	if not is_equal_approx(_alpha, _target_alpha):
 		_alpha = move_toward(_alpha, _target_alpha, 5.5 * delta)
 		modulate.a = _alpha

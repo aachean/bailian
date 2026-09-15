@@ -345,6 +345,65 @@ func _apply_character_look() -> void:
 	var lbl := get_node_or_null("CharacterName") as Label
 	if lbl != null:
 		lbl.text = tr(character.name_key)
+	_setup_skin()
+
+
+# ── 精灵图模式（ADR-0015）────────────────────────────────────
+# CharacterData.sprite_dir 非空时，色块视觉退位，AI 生图三帧上阵：
+# idle 常驻 / atk_windup 攻击前摇 / atk_strike 判定窗起插入并带一记挤压。
+# 方向翻转沿用 Visuals.scale.x 的老机制 —— 素材统一面朝右，翻容器就够。
+
+## 精灵图显示高度。64 = 色块时代（32px）的两倍，细节才读得出来
+const SKIN_HEIGHT := 64.0
+
+var _skin: Sprite2D = null
+var _skin_frames: Dictionary = {}
+var _skin_base_scale := Vector2.ONE
+
+
+func _setup_skin() -> void:
+	_skin = _visuals.get_node_or_null("Skin") as Sprite2D
+	if _skin == null:
+		_skin = Sprite2D.new()
+		_skin.name = "Skin"
+		_visuals.add_child(_skin)
+		_visuals.move_child(_skin, 0)     # 垫底：旋风剑光这类特效要压在角色上面
+	if character.sprite_dir.is_empty():
+		_skin.visible = false
+		_skin_frames = {}
+		return
+	for n in ["Body", "Face", "Blade"]:
+		var n2 := _visuals.get_node_or_null(n)
+		if n2 != null:
+			n2.visible = false
+	_skin_frames = {
+		&"idle": load(character.sprite_dir + "/idle.png"),
+		&"windup": load(character.sprite_dir + "/atk_windup.png"),
+		&"strike": load(character.sprite_dir + "/atk_strike.png"),
+	}
+	_skin.visible = true
+	_skin.texture = _skin_frames[&"idle"]
+	var tex_h := float(_skin.texture.get_height())
+	_skin_base_scale = Vector2.ONE * (SKIN_HEIGHT / tex_h)
+	_skin.scale = _skin_base_scale
+	# 素材的脚在图底：底边对齐旧色块的脚底（Visuals 原点在身体中心，脚底 +16）
+	_skin.position = Vector2(0.0, 16.0 - SKIN_HEIGHT * 0.5)
+
+
+func _skin_active() -> bool:
+	return _skin != null and _skin.visible and not _skin_frames.is_empty()
+
+
+## 换帧 + 挥砍那帧带一记挤压脉冲（scale 由物理帧循环里缓弹回）
+func _set_skin_frame(kind: StringName) -> void:
+	if not _skin_active():
+		return
+	var tex: Texture2D = _skin_frames.get(kind)
+	if tex == null or _skin.texture == tex:
+		return
+	_skin.texture = tex
+	if kind == &"strike":
+		_skin.scale = Vector2(_skin_base_scale.x * 1.12, _skin_base_scale.y * 0.86)
 
 
 ## 兜底连招（角色数据整体缺失时用剑客三段，至少能打）
@@ -609,6 +668,10 @@ func _physics_process(delta: float) -> void:
 		if _trauma <= 0.0:
 			_camera.offset = Vector2.ZERO
 
+	# 精灵图挤压脉冲缓弹回。顿帧早退在上面 —— 世界冻住时挤压也冻住，正是想要的
+	if _skin != null and _skin.scale != _skin_base_scale:
+		_skin.scale = _skin.scale.lerp(_skin_base_scale, 0.28)
+
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
 	# 五个槽各算各的冷却
@@ -821,6 +884,7 @@ func _start_attack(index: int) -> void:
 	_swing_sfx(_current)
 	state = State.ATTACK
 	_state_frame = 0
+	_set_skin_frame(&"windup")
 	_attack_queued = false
 	_dodge_queued = false
 	_jump_buffer_timer = 0.0
@@ -844,6 +908,7 @@ func _attack_process(delta: float) -> void:
 
 	if sk.is_active_at(t):
 		_hitbox.activate(sk, self, _facing)
+		_set_skin_frame(&"strike")
 		_blade.modulate.a = 1.0
 		# 剑气这类技能在判定窗口的第一帧甩出投射物（窗口有 4 帧，只该发一道）
 		if not _projectile_fired and sk.projectile_scene != null:
@@ -971,6 +1036,7 @@ func _latch_action_input() -> void:
 
 func _end_action() -> void:
 	_hitbox.deactivate()
+	_set_skin_frame(&"idle")
 	_blade.modulate.a = 0.0
 	_whirl_fx.visible = false
 	_whirl_fx.modulate.a = 0.0
@@ -1083,6 +1149,7 @@ func _spawn_hit_fx(point: Vector2, color: Color, count: int, speed: float) -> vo
 ## 硬直帧数比无敌窗口长，所以连招惩罚依然成立 —— 这是有意的。
 func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir: int) -> void:
 	hurts_taken += 1
+	_set_skin_frame(&"idle")   # 出招被打断时把姿势收回来
 	# 挨打是负反馈 —— 玩家必须**立刻**知道自己中招了（6.2 的首响应）。
 	# 这声比命中更响：命中有连招会响好几下，挨打才是要命的那个
 	Audio.play(&"hurt")

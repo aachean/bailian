@@ -33,6 +33,17 @@ const EYE_COLOR := Color(0.12, 0.12, 0.15)
 ## 经验进度 0..1
 var _ratio := 0.0
 
+## 立绘头像（ADR-0015）：非空时画方形照片（内接内圆），空则维持程序化小人。
+## 弓手还没立绘 —— 这就是那条兜底
+var face_texture: Texture2D = null
+
+
+func set_face_texture(t: Texture2D) -> void:
+	if t == face_texture:
+		return
+	face_texture = t
+	queue_redraw()
+
 
 ## 设置经验进度。值没变就不重画 —— 每帧轮询调用，不做这个判断会白白重绘
 func set_exp(v: float) -> void:
@@ -64,7 +75,13 @@ func _draw() -> void:
 	draw_arc(c, ring_r + ring_w * 0.5, 0.0, TAU, 48, RIM_COLOR, maxf(1.0, 1.0 * k), true)
 	# 内圆底再画头像，头像压着圆底
 	draw_circle(c, 23.0 * k, DISC_COLOR)
-	_draw_person(k)
+	if face_texture != null:
+		# 照片取内接正方形：边长 31（角距中心 ≈21.9 < 内圆半径 23，不出方角）
+		var side := 31.0 * k
+		draw_texture_rect(face_texture,
+			Rect2(c - Vector2(side, side) * 0.5, Vector2(side, side)), false)
+	else:
+		_draw_person(k)
 
 
 ## 头像：斗笠 + 头 + 肩。

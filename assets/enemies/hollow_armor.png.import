@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cdyw4fas7nu1d"
-path="res://.godot/imported/plank.png-ba51f7d711beafc120552ddec651b96a.ctex"
+uid="uid://dhbdud105kfmm"
+path="res://.godot/imported/hollow_armor.png-733a84f38316ed9a475ab5e98fb3ebce.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/tiles/plank.png"
-dest_files=["res://.godot/imported/plank.png-ba51f7d711beafc120552ddec651b96a.ctex"]
+source_file="res://assets/enemies/hollow_armor.png"
+dest_files=["res://.godot/imported/hollow_armor.png-733a84f38316ed9a475ab5e98fb3ebce.ctex"]
 
 [params]
 

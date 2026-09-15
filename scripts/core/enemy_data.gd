@@ -39,6 +39,11 @@ extends Resource
 ## 攻击用哪张技能表（data/skills/ 里的 SkillData）
 @export var attack_skill: SkillData
 
+@export_group("外观（AI 生图管线，ADR-0015）")
+## 精灵贴图路径。空 = 维持程序化色块视觉。素材统一**面朝左**（朝向翻转靠
+## walker._apply_facing 的 scale.x 与 skin 恒定 -1 相互抵消实现）
+@export var sprite_path: String = ""
+
 @export_group("掉落")
 ## 死亡时掉多少精铁碎片（强化素材）。0 = 不掉
 @export var drop_shards: int = 1

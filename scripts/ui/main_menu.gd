@@ -257,6 +257,13 @@ func _build_character_page() -> void:
 	for c in CharacterData.all():
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(420, 52)
+		# 有立绘就挂头像（ADR-0015）—— 选人页一眼看到「这是谁」
+		if not c.sprite_dir.is_empty():
+			var icon_path := c.sprite_dir + "/portrait.png"
+			if ResourceLoader.exists(icon_path):
+				b.icon = load(icon_path)
+				b.expand_icon = true
+				b.add_theme_constant_override("h_separation", 12)
 		b.pressed.connect(_on_character.bind(c.id))
 		box.add_child(b)
 		_char_btns.append(b)
