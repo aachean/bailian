@@ -26,3 +26,5 @@ drop_items = Array[String](["res://data/items/iron_helm.tres", "res://data/items
 drop_gold = 3
 drop_heal_chance = 0.0
 drop_mana_chance = 0.10
+
+sprite_dir = "res://assets/enemies/goblin/walker_elite"

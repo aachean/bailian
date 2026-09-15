@@ -26,4 +26,5 @@ drop_gold = 2
 drop_heal_chance = 0.10
 drop_mana_chance = 0.0
 
-sprite_path = "res://assets/enemies/hollow_armor.png"
+
+sprite_dir = "res://assets/enemies/goblin/walker"

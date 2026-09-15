@@ -43,6 +43,8 @@ extends Resource
 ## 精灵贴图路径。空 = 维持程序化色块视觉。素材统一**面朝左**（朝向翻转靠
 ## walker._apply_facing 的 scale.x 与 skin 恒定 -1 相互抵消实现）
 @export var sprite_path: String = ""
+## 帧序列目录（walk_N.png 循环 + idle_0/hurt_0/dead_0）。非空时优先于 sprite_path
+@export var sprite_dir: String = ""
 
 @export_group("掉落")
 ## 死亡时掉多少精铁碎片（强化素材）。0 = 不掉
