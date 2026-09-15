@@ -50,6 +50,7 @@ func _ready() -> void:
 	await _t13_skills_survive_snapshot()
 	await _t14_skill_bar_shows_five()
 	await _t15_no_key_leak()
+	await _t16_locked_skill_cannot_toggle()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -523,3 +524,33 @@ func _t15_no_key_leak() -> void:
 		leaks.is_empty(),
 		"扫了 %d 段文本　泄漏：%s" % [
 			texts.size(), "无" if leaks.is_empty() else ", ".join(leaks)])
+
+
+## 未解锁的技能 J 也装不上（黑盒验收抓到的洞：数字键装槽有解锁检查，J 漏了 ——
+## 面板里灰色的「未解锁」其实装得上）。装上的门以 is_skill_unlocked 为准，
+## 与等级走：同一个键，解锁之后自然就能装了
+func _t16_locked_skill_cannot_toggle() -> void:
+	await _set_level(1)
+	PlayerState.skill_slots = ["", "", "", "", ""]
+	await _pframes(2)
+	_press("skill_panel")
+	await _pframes(3)
+	_release("skill_panel")
+	await _pframes(3)
+	_key(KEY_DOWN)
+	await _pframes(2)
+	_key(KEY_DOWN)                # 光标到第 3 行 = 铁壁（12 级解锁，1 级时是灰的）
+	await _pframes(2)
+	_key(KEY_J)
+	await _pframes(3)
+	var carried := _count_carried()
+	var ironwall_locked: bool = not PlayerState.carries(IRONWALL) \
+		and not bool(_player.call("is_skill_unlocked", IRONWALL))
+	_press("skill_panel")
+	await _pframes(3)
+	_release("skill_panel")
+	await _pframes(2)
+	_check("16", "未解锁的技能 J 也装不上（与数字键同一扇门）",
+		carried == 0 and ironwall_locked,
+		"Lv1 对铁壁按 J：携带 %d 件，铁壁在带=%s" % [
+			carried, str(PlayerState.carries(IRONWALL))])

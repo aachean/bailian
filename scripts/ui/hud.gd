@@ -307,7 +307,9 @@ func _skill_key(code: int) -> void:
 			_unequip_skill_at_cursor()
 
 
-## J：没带就装进第一个空槽；已经带着就摘下来
+## J：没带就装进第一个空槽；已经带着就摘下来。
+## **未解锁的技能不许装** —— 与数字键装槽同一扇门（黑盒验收抓到的漏网之鱼：
+## 数字键有检查、J 没有，于是面板里灰色的「未解锁」其实装得上）
 func _toggle_skill_at_cursor() -> void:
 	var pool := _pool()
 	if _skill_cursor < 0 or _skill_cursor >= pool.size():
@@ -315,11 +317,14 @@ func _toggle_skill_at_cursor() -> void:
 	var path := str(pool[_skill_cursor])
 	if PlayerState.carries(path):
 		PlayerState.clear_skill_slot_by_path(path)
-	else:
-		var free := PlayerState.skill_slots.find("")
-		if free < 0:
-			return                      # 5 格满了：先按 0 摘一个，否则不给装
-		PlayerState.set_skill_slot(free, path)
+		refresh()
+		return
+	if not _player.call("is_skill_unlocked", path):
+		return                          # 未解锁：不装、不报错，灰色就是它的状态
+	var free := PlayerState.skill_slots.find("")
+	if free < 0:
+		return                      # 5 格满了：先按 0 摘一个，否则不给装
+	PlayerState.set_skill_slot(free, path)
 	refresh()
 
 

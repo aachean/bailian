@@ -7,11 +7,12 @@ extends Node2D
 ## 吸附 / 拾取 / 排序的代码完全一样，差别只在「捡起来交给谁」。复制成四个场景的话，
 ## 以后调吸附手感要改四处，迟早会漏一处。
 ##
-## ── 消耗品的门（计划 §3.7）───────────────────────────────────
+## ── 消耗品怎么用（计划 §3.7，2026-09-15 按神的黑盒反馈修订）────
 ## 药掉在地上，走近直接生效 —— 不进背包、不占快捷键。
-## 但**满血 / 满蓝时不拾取，留在地上**：吸附的门也一并关掉，
-## 不然它会贴着玩家飘，像个甩不掉的跟班。
-## 元宝与精铁没有门 —— 钱不会嫌多。
+## **不管满不满，靠近就喝**：满血喝回血药 = 白喝，但那是玩家自己走进去的；
+## 「满了就拒收」反而让玩家站在药边上想喝喝不到（实测反馈）。
+## 「防止没靠近就被用」由拾取距离管：吸附从 46px 起，**生效只在 10px 内** ——
+## 钱和药是同一套距离，不发明第二套。
 ##
 ## 不做物理弹跳 —— 原型阶段碎片原地散落就够了，吸附拾取的手感（走近被吸走）
 ## 比弹跳值钱。拾取走轮询距离，不走 Area2D 信号：吸附本身就在逐帧挪位置，
@@ -69,16 +70,6 @@ func _dress_as_item() -> void:
 	_icon.set_item_path(item_path)
 
 
-## 药水的门：满了他就不收。返回 true = 现在不收
-func _potion_not_needed() -> bool:
-	if potion == &"hp":
-		var h := _player.get_node_or_null("Health") as Health
-		return h == null or h.hp >= h.max_hp
-	if potion == &"mp":
-		return int(_player.get("mp")) >= int(_player.get("max_mp"))
-	return false
-
-
 func _physics_process(delta: float) -> void:
 	if _collected:
 		return
@@ -90,11 +81,8 @@ func _physics_process(delta: float) -> void:
 	if h == null or h.is_dead:
 		return                      # 玩家死了不捡，重生后再来
 
-	# 满血 / 满蓝的药：不吸附、不拾取，安静躺在地上等需要它的人
-	var gated := not potion.is_empty() and _potion_not_needed()
-
 	var d := global_position.distance_to(_player.global_position)
-	if not gated and d < COLLECT_DIST:
+	if d < COLLECT_DIST:
 		_collected = true
 		if not item_path.is_empty():
 			if _player.has_method("collect_item"):
@@ -114,6 +102,6 @@ func _physics_process(delta: float) -> void:
 			if _player.has_method("collect_shard"):
 				_player.call("collect_shard")
 		queue_free()
-	elif not gated and d < ATTRACT_DIST:
+	elif d < ATTRACT_DIST:
 		global_position = global_position.move_toward(_player.global_position, ATTRACT_SPEED * delta)
 	# 没人靠近就安静躺着

@@ -7,7 +7,8 @@ extends Node
 ## 设计依据：计划 §3.7（2026-09-14 定）——
 ##   · 元宝是**唯一通用货币**，与精铁刻意互不兑换（两笔钱各管各的）
 ##   · 元宝来源只有两条：打怪掉小额 + 出售装备
-##   · 消耗品掉在地上**走近直接生效**，不进背包；满血 / 满蓝不拾取
+##   · 消耗品掉在地上**走近直接生效**，不进背包；满血 / 满蓝也喝
+##     （2026-09-15 神的黑盒反馈推翻了原「满了不收」—— 白喝是玩家自己走进去的）
 ##   · 商店随第一个副本首通解锁；出售进账 = 定价 × 折价率（ShopData）
 ##
 ## 断言盯的都是「静默就完蛋」的接缝：
@@ -191,45 +192,41 @@ func _t5_stand_unlock_gate() -> void:
 		"开张与否只看 SaveManager 的通关表，商店台不存第二份")
 
 
-## 药水的门：满血不收（躺着不动），掉了血才吸走并生效（计划 §3.7）
+## 消耗品（2026-09-15 黑盒反馈修订）：**不管满不满，靠近就喝**；
+## 「防止没靠近就被用」由拾取距离管 —— 10px 内才生效，远处躺着不动
 func _t6_potion_gate() -> void:
 	var h := _player.get_node("Health") as Health
 	h.heal_full()
 
-	# 满血：药在玩家脚下也不收
+	# 满血：也喝（白喝是玩家自己走进去的），血不掉就是全部效果
 	var hp_pot := PICKUP.instantiate()
 	hp_pot.set("potion", &"hp")
 	add_child(hp_pot)
 	hp_pot.global_position = _player.global_position
 	await _pframes(12)
-	var stayed: bool = is_instance_valid(hp_pot) and not hp_pot.get("_collected")
-	if is_instance_valid(hp_pot):
-		hp_pot.queue_free()
-	await _pframes(2)          # 必须等它真消失：留着的话，下一步一掉血
-	                          # 它的「门」就开了，会抢在第二瓶之前把血回掉（测试自己污染自己）
+	var drank_at_full: bool = not is_instance_valid(hp_pot) and h.hp == h.max_hp
 
-	# 掉血：吸走 + 回血 40
-	var low := h.max_hp - 50
-	h.restore(low)
-	var pot2 := PICKUP.instantiate()
-	pot2.set("potion", &"hp")
-	add_child(pot2)
-	pot2.global_position = _player.global_position
+	# 距离门：放远了不吸不喝；把玩家挪过去才被喝掉
+	h.heal_full()
+	var far := PICKUP.instantiate()
+	far.set("potion", &"hp")
+	add_child(far)
+	far.global_position = _player.global_position + Vector2(300.0, 0.0)
 	await _pframes(12)
-	var healed: bool = not is_instance_valid(pot2) \
-		and h.hp == mini(low + 40, h.max_hp)
+	var waited: bool = is_instance_valid(far) and not far.get("_collected")
+	far.global_position = _player.global_position
+	await _pframes(12)
+	var drank_when_close: bool = not is_instance_valid(far) and h.hp == h.max_hp
 
-	# 回蓝：满了不收，掉了才收（同一扇门，两条管道）
+	# 回蓝：满蓝也喝；有缺口喝下去真回
 	var mp_pot := PICKUP.instantiate()
 	mp_pot.set("potion", &"mp")
 	add_child(mp_pot)
 	mp_pot.global_position = _player.global_position
 	_player.set("mp", _player.get("max_mp"))
 	await _pframes(12)
-	var mp_stayed: bool = is_instance_valid(mp_pot)
-	if is_instance_valid(mp_pot):
-		mp_pot.queue_free()
-	await _pframes(2)          # 同上：别让满蓝时躺着的瓶子混进下一轮
+	var mp_drank_at_full: bool = not is_instance_valid(mp_pot) \
+		and int(_player.get("mp")) >= int(_player.get("max_mp"))
 	_player.set("mp", 10)
 	var mp_pot2 := PICKUP.instantiate()
 	mp_pot2.set("potion", &"mp")
@@ -241,9 +238,10 @@ func _t6_potion_gate() -> void:
 	var mp_filled: bool = not is_instance_valid(mp_pot2) \
 		and int(_player.get("mp")) >= 35
 
-	_check("6", "消耗品：满血/满蓝不拾取（原地躺）；有缺口才吸走并直接生效",
-		stayed and healed and mp_stayed and mp_filled,
-		"stayed=%s healed=%s mp_stayed=%s mp_filled=%s" % [stayed, healed, mp_stayed, mp_filled])
+	_check("6", "消耗品：满状态也直接喝；远处不吸不喝，靠近才生效",
+		drank_at_full and waited and drank_when_close and mp_drank_at_full and mp_filled,
+		"满血=%s 远候=%s 近喝=%s 满蓝=%s 回蓝=%s" % [
+			drank_at_full, waited, drank_when_close, mp_drank_at_full, mp_filled])
 
 
 ## 老货币一分不许动：强化仍然只走精铁；卖装备不产精铁（两条管道互不兑换）
