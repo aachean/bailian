@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+[ext_resource type="PackedScene" path="res://scenes/skills/arrow.tscn" id="2_arrow"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"heavy_bolt"
+display_name = "碎甲重矢"
+kind = 0
+startup_frames = 7
+active_frames = 2
+recovery_frames = 9
+damage = 20
+damage_variance = 0.12
+knockback = 160.0
+hitstop_frames = 5
+heavy = true
+chainable = false
+hitbox_size = Vector2(4, 4)
+hitbox_offset = Vector2(20, -2)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+cooldown_frames = 110
+mp_cost = 30
+unlock_level = 12
+projectile_scene = ExtResource("2_arrow")
+projectile_speed = 380.0
+projectile_life = 1.5
+shake_gain = 0.5

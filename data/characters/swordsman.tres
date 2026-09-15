@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CharacterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/character_data.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"swordsman"
+name_key = &"CHAR_SWORDSMAN"
+desc_key = &"CHAR_SWORDSMAN_DESC"
+body_color = Color(0.847, 0.353, 0.188, 1)
+combo = Array[String](["res://data/skills/attack_1.tres", "res://data/skills/attack_2.tres", "res://data/skills/attack_3.tres"])
+skills = Array[String](["res://data/skills/whirl.tres", "res://data/skills/thrust.tres", "res://data/skills/ironwall.tres", "res://data/skills/sword_wave.tres", "res://data/skills/quake.tres", "res://data/skills/breathe.tres", "res://data/skills/upcut.tres"])

@@ -19,6 +19,13 @@ var target_mask: int = 1
 ## 伤害倍率。玩家发射的剑气用它带上装备加成 —— 与 Hitbox.damage_scale 同一个意思：
 ## 加成属于「这个人」，不属于「这一招」
 var damage_scale: float = 1.0
+## 命中反馈三件套（M4 打击感）：顿帧、火花、屏震。
+## 由发射方从 SkillData 抄进来 —— 敌方的矛不设（默认 0），命中只有掉血，
+## 玩家听到的受击声与红色火花由玩家自己的 _on_damaged 负责，两头不重样
+var hitstop_frames: int = 0
+var heavy: bool = false
+var shake_gain: float = 0.0
+const HIT_FX := preload("res://scenes/components/hit_fx.tscn")
 
 var _hit_done := false
 
@@ -62,6 +69,20 @@ func _physics_process(delta: float) -> void:
 		var point := global_position
 		var dir := 1 if velocity.x >= 0.0 else -1
 		var dmg := int(round(float(damage) * damage_scale))
+		# 命中反馈：声、火花、双方顿帧、屏震 —— 与近战 _on_hit_landed 同一套语言。
+		# 弓箭打人不该是哑的（这正是远程角色要复用的管线）
+		Audio.play(&"hit")
+		var fx: Node2D = HIT_FX.instantiate()
+		fx.setup(Color(1.0, 0.62, 0.25) if heavy else Color(1.0, 0.9, 0.5),
+				16 if heavy else 10, 190.0 if heavy else 140.0)
+		get_tree().current_scene.add_child(fx)
+		fx.global_position = point
+		if body.has_method("apply_hitstop"):
+			body.call("apply_hitstop", hitstop_frames)
+		if hitstop_frames > 0 and is_instance_valid(source) and source.has_method("apply_hitstop"):
+			source.call("apply_hitstop", hitstop_frames)
+		if shake_gain > 0.0 and is_instance_valid(source) and source.has_method("add_shake"):
+			source.call("add_shake", shake_gain)
 		h.take_damage(dmg, point, false, dir)
 		_hit_done = true
 		queue_free()

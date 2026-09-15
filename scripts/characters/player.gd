@@ -24,25 +24,18 @@ extends CharacterBody2D
 
 enum State { FREE, ATTACK, DODGE, HURT, DEAD }
 
-const COMBO_PATHS := [
+## 角色数据的兜底（character_id 认不出时回退它；正常流程不会走到）
+const FALLBACK_COMBO := [
 	"res://data/skills/attack_1.tres",
 	"res://data/skills/attack_2.tres",
 	"res://data/skills/attack_3.tres",
 ]
 const DODGE_PATH := "res://data/skills/dodge.tres"
 
-## 技能池：按解锁等级排。加一个技能 = 加一个 .tres + 这里加一行。
-## 顺序同时决定了三件事：技能面板里的显示顺序、升级时自动补位的顺序、
-## 以及「解锁了但没带」的判定基准
-const SKILL_PATHS := [
-	"res://data/skills/whirl.tres",       # 旋风斩 Lv1
-	"res://data/skills/thrust.tres",      # 突刺斩 Lv2
-	"res://data/skills/ironwall.tres",    # 铁壁 Lv3
-	"res://data/skills/sword_wave.tres",  # 剑气斩 Lv4
-	"res://data/skills/quake.tres",       # 崩山击 Lv5
-	"res://data/skills/breathe.tres",     # 调息 Lv6
-	"res://data/skills/upcut.tres",       # 上撩斩 Lv8
-]
+## 当前角色（连招 / 技能池 / 外观色都从它来）。
+## **M4 架构验证的落点**：第二个角色落地时，本文件没为它改一行逻辑 ——
+## 差异全部住在 data/characters/*.tres 里。选谁由 PlayerState.character_id 决定
+var character: CharacterData = null
 
 ## 携带的 5 个技能（槽位 → SkillData，空槽 null）。真相在 PlayerState.skill_slots
 var skills: Array[SkillData] = []
@@ -252,19 +245,24 @@ const SHAKE_HURT_HEAVY := 0.6
 var _trauma := 0.0
 
 
-func _ready() -> void:
-	# 连招和闪避是数据，不写死在这里；tscn 里若已指定则优先用 tscn 的
+## 角色数据在 **_init** 就位（不是 _ready）：HUD 是玩家的子节点，
+## 子节点 _ready 先于父节点跑 —— 技能面板在自己的 _ready 里按池建行，
+## 那一刻角色必须已经加载好（M4 第二角色踩过：面板建出 0 行）。
+## 这里只动数据；外观（要摸子节点）仍留给 _ready
+func _init() -> void:
+	character = CharacterData.by_id(StringName(PlayerState.character_id))
+	if character == null:
+		character = CharacterData.default_character()
 	if attack_combo.is_empty():
-		for p in COMBO_PATHS:
-			var r := load(p)
-			if r is SkillData:
-				attack_combo.append(r)
-			else:
-				push_error("[player] 连招数据加载失败: %s" % p)
+		attack_combo = character.load_combo() if character != null else _load_fallback_combo()
 	if dodge_skill == null:
 		dodge_skill = load(DODGE_PATH) as SkillData
-	_body_mask = collision_mask
+
+
+func _ready() -> void:
+	_apply_character_look()
 	_hitbox.hit_landed.connect(_on_hit_landed)
+	_body_mask = collision_mask
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
 	_health.revived.connect(_on_revived)
@@ -316,10 +314,11 @@ func _sync_skill_slots() -> void:
 	PlayerState.auto_fill_slots(unlocked_skill_paths())
 
 
-## 当前等级下已解锁的技能资源路径（按 SKILL_PATHS 的顺序）
+## 当前等级下已解锁的技能资源路径（按角色技能池的顺序）。
+## 池子来自 CharacterData —— 每个角色自己的一套
 func unlocked_skill_paths() -> Array:
 	var out: Array = []
-	for p in SKILL_PATHS:
+	for p in skill_pool_paths():
 		var sk := load(p) as SkillData
 		if sk != null and level >= sk.unlock_level:
 			out.append(p)
@@ -328,7 +327,29 @@ func unlocked_skill_paths() -> Array:
 
 ## 整个技能池的路径（技能面板按这个顺序列）
 func skill_pool_paths() -> Array:
-	return SKILL_PATHS.duplicate()
+	return character.skills.duplicate() if character != null else []
+
+
+## 外观：换身体颜色。轮廓与脸共用 —— 同一个人的两个流派，一眼认得出是一家
+func _apply_character_look() -> void:
+	if character == null:
+		return
+	var body: ColorRect = _visuals.get_node_or_null("Body")
+	if body != null:
+		body.color = character.body_color
+	var lbl := get_node_or_null("CharacterName") as Label
+	if lbl != null:
+		lbl.text = tr(character.name_key)
+
+
+## 兜底连招（角色数据整体缺失时用剑客三段，至少能打）
+func _load_fallback_combo() -> Array[SkillData]:
+	var out: Array[SkillData] = []
+	for p in FALLBACK_COMBO:
+		var r := load(p)
+		if r is SkillData:
+			out.append(r)
+	return out
 
 
 ## 某个技能是否已解锁（技能面板用它把未解锁的画灰）
@@ -876,6 +897,11 @@ func _fire_projectile(sk: SkillData) -> void:
 		return
 	node.set("damage_scale", _hitbox.damage_scale)
 	node.set("target_mask", 2)          # 打敌人层
+	# 命中反馈三件套从招式表抄给箭 —— 投射物命中不经过 _on_hit_landed，
+	# 反馈得让它自己带（否则远程角色的打击是哑的）
+	node.set("hitstop_frames", sk.hitstop_frames)
+	node.set("heavy", sk.heavy)
+	node.set("shake_gain", sk.shake_gain)
 	host.add_child(node)
 	node.global_position = global_position + Vector2(18.0 * float(_facing), -4.0)
 	if node.has_method("setup"):

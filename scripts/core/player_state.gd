@@ -75,6 +75,10 @@ var shards: int = 0
 ## 与精铁（shards）刻意互不兑换 —— 两笔钱各管各的，见计划 §3.7 的按语
 var gold: int = 0
 
+## 选的角色 id（CharacterData.id）。**属于存档**：每个档可以玩不同的人。
+## 空 = 老档 / 还没选过，玩家节点回退默认角色
+var character_id: String = ""
+
 var level: int = 1
 var exp: int = 0
 
@@ -114,6 +118,7 @@ var _bonus: Dictionary = {"atk": 0.0, "hp": 0, "def": 0.0}
 func reset_for_new_game() -> void:
 	shards = 0
 	gold = 0
+	character_id = ""
 	level = 1
 	exp = 0
 	equipped.clear()
@@ -130,6 +135,8 @@ func reset_for_new_game() -> void:
 func load_from(d: Dictionary) -> void:
 	shards = int(d.get("shards", shards))
 	gold = int(d.get("gold", 0))     # 旧档没有这字段 → 从 0 开始（元宝是增量 12 才有的）
+	# 旧档没有这字段 → 保持空串，玩家节点回退默认角色
+	character_id = str(d.get("character_id", character_id))
 	level = progression.clamp_level(int(d.get("level", level)))
 	exp = int(d.get("exp", exp))
 	equipped = (d.get("equipped", {}) as Dictionary).duplicate()
@@ -152,6 +159,7 @@ func save_to() -> Dictionary:
 	return {
 		"shards": shards,
 		"gold": gold,
+		"character_id": character_id,
 		"level": level,
 		"exp": exp,
 		"equipped": equipped.duplicate(),

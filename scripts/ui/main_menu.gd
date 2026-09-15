@@ -21,6 +21,8 @@ var _slot_mode: int = SlotMode.START
 var _page := 0
 ## 待覆盖确认的槽位（确认面板开着时有值）
 var _pending_slot := 0
+## 新的开始：先选人再选槽。选中的角色 id（CharacterData.id）
+var _pending_character := &""
 
 var _slot_btns: Array[Button] = []
 var _prev_btn: Button
@@ -54,6 +56,7 @@ func _ready() -> void:
 	_back_btn.pressed.connect(_close_slots)
 	_build_slot_rows()
 	_build_confirm_panel()
+	_build_character_page()
 	if not GameSettings.language_changed.is_connected(_refresh_texts):
 		GameSettings.language_changed.connect(_refresh_texts)
 	_slots.visible = false
@@ -201,13 +204,98 @@ func _slot_text(slot: int, index: int) -> String:
 		index, tail, tr("HUD_SHARD"), shards, tr("PANEL_LEVEL"), level]
 
 
-# ── 按钮动作 ───────────────────────────────────────────────────
+# ── 选人页（M4：新的开始先选角色）────────────────────────────
 
-func _on_start() -> void:
+## 角色按钮列表（代码建，数量跟着 data/characters/ 里的 .tres 走）
+var _char_btns: Array[Button] = []
+var _char_page: Control = null
+var _char_title: Label = null
+
+
+## 选人页：暗底 + 标题 + 每个角色一颗按钮（名字 + 一句话介绍）。
+## 角色列表来自 CharacterData.all() —— 加角色 = 加 .tres，这页自己长
+func _build_character_page() -> void:
+	_char_page = Control.new()
+	_char_page.visible = false
+	add_child(_char_page)
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0.09, 0.09, 0.11, 1)
+	_char_page.add_child(dim)
+
+	_char_title = Label.new()
+	_char_title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_char_title.offset_top = 34.0
+	_char_title.offset_bottom = 66.0
+	_char_title.add_theme_font_size_override("font_size", 20)
+	_char_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_char_page.add_child(_char_title)
+
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.custom_minimum_size = Vector2(420, 0)
+	box.position = Vector2(110, 100)
+	box.size = Vector2(420, 160)
+	box.add_theme_constant_override("separation", 14)
+	_char_page.add_child(box)
+
+	for c in CharacterData.all():
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(420, 52)
+		b.pressed.connect(_on_character.bind(c.id))
+		box.add_child(b)
+		_char_btns.append(b)
+
+	var back := Button.new()
+	back.custom_minimum_size = Vector2(420, 32)
+	back.position = Vector2(110, 290)
+	back.size = Vector2(420, 32)
+	back.pressed.connect(_on_back_from_chars)
+	_char_page.add_child(back)
+	_char_page.set_meta("back_btn", back)
+
+
+func _on_back_from_chars() -> void:
+	_char_page.visible = false
+
+
+## 选人页的文字在打开时刷（角色列表是启动时建死的，数量不会中途变）
+func _open_character_page() -> void:
+	_char_title.text = tr("UI_CHAR_TITLE")
+	var all := CharacterData.all()
+	for i in _char_btns.size():
+		var c := all[i] if i < all.size() else null
+		if c == null:
+			_char_btns[i].visible = false
+			continue
+		_char_btns[i].visible = true
+		_char_btns[i].text = "%s　—　%s" % [tr(c.name_key), tr(c.desc_key)]
+	(back_btn_from_char_page()).visible = true
+	_char_page.visible = true
+
+
+func back_btn_from_char_page() -> Button:
+	return _char_page.get_meta("back_btn") as Button
+
+
+## 选中角色 → 进槽位选择（覆盖确认照旧）。选谁记在 _pending_character，
+## 真正写进存档是 _begin_new_game 的事 —— 中途返回不留下半个字
+func _on_character(cid: StringName) -> void:
+	_pending_character = cid
+	_char_page.visible = false
 	_slot_mode = SlotMode.START
 	_page = 0
 	_slots.visible = true
 	_refresh_texts()
+
+
+# ── 按钮动作 ───────────────────────────────────────────────────
+
+func _on_start() -> void:
+	_pending_character = &""
+	_slots.visible = false
+	_open_character_page()
 
 
 func _on_load() -> void:
@@ -259,9 +347,10 @@ func _on_cancel_overwrite() -> void:
 	_confirm.visible = false
 
 
-## 真正开新游戏：清成长数据 → 起新档 → 清解锁进度 → 进城镇
+## 真正开新游戏：清成长数据 → 记下选的角色 → 起新档 → 清解锁进度 → 进城镇
 func _begin_new_game(slot: int) -> void:
 	PlayerState.reset_for_new_game()
+	PlayerState.character_id = String(_pending_character)
 	SaveManager.start_new_game(slot, LEVEL_PATH)
 	# 开局的解锁进度：只有第一个副本的第一段。其余全靠一关一关打出来
 	GameProgress.reset_progress()
