@@ -88,8 +88,10 @@ func _apply_portrait() -> void:
 	var def := PlayerState.character_def()
 	if def != null and not def.sprite_dir.is_empty():
 		var path := def.sprite_dir + "/portrait.png"
+		if not ResourceLoader.exists(path):
+			path = def.sprite_dir + "/idle_0.png"   # 没立绘就用站姿第一帧顶上
 		if ResourceLoader.exists(path):
-			_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			_portrait.set_face_texture(load(path))
 
 

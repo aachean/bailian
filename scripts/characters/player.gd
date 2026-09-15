@@ -348,20 +348,22 @@ func _apply_character_look() -> void:
 	_setup_skin()
 
 
-# ── 精灵图模式（ADR-0015）────────────────────────────────────
-# CharacterData.sprite_dir 非空时，色块视觉退位，AI 生图三帧上阵：
-# idle 常驻 / atk_windup 攻击前摇 / atk_strike 判定窗起插入并带一记挤压。
-# 方向翻转沿用 Visuals.scale.x 的老机制 —— 素材统一面朝右，翻容器就够。
+# ── 精灵帧序列动画（ADR-0015 v2：像素素材包路线）──────────────
+# CharacterData.sprite_dir 非空时，色块视觉退位，**帧序列**上阵：
+# 约定文件 idle_N.png / run_N.png / attack_N.png / jump_N.png / x_N.png（死亡），
+# N 从 0 连续编号。attack_N 在装载时按编号中点劈成 windup（前摇）/strike（判定）两段。
+# 像素素材纪律：nearest 过滤 + 整数倍缩放（scale 2 = 40px 原生 ×2）——
+# 挤压/倾斜这类非整数形变一律不上，会把像素弄花。方向翻转沿用 Visuals.scale.x。
 
-## 精灵图显示高度。64 在实机上被评「看不清」——手绘插画的细节密度需要 88
-const SKIN_HEIGHT := 88.0
+## 像素缩放倍数（原生帧高 29 × 2 = 58px 显示）
+const SKIN_SCALE := 2.0
+const SKIN_FRAME_H := 29.0
 
 var _skin: Sprite2D = null
-var _skin_frames: Dictionary = {}
-var _skin_base_scale := Vector2.ONE
-## Skin 的基准纵向位置（脚底对齐用；走路颠步在它上下浮动）
-var _skin_base_y := 0.0
-## 走路步频时钟（_update_skin_motion 推进）
+var _skin_anims: Dictionary = {}     # StringName -> Array[Texture2D]
+var _skin_anim := &""
+var _anim_clock := 0.0
+var _anim_fps := 8.0
 var _walk_clock := 0.0
 
 
@@ -374,51 +376,72 @@ func _setup_skin() -> void:
 		_visuals.move_child(_skin, 0)     # 垫底：旋风剑光这类特效要压在角色上面
 	if character.sprite_dir.is_empty():
 		_skin.visible = false
-		_skin_frames = {}
+		_skin_anims = {}
 		return
-	# 高清手绘帧不是像素图：项目默认最近邻（像素风遗产）会把 256→64 的缩放采成
-	# 闪烁糊块。线性 + mipmap 才是这类素材的正确过滤
-	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	for n in ["Body", "Face", "Blade"]:
 		var n2 := _visuals.get_node_or_null(n)
 		if n2 != null:
 			n2.visible = false
-	_skin_frames = {
-		&"idle": load(character.sprite_dir + "/idle.png"),
-		&"windup": load(character.sprite_dir + "/atk_windup.png"),
-		&"strike": load(character.sprite_dir + "/atk_strike.png"),
-	}
-	# 移动帧：存在才进表（缺帧 _set_skin_frame 自动回退当前帧，不崩）
-	for pair in [["walk_a", "walk_a.png"], ["walk_b", "walk_b.png"],
-			["walk_b2", "walk_b2.png"], ["walk_pass", "walk_pass.png"],
-			["jump", "jump.png"]]:
-		var p: String = character.sprite_dir + "/" + str(pair[1])
-		if ResourceLoader.exists(p):
-			_skin_frames[StringName(pair[0])] = load(p)
+	_skin_anims = _load_anim_sequences(character.sprite_dir, {
+		&"idle": &"idle", &"run": &"run", &"jump": &"jump", &"dead": &"x",
+		&"windup": &"attack_half1", &"strike": &"attack_half2",
+	})
+	if _skin_anims.is_empty():
+		_skin.visible = false
+		return
+	# 像素素材：nearest + 整数倍缩放。脚底对齐旧色块脚底（Visuals 原点，+16）
+	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_skin.scale = Vector2(SKIN_SCALE, SKIN_SCALE)
+	_skin.position = Vector2(0.0, 16.0 - SKIN_FRAME_H * SKIN_SCALE * 0.5)
 	_skin.visible = true
-	_skin.texture = _skin_frames[&"idle"]
-	var tex_h := float(_skin.texture.get_height())
-	_skin_base_scale = Vector2.ONE * (SKIN_HEIGHT / tex_h)
-	_skin.scale = _skin_base_scale
-	# 素材的脚在图底：底边对齐旧色块的脚底（Visuals 原点在身体中心，脚底 +16）
-	_skin_base_y = 16.0 - SKIN_HEIGHT * 0.5
-	_skin.position = Vector2(0.0, _skin_base_y)
+	_set_skin_anim(&"idle", 6.0)
+
+
+## 读帧序列目录：返回 {动画名: [Texture,...]}。
+## half1/half2 特例：attack_N 按编号中点劈成攻击前摇/判定两段
+func _load_anim_sequences(dir: String, wanted: Dictionary) -> Dictionary:
+	var d := DirAccess.open(dir)
+	if d == null:
+		return {}
+	var files: Dictionary = {}
+	for f in d.get_files():
+		if not f.ends_with(".png"):
+			continue
+		var m := f.replace(".png", "").split("_")
+		if m.size() != 2 or not m[1].is_valid_int():
+			continue
+		files.get_or_add(StringName(m[0]), []).append([int(m[1]), f])
+	var out: Dictionary = {}
+	for anim in wanted:
+		var key := String(wanted[anim])
+		var base := key.replace("_half1", "").replace("_half2", "")
+		if not files.has(StringName(base)):
+			continue
+		var list: Array = files[StringName(base)]
+		list.sort_custom(func(a, b): return a[0] < b[0])
+		var texs: Array = []
+		for e in list:
+			texs.append(load(dir + "/" + str(e[1])))
+		if key.ends_with("_half"):
+			var cut := ceili(texs.size() / 2.0)
+			texs = texs.slice(0, cut) if key.ends_with("_half1") else texs.slice(cut)
+		if not texs.is_empty():
+			out[anim] = texs
+	return out
 
 
 func _skin_active() -> bool:
-	return _skin != null and _skin.visible and not _skin_frames.is_empty()
+	return _skin != null and _skin.visible and _skin_anims.size() > 0
 
 
-## 换帧 + 挥砍那帧带一记挤压脉冲（scale 由物理帧循环里缓弹回）
-func _set_skin_frame(kind: StringName) -> void:
-	if not _skin_active():
+## 切动画（同名不重置）。帧推进在 _physics_process 的 _tick_skin_anim
+func _set_skin_anim(anim: StringName, fps := 8.0) -> void:
+	if not _skin_active() or _skin_anim == anim or not _skin_anims.has(anim):
 		return
-	var tex: Texture2D = _skin_frames.get(kind)
-	if tex == null or _skin.texture == tex:
-		return
-	_skin.texture = tex
-	if kind == &"strike":
-		_skin.scale = Vector2(_skin_base_scale.x * 1.12, _skin_base_scale.y * 0.86)
+	_skin_anim = anim
+	_anim_fps = fps
+	_anim_clock = 0.0
+	_skin.texture = _skin_anims[anim][0]
 
 
 ## 兜底连招（角色数据整体缺失时用剑客三段，至少能打）
@@ -683,9 +706,11 @@ func _physics_process(delta: float) -> void:
 		if _trauma <= 0.0:
 			_camera.offset = Vector2.ZERO
 
-	# 精灵图挤压脉冲缓弹回。顿帧早退在上面 —— 世界冻住时挤压也冻住，正是想要的
-	if _skin != null and _skin.scale != _skin_base_scale:
-		_skin.scale = _skin.scale.lerp(_skin_base_scale, 0.28)
+	# 精灵帧推进。顿帧早退在上面 —— 世界冻住时动画也冻住，正是想要的
+	if _skin_active() and _skin_anim != &"":
+		_anim_clock += delta * _anim_fps
+		var frames: Array = _skin_anims[_skin_anim]
+		_skin.texture = frames[int(_anim_clock) % frames.size()]
 
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
@@ -726,41 +751,22 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
-## 移动帧（ADR-0015 补间法的移动侧）：地面四拍循环 walk_a → pass → walk_b → pass
-## （造梦西游式：收腿过渡消除两帧硬切的滑步感），身体随步频上下起伏 + 躯干前倾；
-## 空中跳帧（上升/下落共用）。只管 FREE 状态：攻击/受击的帧由各自流程负责
+## 移动动画（帧序列版）：地面 run 循环（帧率随速度），空中 jump。只管 FREE 状态 ——
+## 攻击/受击/死亡的动画由各自流程负责，别在这里抢
 func _update_skin_motion(delta: float) -> void:
 	if not _skin_active() or state != State.FREE:
 		return
 	if not is_on_floor():
-		_set_skin_frame(&"jump")
-		_skin_pose_relax(delta)
+		_set_skin_anim(&"jump", 10.0)
 		return
 	var speed := absf(velocity.x)
 	if speed < 20.0:
-		_set_skin_frame(&"idle")
+		_set_skin_anim(&"idle", 6.0)
 		_walk_clock = 0.0
-		_skin_pose_relax(delta)
 		return
-	# 步频随速度（满速约每秒两步）。四拍循环「跨步1 ↔ 收腿 ↔ 跨步2 ↔ 收腿」：
-	# 两个跨步帧左右腿真正交替（walk_b2 纯文生图 + 特征词表，双自检过线：
-	# 下半身差分 61 = 姿势真交替 / 亮度差 9 = 风格一致）
-	_walk_clock += delta * clampf(speed / 140.0, 0.7, 1.6) * 4.0
-	match int(floor(_walk_clock)) % 4:
-		0, 2: _set_skin_frame(&"walk_b")
-		1, 3: _set_skin_frame(&"walk_pass")
-	# 步颠：换拍（脚触地）时最低、迈步中间最高，幅度 3px；
-	# 前倾 4°——素材面朝右，visuals.scale.x 翻转时倾角自动跟着镜像，方向永远正确
-	var bob := absf(sin(_walk_clock * PI)) * 3.0
-	_skin.position.y = _skin_base_y - bob
-	_skin.rotation = lerpf(_skin.rotation, 0.07, minf(delta * 10.0, 1.0))
-
-
-## 非走路状态把姿态收回基准（站直、回正）
-func _skin_pose_relax(delta: float) -> void:
-	_skin.position.y = lerpf(_skin.position.y, _skin_base_y, minf(delta * 12.0, 1.0))
-	_skin.rotation = lerpf(_skin.rotation, 0.0, minf(delta * 12.0, 1.0))
-
+	_walk_clock += delta
+	# 帧率随速度：满速约 12fps 的跑步循环（run 6 帧 = 每秒两个完整步周期）
+	_set_skin_anim(&"run", clampf(6.0 + speed / 140.0 * 6.0, 6.0, 12.0))
 
 ## 受击硬直：输入全部无效，只剩击退的惯性 + 重力。
 ## 「挨打要停一拍」是动作游戏的基本代价，它让敌人的攻击真的构成威胁。
@@ -936,7 +942,7 @@ func _start_attack(index: int) -> void:
 	_swing_sfx(_current)
 	state = State.ATTACK
 	_state_frame = 0
-	_set_skin_frame(&"windup")
+	_set_skin_anim(&"windup", 18.0)
 	_attack_queued = false
 	_dodge_queued = false
 	_jump_buffer_timer = 0.0
@@ -960,7 +966,7 @@ func _attack_process(delta: float) -> void:
 
 	if sk.is_active_at(t):
 		_hitbox.activate(sk, self, _facing)
-		_set_skin_frame(&"strike")
+		_set_skin_anim(&"strike", 18.0)
 		_blade.modulate.a = 1.0
 		# 剑气这类技能在判定窗口的第一帧甩出投射物（窗口有 4 帧，只该发一道）
 		if not _projectile_fired and sk.projectile_scene != null:
@@ -1088,7 +1094,7 @@ func _latch_action_input() -> void:
 
 func _end_action() -> void:
 	_hitbox.deactivate()
-	_set_skin_frame(&"idle")
+	_set_skin_anim(&"idle", 6.0)
 	_blade.modulate.a = 0.0
 	_whirl_fx.visible = false
 	_whirl_fx.modulate.a = 0.0
@@ -1201,7 +1207,7 @@ func _spawn_hit_fx(point: Vector2, color: Color, count: int, speed: float) -> vo
 ## 硬直帧数比无敌窗口长，所以连招惩罚依然成立 —— 这是有意的。
 func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir: int) -> void:
 	hurts_taken += 1
-	_set_skin_frame(&"idle")   # 出招被打断时把姿势收回来
+	_set_skin_anim(&"idle", 6.0)   # 出招被打断时把姿势收回来
 	# 挨打是负反馈 —— 玩家必须**立刻**知道自己中招了（6.2 的首响应）。
 	# 这声比命中更响：命中有连招会响好几下，挨打才是要命的那个
 	Audio.play(&"hurt")
