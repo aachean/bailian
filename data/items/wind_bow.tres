@@ -7,6 +7,7 @@ script = ExtResource("1_data")
 id = &"wind_bow"
 name_key = &"ITEM_WIND_BOW"
 slot = 0
+weapon_type = &"bow"
 tier = 1
 atk_bonus = 0.15
 gold_price = 40

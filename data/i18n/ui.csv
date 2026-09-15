@@ -157,3 +157,5 @@ SKILL_BOW_3,"贯日","Sunshot"
 SKILL_QUICK_SHOT,"疾风连珠","Gale Burst"
 SKILL_HEAVY_BOLT,"碎甲重矢","Armor Splitter"
 SKILL_SKY_PIERCE,"穿云箭","Sky Piercer"
+
+UI_BAG_WRONG_WEAPON,"%s 不是这个角色能使的武器（K 可以卖掉）","%s cannot wield this weapon (K to sell)"

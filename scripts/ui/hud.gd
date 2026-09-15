@@ -21,6 +21,9 @@ const ICON_SIZE := 16.0
 const CHAR_ROW_HEIGHT := 18.0    # 角色面板一行（更挤：上面还有八行属性）
 
 var _bag_open := false
+## 背包面板的提示消息（穿不上武器之类）—— 带过期时刻，2.4 秒后回常规提示
+var _bag_msg := ""
+var _bag_msg_until := 0
 var _cursor := 0                 # 全面板共用一个光标：0..3 是装备槽，之后是背包
 var _equip_rows: Array[HBoxContainer] = []
 var _bag_rows: Array[HBoxContainer] = []
@@ -424,7 +427,16 @@ func _use_cursor() -> void:
 	else:
 		var idx := _cursor - slots
 		if idx < PlayerState.bag.size():
-			PlayerState.equip(str(PlayerState.bag[idx]))
+			var uid := str(PlayerState.bag[idx])
+			var it := PlayerState.item_of(uid)
+			# 武器类型不匹配（弓手拿铁剑）：穿上会被拒 —— **必须说出来**，
+			# 按了没反应玩家分不清是 bug 还是规则
+			if it != null and not PlayerState.can_equip(it):
+				_bag_msg = tr("UI_BAG_WRONG_WEAPON") % [tr(it.name_key)]
+				_bag_msg_until = Time.get_ticks_msec() + 2400
+				refresh()
+				return
+			PlayerState.equip(uid)
 	_clamp_cursor()
 	refresh()
 
@@ -497,10 +509,15 @@ func refresh_bag() -> void:
 	if not _bag_open:
 		return
 	_bag_title.text = tr("UI_BAG_TITLE")
-	# 键位提示 + 余额：卖东西要看钱进了没有，两笔钱都摆在这行里
-	_bag_hint.text = "%s　·　%s　·　%s ×%d　%s ×%d" % [
-		tr("UI_BAG_HINT"), tr("UI_BAG_SELL"),
-		tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards]
+	# 提示行两级：出错消息（2.4s）> 常规键位+余额。消息必须说出来，不许静默
+	if not _bag_msg.is_empty() and Time.get_ticks_msec() < _bag_msg_until:
+		_bag_hint.text = _bag_msg
+	else:
+		_bag_msg = ""
+		# 键位提示 + 余额：卖东西要看钱进了没有，两笔钱都摆在这行里
+		_bag_hint.text = "%s　·　%s　·　%s ×%d　%s ×%d" % [
+			tr("UI_BAG_HINT"), tr("UI_BAG_SELL"),
+			tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards]
 	var dim := Color(0.62, 0.6, 0.55, 1)
 	var normal := Color(0.9, 0.88, 0.84, 1)
 

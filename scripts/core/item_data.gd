@@ -40,6 +40,12 @@ const SLOT_KEYS: Array[StringName] = [&"SLOT_WEAPON", &"SLOT_HELM", &"SLOT_ARMOR
 ## 减伤比例。0.1 = 受到的伤害少 10%。全身上限见 Health.MAX_DAMAGE_REDUCTION
 @export var def_bonus: float = 0.0
 
+@export_group("武器类型（武器必填，防具/饰品留空）")
+## 武器归属：&"sword" 剑系 / &"bow" 弓系。**角色只能穿自己类型的武器**
+## （CharacterData.weapon_type 对照，PlayerState.equip 是唯一的门）——
+## 弓手捡了铁剑可以卖钱，但不能挥
+@export var weapon_type: StringName = &""
+
 @export_group("经济")
 ## 商店定价（元宝）。掉落与商店标价共用这一个数；
 ## 出售进账 = 它 × ShopData.sell_ratio（折价率住在 shop.tres，不在这）

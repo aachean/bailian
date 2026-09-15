@@ -28,6 +28,11 @@ extends Resource
 ## dialogue_box 发奖时按当前角色换成这里这份）—— 弓手不该背着铁剑出门
 @export var starting_weapon: String = ""
 
+@export_group("武器类型")
+## 这个角色使什么类型的武器（对照 ItemData.weapon_type）。
+## 装备门在 PlayerState.equip：类型不匹配的武器穿不上
+@export var weapon_type: StringName = &"sword"
+
 @export_group("战斗数据（res:// 路径）")
 ## 普攻连招：J 一下接一下的那几段，按顺序
 @export var combo: Array[String] = []

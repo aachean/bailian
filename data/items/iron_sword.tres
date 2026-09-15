@@ -7,6 +7,7 @@ script = ExtResource("1_data")
 id = &"iron_sword"
 name_key = &"ITEM_IRON_SWORD"
 slot = 0
+weapon_type = &"sword"
 tier = 1
 atk_bonus = 0.15
 

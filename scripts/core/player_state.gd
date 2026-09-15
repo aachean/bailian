@@ -428,6 +428,28 @@ func auto_fill_slots(available: Array) -> bool:
 
 # ── 装备栏操作 ─────────────────────────────────────────────────
 
+## 当前角色的定义（缓存住 —— 目录扫描不必每次装备都跑一遍）
+var _character: CharacterData = null
+var _character_loaded_for := ""
+
+
+func character_def() -> CharacterData:
+	if _character == null or _character_loaded_for != character_id:
+		_character = CharacterData.by_id(StringName(character_id))
+		if _character == null:
+			_character = CharacterData.default_character()
+		_character_loaded_for = character_id
+	return _character
+
+
+## 这件装备当前角色能不能穿。武器看类型匹配；防具/饰品不限
+func can_equip(item: ItemData) -> bool:
+	if item == null:
+		return false
+	if item.weapon_type == &"":
+		return true
+	return item.weapon_type == character_def().weapon_type
+
 ## 某槽位穿着的装备 uid（空槽返回空串）
 func equipped_uid(slot: StringName) -> String:
 	return str(equipped.get(String(slot), ""))
@@ -458,10 +480,15 @@ func add_item(path: String) -> String:
 
 
 ## 穿上一件背包里的装备（参数是 uid）。返回被替换下来的那件 uid（"" = 原来空槽）。
-## 换下来的自动回背包 —— 玩家不该因为换装而丢东西
+## 换下来的自动回背包 —— 玩家不该因为换装而丢东西。
+##
+## **武器类型是唯一的门**（M4 第二角色）：武器必须与当前角色的 weapon_type 匹配
+## —— 弓手捡了铁剑可以卖钱，但不能挥。防具/饰品（weapon_type 为空）不限
 func equip(uid: String) -> String:
 	var item := item_of(uid)
 	if item == null:
+		return ""
+	if not can_equip(item):
 		return ""
 	_remove_from_bag(uid)
 	var slot := String(item.slot_id())

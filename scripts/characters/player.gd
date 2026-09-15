@@ -332,13 +332,16 @@ func skill_pool_paths() -> Array:
 	return character.skills.duplicate() if character != null else []
 
 
-## 外观：换身体颜色。轮廓与脸共用 —— 同一个人的两个流派，一眼认得出是一家
+## 外观：换身体颜色 + 武器表现。弓手不挥剑光 —— 手里那片剑刃藏起来
 func _apply_character_look() -> void:
 	if character == null:
 		return
 	var body: ColorRect = _visuals.get_node_or_null("Body")
 	if body != null:
 		body.color = character.body_color
+	var blade: ColorRect = _visuals.get_node_or_null("Blade")
+	if blade != null:
+		blade.visible = character.weapon_type != &"bow"
 	var lbl := get_node_or_null("CharacterName") as Label
 	if lbl != null:
 		lbl.text = tr(character.name_key)

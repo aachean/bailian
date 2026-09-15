@@ -86,7 +86,30 @@ func _draw() -> void:
 		ItemData.Slot.TRINKET:
 			_draw_trinket(k, base, hi, dark)
 		_:
-			_draw_sword(k, base, hi, dark)
+			# 武器分家（M4 第二角色）：弓画弓，其余画剑 ——
+			# 背包里铁剑和逐风弓得一眼分得出，不然装备门提示都像在说谎
+			if _item.weapon_type == &"bow":
+				_draw_bow(k, base, hi)
+			else:
+				_draw_sword(k, base, hi, dark)
+
+
+## 弓：一段弧 + 弦 + 搭着的箭杆
+func _draw_bow(k: float, base: Color, hi: Color) -> void:
+	# 弓身：右弯的弧（八个近似点，draw_arc 的粗细随缩放）
+	var pts := PackedVector2Array()
+	for i in 9:
+		var a := -1.25 + 2.5 * float(i) / 8.0
+		pts.append(Vector2(4.0 + 5.0 * cos(a), 8.0 + 7.0 * sin(a)) * k)
+	for i in pts.size() - 1:
+		draw_line(pts[i], pts[i + 1], base, maxf(1.6, 1.6 * k))
+	# 弦
+	draw_line(pts[0], pts[pts.size() - 1], hi, maxf(1.0, k))
+	# 搭着的箭
+	draw_line(Vector2(1.5, 8.0) * k, Vector2(13.0, 8.0) * k, hi, maxf(1.2, 1.2 * k))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(15, 8) * k, Vector2(12, 6.2) * k, Vector2(12, 9.8) * k,
+	]), hi)
 
 
 ## 精铁碎片：一颗小八角粒

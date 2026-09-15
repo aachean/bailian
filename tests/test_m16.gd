@@ -33,6 +33,7 @@ func _ready() -> void:
 	await _t4_save_roundtrip()
 	await _t5_menu_character_page()
 	await _t6_old_save_falls_back()
+	await _t7_weapon_type_gate()
 
 	SaveGuard.restore(_bak)
 	PlayerState.character_id = ""
@@ -203,3 +204,31 @@ func _count_projectiles(room: Node) -> int:
 		if c.get_script() != null and str(c.get_script().resource_path).ends_with("projectile.gd"):
 			n += 1
 	return n
+
+
+## 武器类型是唯一的装备门：弓手穿铁剑被拒（可卖不可挥），剑客反之；
+## 本命武器畅通。**拒绝必须能在界面上说出来**（背包提示行），不许静默
+func _t7_weapon_type_gate() -> void:
+	PlayerState.character_id = "archer"
+	PlayerState.reset_for_new_game()
+	PlayerState.character_id = "archer"
+	var sword_uid := PlayerState.add_item("res://data/items/iron_sword.tres")
+	var bow_uid := PlayerState.add_item("res://data/items/wind_bow.tres")
+	var sword_refused: bool = PlayerState.equip(sword_uid) == "" \
+		and PlayerState.bag.has(sword_uid) \
+		and PlayerState.equipped_uid(&"weapon") == ""
+	# 注意 equip 的返回值是「被换下来的旧装备 uid」—— 原来槽是空的，成功也返回空串，
+	# 别拿它判成败，判「武器栏现在是谁」
+	PlayerState.equip(bow_uid)
+	var bow_ok: bool = PlayerState.equipped_uid(&"weapon") == bow_uid
+	# 剑客侧：逐风弓进不了手
+	PlayerState.character_id = "swordsman"
+	PlayerState._character = null      # 清缓存（角色切换走菜单，测试里手动模拟）
+	PlayerState._character_loaded_for = ""
+	var bow_on_sword: bool = not PlayerState.can_equip(PlayerState.item_of(bow_uid))
+	var sword_on_sword: bool = PlayerState.can_equip(PlayerState.item_of(sword_uid))
+	PlayerState.reset_for_new_game()
+	_check("7", "装备门：弓手穿不了铁剑（留在包里可卖）、本命弓畅通；剑客反之",
+		sword_refused and bow_ok and bow_on_sword and sword_on_sword,
+		"弓手+铁剑拒=%s　弓手+逐风弓=%s　剑客+逐风弓拒=%s　剑客+铁剑=%s" % [
+			str(sword_refused), str(bow_ok), str(bow_on_sword), str(sword_on_sword)])
