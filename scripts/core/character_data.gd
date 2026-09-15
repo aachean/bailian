@@ -23,6 +23,11 @@ extends Resource
 ## 身体主色。脸是固定的白 —— 只换衣服颜色，轮廓不变，一眼「同一个人的两个流派」
 @export var body_color: Color = Color(0.847, 0.353, 0.188)
 
+@export_group("初始装备（res:// 路径）")
+## 初始武器。老铁匠的见面礼按它发货（对话 give_item 写的是剑客的铁剑，
+## dialogue_box 发奖时按当前角色换成这里这份）—— 弓手不该背着铁剑出门
+@export var starting_weapon: String = ""
+
 @export_group("战斗数据（res:// 路径）")
 ## 普攻连招：J 一下接一下的那几段，按顺序
 @export var combo: Array[String] = []

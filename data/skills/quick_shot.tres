@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_skill")
 id = &"quick_shot"
+name_key = &"SKILL_QUICK_SHOT"
 display_name = "疾风连珠"
 kind = 0
 startup_frames = 7
@@ -23,7 +24,7 @@ lunge_speed = 0.0
 lunge_decay_frames = 1
 cooldown_frames = 40
 mp_cost = 10
-unlock_level = 5
+unlock_level = 1
 projectile_scene = ExtResource("2_arrow")
 projectile_speed = 500.0
 projectile_life = 1.0

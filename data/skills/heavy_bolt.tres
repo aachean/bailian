@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_skill")
 id = &"heavy_bolt"
+name_key = &"SKILL_HEAVY_BOLT"
 display_name = "碎甲重矢"
 kind = 0
 startup_frames = 7

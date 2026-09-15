@@ -8,5 +8,6 @@ id = &"swordsman"
 name_key = &"CHAR_SWORDSMAN"
 desc_key = &"CHAR_SWORDSMAN_DESC"
 body_color = Color(0.847, 0.353, 0.188, 1)
+starting_weapon = "res://data/items/iron_sword.tres"
 combo = Array[String](["res://data/skills/attack_1.tres", "res://data/skills/attack_2.tres", "res://data/skills/attack_3.tres"])
 skills = Array[String](["res://data/skills/whirl.tres", "res://data/skills/thrust.tres", "res://data/skills/ironwall.tres", "res://data/skills/sword_wave.tres", "res://data/skills/quake.tres", "res://data/skills/breathe.tres", "res://data/skills/upcut.tres"])

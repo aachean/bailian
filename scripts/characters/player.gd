@@ -172,6 +172,8 @@ func apply_saved(d: Dictionary) -> void:
 	PlayerState.shards = int(d.get("shards", PlayerState.shards))
 	# 元宝同理只住 PlayerState（增量 12 起有这个字段；旧快照读不到就保持原值）
 	PlayerState.gold = int(d.get("gold", PlayerState.gold))
+	# 角色同理 —— 快照里没有就保持原值（老快照兼容）
+	PlayerState.character_id = str(d.get("character_id", PlayerState.character_id))
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
 	# 装备栏 / 背包 / 强化表也在快照里，先摆回 PlayerState 再算属性。

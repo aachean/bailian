@@ -199,9 +199,15 @@ func _slot_text(slot: int, index: int) -> String:
 	# 拿它判会把「能读的档」误报成「进度要重来」
 	var stale := SaveManager.slot_version(slot) < SaveManager.STRUCTURE_VERSION
 	var tail := tr("UI_SLOT_OLD") if stale else place
+	# 这档玩的是谁（2026-09-15 黑盒反馈：读档列表看不出哪档是弓手）
+	var cid := str(player.get("character_id", ""))
+	var who := ""
+	var cd := CharacterData.by_id(StringName(cid))
+	if cd != null:
+		who = tr(cd.name_key) + "　"
 	# 摘要里不再写「武器 Lv.N」—— 强化改成逐件之后，那个全局等级不存在了
-	return "%d. %s　%s ×%d　%s Lv.%d" % [
-		index, tail, tr("HUD_SHARD"), shards, tr("PANEL_LEVEL"), level]
+	return "%d. %s%s　%s ×%d　%s Lv.%d" % [
+		index, who, tail, tr("HUD_SHARD"), shards, tr("PANEL_LEVEL"), level]
 
 
 # ── 选人页（M4：新的开始先选角色）────────────────────────────
@@ -213,30 +219,37 @@ var _char_title: Label = null
 
 
 ## 选人页：暗底 + 标题 + 每个角色一颗按钮（名字 + 一句话介绍）。
-## 角色列表来自 CharacterData.all() —— 加角色 = 加 .tres，这页自己长
+## 角色列表来自 CharacterData.all() —— 加角色 = 加 .tres，这页自己长。
+##
+## ── 布局用显式坐标，不用锚点 ──────────────────────────────────
+## 黑盒反馈：第一版标题和按钮全跟主菜单叠在一起 —— 当时依赖
+## set_anchors_preset 铺满/居中，控件加进树之前设的锚点没按预期铺开，
+## 暗底尺寸为 0 等于没遮。HUD 那次的教训在这里又应验一遍：
+## **全屏遮罩一律显式 position + size**。
+## 另外打开本页时把主菜单的标题与按钮区**藏起来** —— 叠着就是两层界面。
 func _build_character_page() -> void:
 	_char_page = Control.new()
 	_char_page.visible = false
+	_char_page.position = Vector2.ZERO
+	_char_page.size = Vector2(640, 360)
 	add_child(_char_page)
 
 	var dim := ColorRect.new()
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0.09, 0.09, 0.11, 1)
+	dim.position = Vector2.ZERO
+	dim.size = Vector2(640, 360)
+	dim.color = Color(0.07, 0.07, 0.09, 1)
 	_char_page.add_child(dim)
 
 	_char_title = Label.new()
-	_char_title.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_char_title.offset_top = 34.0
-	_char_title.offset_bottom = 66.0
+	_char_title.position = Vector2(0, 30)
+	_char_title.size = Vector2(640, 40)
 	_char_title.add_theme_font_size_override("font_size", 20)
 	_char_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_char_page.add_child(_char_title)
 
 	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.custom_minimum_size = Vector2(420, 0)
-	box.position = Vector2(110, 100)
-	box.size = Vector2(420, 160)
+	box.position = Vector2(110, 96)
+	box.size = Vector2(420, 170)
 	box.add_theme_constant_override("separation", 14)
 	_char_page.add_child(box)
 
@@ -249,7 +262,7 @@ func _build_character_page() -> void:
 
 	var back := Button.new()
 	back.custom_minimum_size = Vector2(420, 32)
-	back.position = Vector2(110, 290)
+	back.position = Vector2(110, 300)
 	back.size = Vector2(420, 32)
 	back.pressed.connect(_on_back_from_chars)
 	_char_page.add_child(back)
@@ -258,10 +271,15 @@ func _build_character_page() -> void:
 
 func _on_back_from_chars() -> void:
 	_char_page.visible = false
+	_title.visible = true
+	$Panel.visible = true
 
 
-## 选人页的文字在打开时刷（角色列表是启动时建死的，数量不会中途变）
+## 选人页的文字在打开时刷（角色列表是启动时建死的，数量不会中途变）。
+## 打开时**把主菜单的标题与按钮区藏起来** —— 两层界面叠着就是事故（黑盒反馈）
 func _open_character_page() -> void:
+	_title.visible = false
+	$Panel.visible = false
 	_char_title.text = tr("UI_CHAR_TITLE")
 	var all := CharacterData.all()
 	for i in _char_btns.size():
@@ -308,6 +326,8 @@ func _on_load() -> void:
 func _close_slots() -> void:
 	_slots.visible = false
 	_confirm.visible = false
+	_title.visible = true
+	$Panel.visible = true
 
 
 func _on_prev_page() -> void:

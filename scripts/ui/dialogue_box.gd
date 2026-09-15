@@ -136,7 +136,16 @@ func _reward(d: DialogueData) -> void:
 		return
 	# add_item 返回的是**实例 uid**（空串 = 不是装备）。这里只关心成没成功，
 	# 所以判空串而不是拿它当 bool —— 别指望 GDScript 替你隐式转换
-	if not PlayerState.add_item(d.give_item).is_empty():
+	# 初始武器按角色发货：give_item 写的是剑客的铁剑（第一个角色的历史遗留），
+	# 弓手来领礼就该领到弓 —— 路径匹配任一角色的初始武器时，换成当前角色那份
+	var gift := d.give_item
+	for c in CharacterData.all():
+		if c.starting_weapon == gift and String(c.id) != PlayerState.character_id:
+			var mine := CharacterData.by_id(StringName(PlayerState.character_id))
+			if mine != null and not mine.starting_weapon.is_empty():
+				gift = mine.starting_weapon
+			break
+	if not PlayerState.add_item(gift).is_empty():
 		PlayerState.set_flag(d.flag)
 
 

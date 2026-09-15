@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_skill")
 id = &"bow_3"
+name_key = &"SKILL_BOW_3"
 display_name = "贯日"
 kind = 0
 startup_frames = 7

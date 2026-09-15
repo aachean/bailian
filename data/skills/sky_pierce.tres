@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_skill")
 id = &"sky_pierce"
+name_key = &"SKILL_SKY_PIERCE"
 display_name = "穿云箭"
 kind = 0
 startup_frames = 7

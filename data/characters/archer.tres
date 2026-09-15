@@ -8,5 +8,6 @@ id = &"archer"
 name_key = &"CHAR_ARCHER"
 desc_key = &"CHAR_ARCHER_DESC"
 body_color = Color(0.25, 0.62, 0.5, 1)
+starting_weapon = "res://data/items/wind_bow.tres"
 combo = Array[String](["res://data/skills/bow_1.tres", "res://data/skills/bow_2.tres", "res://data/skills/bow_3.tres"])
 skills = Array[String](["res://data/skills/quick_shot.tres", "res://data/skills/heavy_bolt.tres", "res://data/skills/sky_pierce.tres"])
