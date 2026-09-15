@@ -68,6 +68,9 @@ func _other_ui_open() -> bool:
 	var atlas := _player.get_node_or_null("Atlas")
 	if atlas != null and atlas.has_method("is_open") and bool(atlas.call("is_open")):
 		return true
+	var shop := _player.get_node_or_null("ShopPanel")
+	if shop != null and shop.has_method("is_open") and bool(shop.call("is_open")):
+		return true
 	var box := get_tree().get_first_node_in_group("dialogue_box")
 	return box != null and bool(box.call("is_open"))
 

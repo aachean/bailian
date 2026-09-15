@@ -21,3 +21,7 @@ attack_skill = ExtResource("2_skill")
 exp_reward = 8
 drop_item_chance = 0.18
 drop_items = Array[String](["res://data/items/leather_cap.tres", "res://data/items/cloth_robe.tres", "res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres"])
+
+drop_gold = 2
+drop_heal_chance = 0.10
+drop_mana_chance = 0.0

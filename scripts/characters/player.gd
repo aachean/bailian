@@ -174,6 +174,8 @@ func apply_saved(d: Dictionary) -> void:
 	# 精铁 / 等级 / 经验都只住在 PlayerState —— 玩家节点不存第二份，
 	# 所以这里是「把它摆回 PlayerState」，不是「抄到自己身上再写回去」
 	PlayerState.shards = int(d.get("shards", PlayerState.shards))
+	# 元宝同理只住 PlayerState（增量 12 起有这个字段；旧快照读不到就保持原值）
+	PlayerState.gold = int(d.get("gold", PlayerState.gold))
 	PlayerState.level = level
 	PlayerState.exp = exp_pts
 	# 装备栏 / 背包 / 强化表也在快照里，先摆回 PlayerState 再算属性。
@@ -493,6 +495,47 @@ func collect_shard() -> void:
 	PlayerState.shards += 1
 	Audio.play(&"pickup")
 	_refresh_hud()
+
+
+## 拾取元宝（Pickup 组件调）。元宝只进商店 —— 买装备、（以后）买别的。
+## 真相同样只住在 PlayerState（与精铁同一条教训，不写第二份）
+func collect_gold(n: int) -> void:
+	PlayerState.add_gold(n)
+	Audio.play(&"pickup")
+	_refresh_hud()
+
+
+## 喝回血药（Pickup 组件调 —— 药掉在地上，走近直接生效，不进背包）。
+## 头顶飘绿字：喝药必须有反馈，不然玩家不知道刚才那一下是回血还是没生效
+func drink_heal(amount: int) -> void:
+	var healed := _health.heal(amount)
+	Audio.play(&"pickup")
+	_pickup_fx_text("+%d" % healed, Color(0.45, 0.85, 0.5))
+
+
+## 喝回蓝药。同上，飘蓝字
+func drink_mana(amount: int) -> void:
+	mp = mini(mp + amount, max_mp)
+	Audio.play(&"pickup")
+	_pickup_fx_text("+%d" % amount, Color(0.45, 0.65, 0.95))
+
+
+## 拾取飘字（药水用）。与装备飘字同一套动作：上浮 + 淡出
+func _pickup_fx_text(text: String, color: Color) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var lbl := Label.new()
+	lbl.z_index = 50
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.position = global_position + Vector2(-14, -56)
+	host.add_child(lbl)
+	var tw := lbl.create_tween()
+	tw.tween_property(lbl, "position:y", lbl.position.y - 26.0, 0.9)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.9)
+	tw.tween_callback(lbl.queue_free)
 
 
 func _physics_process(delta: float) -> void:

@@ -9,3 +9,5 @@ name_key = &"ITEM_CLOTH_ROBE"
 slot = 2
 tier = 0
 def_bonus = 0.1
+
+gold_price = 18

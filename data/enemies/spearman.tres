@@ -24,3 +24,7 @@ projectile_damage = 7
 projectile_life = 1.6
 drop_item_chance = 0.22
 drop_items = Array[String](["res://data/items/leather_cap.tres", "res://data/items/cloth_robe.tres", "res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres"])
+
+drop_gold = 3
+drop_heal_chance = 0.0
+drop_mana_chance = 0.10

@@ -42,6 +42,13 @@ extends Resource
 @export_group("掉落")
 ## 死亡时掉多少精铁碎片（强化素材）。0 = 不掉
 @export var drop_shards: int = 1
+## 死亡时掉多少元宝（商店货币）。0 = 不掉。**与精铁是两条管道**（计划 §3.7）：
+## 元宝进商店，精铁进铁匠铺，互不兑换
+@export var drop_gold: int = 0
+## 掉一瓶回血药的概率（0..1）。**药掉在地上，走近直接生效，不进背包**（计划 §3.7）
+@export var drop_heal_chance: float = 0.0
+## 掉一瓶回蓝药的概率（0..1）。同上
+@export var drop_mana_chance: float = 0.0
 ## 死亡时给多少经验
 @export var exp_reward: int = 8
 ## 装备掉落池（data/items/*.tres 的资源路径）。空数组 = 不掉装备

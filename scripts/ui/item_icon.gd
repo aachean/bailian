@@ -19,6 +19,15 @@ const DESIGN := 16.0
 const SHARD_COLOR := Color(0.55, 0.78, 0.9)
 ## 空装备槽的框线颜色
 const EMPTY_COLOR := Color(0.36, 0.33, 0.29)
+## 元宝的颜色（金）。药水的颜色只在这一处定义 —— 地上的、面板里的、飘字必须同色
+const GOLD_COLOR := Color(0.95, 0.78, 0.3)
+const HEAL_COLOR := Color(0.88, 0.32, 0.3)
+const MANA_COLOR := Color(0.4, 0.6, 0.95)
+
+## 非装备形态：&"" 默认（碎片 / 装备），&"gold" 元宝，&"potion_hp"/&"potion_mp" 药水。
+## 为什么进 ItemIcon 而不是另写一个图标类：三种新形态同样要「地上、面板两处同形同色」，
+## 分家的话迟早漂移 —— 与「同一件装备四处同形同色」是同一条纪律
+var kind: StringName = &""
 
 ## 装备资源路径。空 = 不是装备（地上掉落物画碎片、面板里画空框）
 var item_path: String = ""
@@ -49,6 +58,16 @@ func _draw() -> void:
 	var k := minf(size.x, size.y) / DESIGN
 	if k <= 0.0:
 		return
+	match kind:
+		&"gold":
+			_draw_gold(k)
+			return
+		&"potion_hp":
+			_draw_potion(k, HEAL_COLOR)
+			return
+		&"potion_mp":
+			_draw_potion(k, MANA_COLOR)
+			return
 	if _item == null:
 		if empty_frame:
 			draw_rect(Rect2(Vector2(2, 2) * k, Vector2(12, 12) * k),
@@ -76,6 +95,34 @@ func _draw_shard(k: float) -> void:
 		Vector2(5, 1), Vector2(11, 1), Vector2(15, 5), Vector2(15, 11),
 		Vector2(11, 15), Vector2(5, 15), Vector2(1, 11), Vector2(1, 5),
 	], k), SHARD_COLOR)
+
+
+## 元宝：金锭——梯形底座 + 顶上一颗鼓包，一眼「值钱」
+func _draw_gold(k: float) -> void:
+	var dark := GOLD_COLOR.darkened(0.35)
+	var hi := GOLD_COLOR.lightened(0.35)
+	draw_colored_polygon(_poly([
+		Vector2(2, 10), Vector2(14, 10), Vector2(12.5, 15), Vector2(3.5, 15),
+	], k), GOLD_COLOR)
+	draw_colored_polygon(_poly([
+		Vector2(5, 5), Vector2(11, 5), Vector2(14, 10), Vector2(2, 10),
+	], k), dark)
+	draw_colored_polygon(_poly([
+		Vector2(8, 1.5), Vector2(11.5, 5), Vector2(4.5, 5),
+	], k), hi)
+
+
+## 药水：细颈圆瓶 + 瓶塞。回血红、回蓝蓝（形状相同，只换色 —— 玩家学一次就认识）
+func _draw_potion(k: float, liquid: Color) -> void:
+	var glass := Color(0.85, 0.87, 0.9, 0.9)
+	var dark := liquid.darkened(0.4)
+	draw_rect(_rect(6.6, 1.2, 9.4, 3.4, k), dark)             # 瓶塞
+	draw_rect(_rect(6.9, 3.4, 9.1, 6.5, k), glass)            # 瓶颈
+	draw_colored_polygon(_poly([                               # 瓶身（圆·八边形近似）
+		Vector2(3.5, 10), Vector2(5, 6.6), Vector2(11, 6.6), Vector2(12.5, 10),
+		Vector2(12.5, 12), Vector2(10.5, 14.6), Vector2(5.5, 14.6), Vector2(3.5, 12),
+	], k), liquid)
+	draw_rect(_rect(5.4, 7.6, 7.0, 12.5, k), glass.lightened(0.3))  # 高光
 
 
 ## 剑：亮剑身（主体）+ 细护手 + 短柄。

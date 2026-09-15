@@ -9,3 +9,5 @@ name_key = &"ITEM_IRON_HELM"
 slot = 1
 tier = 1
 hp_bonus = 45
+
+gold_price = 40

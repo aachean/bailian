@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="ShopData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/shop_data.gd" id="1_shop"]
+
+[resource]
+script = ExtResource("1_shop")
+stock = Array[String](["res://data/items/leather_cap.tres", "res://data/items/cloth_robe.tres", "res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres", "res://data/items/iron_helm.tres", "res://data/items/iron_armor.tres", "res://data/items/jade_talisman.tres"])
+sell_ratio = 0.5

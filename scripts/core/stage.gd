@@ -486,6 +486,7 @@ func collect() -> Dictionary:
 			"spawn_x": sp.x,
 			"spawn_y": sp.y,
 			"shards": PlayerState.shards,
+			"gold": PlayerState.gold,
 			"level": int(player.get("level")),
 			"exp": int(player.get("exp_pts")),
 			"mp": int(player.get("mp")),

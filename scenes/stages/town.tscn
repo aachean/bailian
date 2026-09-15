@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
@@ -7,6 +7,7 @@
 [ext_resource type="Resource" path="res://data/dialogue/smith_intro.tres" id="6_smith_intro"]
 [ext_resource type="Resource" path="res://data/dialogue/smith_repeat.tres" id="7_smith_repeat"]
 [ext_resource type="PackedScene" path="res://scenes/core/atlas_pedestal.tscn" id="8_pedestal"]
+[ext_resource type="PackedScene" path="res://scenes/core/shop_stand.tscn" id="9_shop"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1280, 24)
@@ -77,6 +78,9 @@ repeat_dialogue = ExtResource("7_smith_repeat")
 
 [node name="Anvil" parent="." instance=ExtResource("4_anvil")]
 position = Vector2(780, 306)
+
+[node name="ShopStand" parent="." instance=ExtResource("9_shop")]
+position = Vector2(930, 306)
 
 [node name="AtlasPedestal" parent="." instance=ExtResource("8_pedestal")]
 position = Vector2(1080, 306)

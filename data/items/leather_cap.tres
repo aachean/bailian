@@ -9,3 +9,5 @@ name_key = &"ITEM_LEATHER_CAP"
 slot = 1
 tier = 0
 hp_bonus = 20
+
+gold_price = 16

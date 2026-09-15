@@ -10,3 +10,5 @@ slot = 3
 tier = 0
 atk_bonus = 0.08
 hp_bonus = 15
+
+gold_price = 12

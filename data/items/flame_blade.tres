@@ -9,3 +9,5 @@ name_key = &"ITEM_FLAME_BLADE"
 slot = 0
 tier = 2
 atk_bonus = 0.3
+
+gold_price = 150

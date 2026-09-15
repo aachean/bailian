@@ -40,6 +40,11 @@ const SLOT_KEYS: Array[StringName] = [&"SLOT_WEAPON", &"SLOT_HELM", &"SLOT_ARMOR
 ## 减伤比例。0.1 = 受到的伤害少 10%。全身上限见 Health.MAX_DAMAGE_REDUCTION
 @export var def_bonus: float = 0.0
 
+@export_group("经济")
+## 商店定价（元宝）。掉落与商店标价共用这一个数；
+## 出售进账 = 它 × ShopData.sell_ratio（折价率住在 shop.tres，不在这）
+@export var gold_price: int = 0
+
 
 ## 本装备所属槽位的字符串 id（存档 / 装备栏字典的 key）
 func slot_id() -> StringName:

@@ -10,3 +10,5 @@ slot = 3
 tier = 2
 atk_bonus = 0.18
 def_bonus = 0.12
+
+gold_price = 120

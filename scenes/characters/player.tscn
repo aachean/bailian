@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/characters/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/components/hitbox.gd" id="2_hitbox"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/atlas.tscn" id="7_atlas"]
 [ext_resource type="PackedScene" path="res://scenes/ui/death_menu.tscn" id="8_death"]
 [ext_resource type="PackedScene" path="res://scenes/ui/forge_panel.tscn" id="9_forge"]
+[ext_resource type="PackedScene" path="res://scenes/ui/shop_panel.tscn" id="10_shop"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(24, 32)
@@ -118,3 +119,5 @@ position_smoothing_speed = 8.0
 [node name="DeathMenu" parent="." instance=ExtResource("8_death")]
 
 [node name="ForgePanel" parent="." instance=ExtResource("9_forge")]
+
+[node name="ShopPanel" parent="." instance=ExtResource("10_shop")]

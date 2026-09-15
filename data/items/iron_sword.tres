@@ -9,3 +9,5 @@ name_key = &"ITEM_IRON_SWORD"
 slot = 0
 tier = 1
 atk_bonus = 0.15
+
+gold_price = 40

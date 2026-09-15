@@ -402,9 +402,13 @@ func _bag_key(code: int) -> void:
 			refresh()
 		KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 			_use_cursor()
+		KEY_K:
+			_sell_cursor()
 
 
 ## J：光标在装备槽上 = 卸下；在背包行上 = 穿上（同部位自动替换，换下来的回背包）
+## K：光标在背包行上 = 出售换元宝。**只收背包件** ——
+## 穿在身上的先卸下再来，「一个按键卖掉正在穿的甲」不该是可能发生的事故
 func _use_cursor() -> void:
 	var slots: int = ItemData.SLOT_IDS.size()
 	if _cursor < slots:
@@ -413,6 +417,20 @@ func _use_cursor() -> void:
 		var idx := _cursor - slots
 		if idx < PlayerState.bag.size():
 			PlayerState.equip(str(PlayerState.bag[idx]))
+	_clamp_cursor()
+	refresh()
+
+
+## 出售光标那件背包装备（K）。卖价 = 定价 × 折价率，算法住在 PlayerState.sell_item
+## （它经手元宝与背包两张表）。卖成了响一声；卖不了（光标在装备槽上 / 背包空）不说废话
+## —— 光标位置本身就是原因，装备槽行上根本没有「卖」这个动作
+func _sell_cursor() -> void:
+	var idx := _cursor - ItemData.SLOT_IDS.size()
+	if idx < 0 or idx >= PlayerState.bag.size():
+		return
+	var uid := str(PlayerState.bag[idx])
+	if PlayerState.sell_item(uid) > 0:
+		Audio.play(&"pickup")
 	_clamp_cursor()
 	refresh()
 
@@ -471,7 +489,10 @@ func refresh_bag() -> void:
 	if not _bag_open:
 		return
 	_bag_title.text = tr("UI_BAG_TITLE")
-	_bag_hint.text = tr("UI_BAG_HINT")
+	# 键位提示 + 余额：卖东西要看钱进了没有，两笔钱都摆在这行里
+	_bag_hint.text = "%s　·　%s　·　%s ×%d　%s ×%d" % [
+		tr("UI_BAG_HINT"), tr("UI_BAG_SELL"),
+		tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards]
 	var dim := Color(0.62, 0.6, 0.55, 1)
 	var normal := Color(0.9, 0.88, 0.84, 1)
 
@@ -573,7 +594,9 @@ func refresh() -> void:
 	_portrait.set_exp(1.0 if needed <= 0 else float(exp_pts) / float(needed))
 	# 等级带上限：等级是「解锁内容的钥匙」，玩家得看得见离顶还有多远
 	_lv_label.text = "Lv.%d/%d" % [level, PlayerState.level_cap]
-	_bag_label.text = "%s ×%d" % [tr("HUD_SHARD"), PlayerState.shards]
+	# 两笔钱都常驻：元宝（商店）/ 精铁（强化）。经济两条管道，玩家随时都得看得见余额
+	_bag_label.text = "%s ×%d　%s ×%d" % [
+		tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards]
 
 	refresh_skill_bar()
 	refresh_stage_label()

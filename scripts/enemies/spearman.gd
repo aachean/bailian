@@ -226,6 +226,8 @@ func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: i
 func _on_died() -> void:
 	_enter(State.DEAD)
 	_drop_shards()
+	_drop_gold()
+	_drop_potions()
 	_drop_item()
 	PlayerState.add_exp(data.exp_reward)   # 击杀经验进玩家成长
 	_revive_t = data.revive_delay
@@ -258,6 +260,39 @@ func _drop_item() -> void:
 	p.set("item_path", path)
 	host.add_child(p)
 	p.global_position = global_position + Vector2(_rng.randf_range(-18.0, 18.0), -8.0)
+
+
+## 死亡掉元宝：一笔（一个拾取物，值 data.drop_gold）。
+## 元宝是商店的钱，与精铁两条管道（计划 §3.7）—— 别把它并进碎片循环里
+func _drop_gold() -> void:
+	var host := get_tree().current_scene
+	if host == null or data.drop_gold <= 0:
+		return
+	var p: Node2D = PICKUP.instantiate()
+	p.set("gold_amount", data.drop_gold)
+	host.add_child(p)
+	p.global_position = global_position + Vector2(
+		_rng.randf_range(-20.0, 20.0), _rng.randf_range(-12.0, 2.0))
+
+
+## 死亡按概率掉药（回血 / 回蓝各判一次）。药掉在地上走近直接生效 ——
+## **满了玩家不收**，这扇门在 pickup 里（计划 §3.7），这里只管掉不掉
+func _drop_potions() -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	if data.drop_heal_chance > 0.0 and _rng.randf() <= data.drop_heal_chance:
+		var hp: Node2D = PICKUP.instantiate()
+		hp.set("potion", &"hp")
+		host.add_child(hp)
+		hp.global_position = global_position + Vector2(
+			_rng.randf_range(-22.0, 22.0), _rng.randf_range(-12.0, 2.0))
+	if data.drop_mana_chance > 0.0 and _rng.randf() <= data.drop_mana_chance:
+		var mp: Node2D = PICKUP.instantiate()
+		mp.set("potion", &"mp")
+		host.add_child(mp)
+		mp.global_position = global_position + Vector2(
+			_rng.randf_range(-22.0, 22.0), _rng.randf_range(-12.0, 2.0))
 
 
 func _on_revived() -> void:

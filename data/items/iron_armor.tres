@@ -9,3 +9,5 @@ name_key = &"ITEM_IRON_ARMOR"
 slot = 2
 tier = 1
 def_bonus = 0.25
+
+gold_price = 55

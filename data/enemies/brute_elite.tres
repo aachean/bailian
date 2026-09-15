@@ -22,3 +22,7 @@ drop_shards = 5
 exp_reward = 32
 drop_item_chance = 0.34
 drop_items = Array[String](["res://data/items/iron_armor.tres", "res://data/items/iron_helm.tres", "res://data/items/iron_sword.tres"])
+
+drop_gold = 6
+drop_heal_chance = 0.15
+drop_mana_chance = 0.0

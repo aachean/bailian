@@ -27,6 +27,9 @@ extends Node
 ## 升级时发。玩家听了加血上限 / 蓝上限并回满
 signal level_up(new_level: int)
 
+## 元宝变化时发（拾取 / 出售 / 购买）。HUD 与商店面板听了重刷数字
+signal gold_changed(new_gold: int)
+
 ## 经验变化时发（包括没升级的零散经验）—— 场景里的玩家节点听它同步，
 ## 否则 HUD 上的经验条只会在切场景后「突然」跳起来（实测反馈）
 signal exp_changed(new_exp: int)
@@ -46,9 +49,12 @@ const UID_SEP := "#"
 const PROGRESSION_PATH := "res://data/progression.tres"
 ## 强化的唯一真相（品质上限 / 成本递增 / 收益递减）
 const FORGE_PATH := "res://data/forge.tres"
+## 商店的唯一真相（库存 / 出售折价率）。买与卖的钱都从这儿过（ADR 无，计划 §3.7）
+const SHOP_PATH := "res://data/shop.tres"
 
 @onready var progression: ProgressionData = load(PROGRESSION_PATH) as ProgressionData
 @onready var _forge: ForgeData = load(FORGE_PATH) as ForgeData
+@onready var _shop: ShopData = load(SHOP_PATH) as ShopData
 
 ## 等级上限（给界面用，省得到处 PlayerState.progression.level_cap）
 @onready var level_cap: int = progression.level_cap
@@ -64,6 +70,10 @@ func is_max_level() -> bool:
 
 
 var shards: int = 0
+
+## 元宝：**唯一通用货币**（计划 §3.7），只进商店（买 / 卖）。
+## 与精铁（shards）刻意互不兑换 —— 两笔钱各管各的，见计划 §3.7 的按语
+var gold: int = 0
 
 var level: int = 1
 var exp: int = 0
@@ -103,6 +113,7 @@ var _bonus: Dictionary = {"atk": 0.0, "hp": 0, "def": 0.0}
 
 func reset_for_new_game() -> void:
 	shards = 0
+	gold = 0
 	level = 1
 	exp = 0
 	equipped.clear()
@@ -118,6 +129,7 @@ func reset_for_new_game() -> void:
 
 func load_from(d: Dictionary) -> void:
 	shards = int(d.get("shards", shards))
+	gold = int(d.get("gold", 0))     # 旧档没有这字段 → 从 0 开始（元宝是增量 12 才有的）
 	level = progression.clamp_level(int(d.get("level", level)))
 	exp = int(d.get("exp", exp))
 	equipped = (d.get("equipped", {}) as Dictionary).duplicate()
@@ -139,6 +151,7 @@ func load_from(d: Dictionary) -> void:
 func save_to() -> Dictionary:
 	return {
 		"shards": shards,
+		"gold": gold,
 		"level": level,
 		"exp": exp,
 		"equipped": equipped.duplicate(),
@@ -273,6 +286,63 @@ func forgeable_uids() -> Array:
 			out.append(uid)
 	out.append_array(bag)
 	return out
+
+
+# ── 元宝（商店经济，计划 §3.7）────────────────────────────────
+# 两条管道进、一条管道出：打怪掉小额 + 出售装备 → 元宝 → 商店买。
+# 与精铁（shards）刻意**互不兑换** —— 两笔钱让玩家每次花钱都要判断该用哪个；
+# 能互换就等于只有一种。精铁只进强化，元宝只进商店。
+
+## 商店数据（库存 / 折价率）。界面要列货架、要算卖价都从这儿拿，
+## 别摸 _shop 私有成员
+func shop() -> ShopData:
+	return _shop
+
+func add_gold(n: int) -> void:
+	if n <= 0:
+		return
+	gold += n
+	gold_changed.emit(gold)
+
+
+## 花 n 个元宝。花不起返回 false —— 「为什么没花成」由调用方说出来（不静默）
+func spend_gold(n: int) -> bool:
+	if n <= 0 or gold < n:
+		return false
+	gold -= n
+	gold_changed.emit(gold)
+	return true
+
+
+## 从商店买一件（必须在库存里）。成功 = 扣钱 + 新实例进背包，返回 uid；
+## 失败返回空串（不在库存 / 不是装备 / 元宝不够 —— 界面负责区分原因）。
+## 买来的是**新实例**：商店卖的是型号，玩家拿到的是自己那一件（与掉落同一模型）
+func buy_item(path: String) -> String:
+	if _shop == null or not _shop.has_stock(path):
+		return ""
+	var it := load(path) as ItemData
+	if it == null:
+		return ""
+	if not spend_gold(it.gold_price):
+		return ""
+	return add_item(path)
+
+
+## 出售一件**背包里的**装备，换元宝。价格只有一套算法：
+## 卖价 = 定价 × 折价率（ShopData.sell_ratio，向下取整）。
+## 返回进账（0 = 卖不了）。穿在身上的不收 —— 先卸下再来，
+## 「一个按键卖掉正在穿的甲」不该是可能发生的事故
+func sell_item(uid: String) -> int:
+	if not bag.has(uid):
+		return 0
+	var it := item_of(uid)
+	if it == null:
+		return 0
+	var gain := _shop.sell_price(int(it.gold_price))
+	_remove_from_bag(uid)
+	equipment_changed.emit()
+	add_gold(gain)
+	return gain
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────
