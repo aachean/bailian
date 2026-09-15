@@ -376,6 +376,9 @@ func _setup_skin() -> void:
 		_skin.visible = false
 		_skin_frames = {}
 		return
+	# 高清手绘帧不是像素图：项目默认最近邻（像素风遗产）会把 256→64 的缩放采成
+	# 闪烁糊块。线性 + mipmap 才是这类素材的正确过滤
+	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	for n in ["Body", "Face", "Blade"]:
 		var n2 := _visuals.get_node_or_null(n)
 		if n2 != null:

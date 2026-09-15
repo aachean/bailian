@@ -104,6 +104,8 @@ func _setup_skin() -> void:
 		if n2 != null:
 			n2.visible = false
 	_skin.texture = load(data.sprite_path)
+	# 高清手绘帧用线性 + mipmap（项目默认最近邻会把缩小采样成糊块）
+	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var tex_h := float(_skin.texture.get_height())
 	var s := 52.0 / tex_h          # 小怪比玩家（64）矮一头
 	_skin.scale = Vector2(-s, s)

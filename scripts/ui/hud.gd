@@ -89,6 +89,7 @@ func _apply_portrait() -> void:
 	if def != null and not def.sprite_dir.is_empty():
 		var path := def.sprite_dir + "/portrait.png"
 		if ResourceLoader.exists(path):
+			_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 			_portrait.set_face_texture(load(path))
 
 

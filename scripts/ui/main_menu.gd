@@ -261,6 +261,7 @@ func _build_character_page() -> void:
 		if not c.sprite_dir.is_empty():
 			var icon_path := c.sprite_dir + "/portrait.png"
 			if ResourceLoader.exists(icon_path):
+				b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 				b.icon = load(icon_path)
 				b.expand_icon = true
 				b.add_theme_constant_override("h_separation", 12)
