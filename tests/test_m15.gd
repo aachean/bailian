@@ -125,8 +125,8 @@ func _t4_hurt_shakes_harder() -> void:
 	_player.call("_on_damaged", 5, 10, point, true, 1)
 	var heavy: float = float(_player.get("_trauma"))
 	_player.set("_trauma", 0.0)
-	_check("4", "挨打屏震：普通 > 命中档，重击 > 普通",
-		light >= 0.5 and heavy > light,
+	_check("4", "挨打屏震：普通 > 命中档，重击 > 普通（第一版太夸张，整体已降档）",
+		light >= 0.4 and heavy > light,
 		"普通挨打 trauma=%.2f　重击挨打 trauma=%.2f" % [light, heavy])
 
 
@@ -138,10 +138,11 @@ func _t5_death_burst() -> void:
 		_check("5", "死亡爆点", false, "测试房里没有 Walker")
 		return
 	walker.call("_death_burst")
-	await _pframes(2)
-	var after := _count_fx()
+	# 轻震只有 0.12 的预算，衰减每帧 0.06 —— 立刻读，等两帧就被扣光了
 	var shaken: bool = float(_player.get("_trauma")) > 0.0
 	_player.set("_trauma", 0.0)
+	await _pframes(2)
+	var after := _count_fx()
 	_check("5", "死亡爆点：尸体撒碎屑 + 玩家相机轻震",
 		after > before and shaken,
 		"特效节点 %d → %d　轻震=%s" % [before, after, str(shaken)])

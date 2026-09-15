@@ -237,15 +237,17 @@ func spawn_point() -> Vector2:
 # 相机偏移 = 上限 × trauma²。平方让小震动真的小、大震动才放得开 ——
 # 线性衰减的屏震里每一下都在抖，几秒后就麻木了。
 
-## 相机最大偏移（像素，trauma=1 时）
-const SHAKE_MAX_OFFSET := 10.0
-## 每帧衰减量。0.045 ≈ 半秒多从最强震回平静
-const SHAKE_DECAY := 0.045
+## 相机最大偏移（像素，trauma=1 时）。
+## **2026-09-15 黑盒反馈：第一版太夸张** —— 10px 砍到 6px，衰减加快，
+## 重击乘数与挨打份量同步下调。第一版的相对分级保留（重 > 轻、挨打 > 命中）
+const SHAKE_MAX_OFFSET := 6.0
+## 每帧衰减量。0.06 ≈ 半秒内从最强震回平静 —— 震完就走，不赖着
+const SHAKE_DECAY := 0.06
 ## 轻命中 / 重命中 / 挨打 / 重击挨打的震动预算（招式自己的 shake_gain 会叠在轻命中上）
 const SHAKE_HIT := 0.22
-const SHAKE_HEAVY_MULT := 1.7
-const SHAKE_HURT := 0.5
-const SHAKE_HURT_HEAVY := 0.8
+const SHAKE_HEAVY_MULT := 1.45
+const SHAKE_HURT := 0.4
+const SHAKE_HURT_HEAVY := 0.6
 
 var _trauma := 0.0
 

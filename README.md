@@ -32,12 +32,12 @@
 ## 怎么跑
 
 1. 用 Godot 4.7.x 打开本目录下的 `project.godot`
-2. 按 `F5` —— 进主菜单：开始游戏 / 继续游戏（有存档时）/ 语言切换 / 退出
+2. 按 `F5` —— 进主菜单：**新的开始** / 继续游戏（有存档时）/ 读取存档 / 设置 / 退出
 
 **操作**：`A`/`D` 或 `←`/`→` 移动　·　`Space`/`W`/`↑` 跳跃　·　`J` 攻击 / **交谈**（连点三下是三段连招）　·　`K` 闪避　·　**`1`~`5` 放技能**（`L` 是 1 号格的别名）　·　`C` 角色面板　·　`B` 装备背包　·　`V` 技能面板　·　**`P` 打开舆图**（站在安全区的舆图台旁，或清空一个副本之后自动弹出）　·　`Esc` 暂停菜单
 　　　倒下之后：`↑↓` 选「重新开始 / 返回城镇」，`J` 确认
 
-**存档**：3 个存档槽（`user://save_1..3.cfg`）。写档时机是暂停菜单里的「保存游戏」与回主菜单。
+**存档**：**15 个存档槽**（`user://save_1..15.cfg`，菜单里 5 个一页翻 3 页，槽位号全页连续）。写档时机是暂停菜单里的「保存游戏」与回主菜单；「新的开始」点到有档的槽会**先弹覆盖确认**，手滑抹不掉旧档。
 当前记录：**已清空的副本**、玩家血量位置、**这一屏打到第几批**、
 精铁与武器强化等级、等级与经验、**装备栏与背包**、**剧情进度标记**、**携带的技能**。
 
@@ -97,7 +97,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m1.tscn
 
 ```
 godot --headless --path . res://tests/check_scenes.tscn              # 场景完整性（34 个场景，缺节点即红）
-godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 槽位存档 / 语言（6 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m2.tscn    # 菜单 / 15 槽分页存档 / 覆盖确认 / 语言（8 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m3.tscn    # 相机 / 城镇入口 / 新怪（12 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m4.tscn    # 等级 / 蓝量 / 技能 / 受击 / 头像经验环 / 血蓝数值（18 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m5.tscn    # 装备掉落 / 穿戴 / 词条 / 图标 / 背包界面（15 条）

@@ -26,7 +26,9 @@ const VERSION := 9
 ## 见 main_menu 的旧档分支。**判定要用它，不是 VERSION**：
 ## 拿 VERSION 判的话，每次加一层同格式的新字段都会误伤一批能用的档
 const STRUCTURE_VERSION := 7
-const SLOT_COUNT := 3
+## 存档槽数量（2026-09-15 黑盒反馈：3 不够，扩到 15，菜单每页 5 个翻 3 页）。
+## 槽位文件名不变（save_N.cfg），老档天然在原位
+const SLOT_COUNT := 15
 const LAST_SLOT_PATH := "user://last_slot.cfg"
 
 ## 正在玩的槽（1 起）。菜单开始 / 读档时设置，游戏内写档都用它

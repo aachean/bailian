@@ -17,7 +17,9 @@ extends RefCounted
 ##     SaveGuard.restore(bak)
 ## ```
 
-const SLOTS := 3
+## 与 SaveManager.SLOT_COUNT 同步（2026-09-15 扩到 15）。
+## 静态函数里不便引用 autoload，这里放字面量 —— 改槽位数时两处一起改
+const SLOTS := 15
 
 
 ## 把三个槽 + last_slot.cfg 读成字节存下来。文件不存在就记成「本来就没有」

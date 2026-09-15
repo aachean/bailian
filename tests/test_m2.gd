@@ -4,8 +4,10 @@ extends Node
 ## 跑法（无头）：
 ##     godot --headless --fixed-fps 60 --path <项目根> res://tests/test_m2.tscn
 ##
-## 存档模型（用户验收定的）：3 槽位 + 最近槽「继续」。这里的断言盯三种翻车：
-## 槽位之间互相污染、读了不存在的档、新游戏把别的槽抹掉。
+## 存档模型（2026-09-15 黑盒反馈修订）：**15 槽位（5×3 页）** + 最近槽「继续」。
+## 「开始游戏」改名「**新的开始**」，选中已有档的槽必须弹覆盖确认。
+## 这里的断言盯四种翻车：槽位之间互相污染、读了不存在的档、
+## 新游戏把别的槽抹掉、**手滑把旧档覆盖掉**。
 
 const MENU := preload("res://scenes/ui/main_menu.tscn")
 ## 这个测试会 wipe 三个存档槽（测槽位隔离）—— 而 user:// 就是玩家真正在玩的
@@ -28,6 +30,8 @@ func _ready() -> void:
 	await _t4_settings_entry()
 	await _t5_world_snapshot_roundtrip()
 	await _t6_snapshot_survives_file()
+	await _t7_fifteen_slots_paged()
+	await _t8_overwrite_confirm()
 	SaveGuard.restore(_bak)          # 玩家原来的存档原样放回去
 
 	print("")
@@ -66,15 +70,16 @@ func _t1_menu_buttons() -> void:
 
 	var missing := PackedStringArray()
 	for node_path in ["Panel/Box/Start", "Panel/Box/Continue", "Panel/Box/Load",
-			"Panel/Box/Settings", "Panel/Box/Quit", "Slots/Box/Slot1", "Slots/Box/Slot3",
+			"Panel/Box/Settings", "Panel/Box/Quit", "Slots/Box/Slot1", "Slots/Box/Slot5",
 			"SettingsPanel"]:
 		if menu.get_node_or_null(node_path) == null:
 			missing.append(node_path)
 	var title := (menu.get_node("Title") as Label).text
 	var start_text := (menu.get_node("Panel/Box/Start") as Button).text
+	var start_renamed: bool = start_text == tr("UI_MENU_START") and start_text != "开始游戏"
 	var ok := missing.is_empty() and not title.is_empty() and title != "UI_MENU_TITLE" \
-		and not start_text.is_empty() and start_text != "UI_MENU_START"
-	_check("1", "主菜单摆得出来：标题 + 五个按钮 + 三个存档位",
+		and start_renamed
+	_check("1", "主菜单摆得出来：标题 + 五个按钮 + 五个存档位；「开始游戏」已改名「新的开始」",
 		ok,
 		"标题=\"%s\" 开始=\"%s\" 缺节点 %d 个" % [title, start_text, missing.size()])
 	menu.queue_free()
@@ -254,3 +259,73 @@ func _t6_snapshot_survives_file() -> void:
 		ok, "玩家血 %s @%s　怪 [0] 血 %s" % [
 			str(p.get("hp")), str(p.get("x")),
 			str((e[0] as Dictionary).get("hp", "?")) if e.size() > 0 else "?"])
+
+
+## 存档扩到 15 个：5 个一页翻 3 页，页码与槽位号对齐，到头禁用箭头
+func _t7_fifteen_slots_paged() -> void:
+	_wipe_all_slots()
+	var menu := MENU.instantiate()
+	add_child(menu)
+	await _steps(2)
+	menu._on_start()
+	await _steps(2)
+	var b1 := menu.get_node("Slots/Box/Slot1") as Button
+	var b5 := menu.get_node("Slots/Box/Slot5") as Button
+	var page1: bool = b1.text.begins_with("1.") and b5.text.begins_with("5.") \
+		and menu._prev_btn.disabled
+
+	menu._on_next_page()
+	await _steps(2)
+	var page2_nums: bool = b1.text.begins_with("6.") and b5.text.begins_with("10.")
+	# 第 7 槽有档 → 第 2 页第 2 颗按钮不再显示「（空）」
+	SaveManager.start_new_game(7, "res://scenes/stages/town.tscn")
+	menu._refresh_texts()
+	await _steps(2)
+	var page2_save: bool = not (menu.get_node("Slots/Box/Slot2") as Button).text.contains(tr("UI_SLOT_EMPTY"))
+
+	menu._on_next_page()
+	await _steps(2)
+	var page3_nums: bool = b1.text.begins_with("11.") and b5.text.begins_with("15.")
+	var at_last: bool = menu._next_btn.disabled and not menu._prev_btn.disabled
+
+	_check("7", "存档 15 个：5 个一页翻 3 页；第 7 槽的档在第 2 页现形；到头箭头禁用",
+		page1 and page2_nums and page2_save and page3_nums and at_last,
+		"P1[1..5]=%s　P2[6..10]=%s 槽7有档=%s　P3[11..15]=%s 末页禁进=%s" % [
+			str(page1), str(page2_nums), str(page2_save), str(page3_nums), str(at_last)])
+	menu.queue_free()
+	await _steps(2)
+
+
+## 「新的开始」踩到有档的槽必须先问一句 —— 手滑不该抹掉几十级进度。
+## 确认板：有档的槽弹出 + 档没被动；取消收板；读档模式不拦（只读不写）。
+## 「覆盖」那分支会真开新游戏并切场景 —— 场景切换会把本测试整个卸掉，
+## 所以这里只验闸门本身；覆盖后的行为由 t3（开新档不抹别的槽）盯着
+func _t8_overwrite_confirm() -> void:
+	_wipe_all_slots()
+	SaveManager.start_new_game(1, "res://scenes/stages/town.tscn")
+	SaveManager.write_progress("res://scenes/stages/town.tscn",
+		{"player": {"hp": 80, "shards": 42}, "enemies": []})
+
+	var menu := MENU.instantiate()
+	add_child(menu)
+	await _steps(2)
+	menu._on_start()
+	await _steps(2)
+	var b1 := menu.get_node("Slots/Box/Slot1") as Button
+	b1.pressed.emit()
+	await _steps(2)
+	var confirm_shown: bool = menu._confirm.visible and menu._pending_slot == 1
+	var intact := func() -> bool:
+		var p := SaveManager.read_state(1).get("player", {}) as Dictionary
+		return int(p.get("shards", -1)) == 42
+	var untouched: bool = intact.call()
+
+	menu._no_btn.pressed.emit()
+	await _steps(2)
+	var cancelled: bool = not menu._confirm.visible and menu._pending_slot == 0 and intact.call()
+
+	_check("8", "覆盖确认：有档的槽先弹确认、档原封不动；取消后安全退出",
+		confirm_shown and untouched and cancelled,
+		"弹确认=%s 档没动=%s 取消干净=%s" % [str(confirm_shown), str(untouched), str(cancelled)])
+	menu.queue_free()
+	await _steps(2)
