@@ -19,6 +19,7 @@
 |---|---|---|---|---|
 | Noto Sans SC（子集化） | https://github.com/google/fonts | Google | SIL OFL 1.1（`assets/fonts/OFL.txt` 随附） | 界面中文字体 |
 | Kenney New Platformer Pack（节选 10 张地形贴图，`assets/tiles/`） | https://kenney.nl/assets/new-platformer-pack | Kenney | CC0 1.0 | 砺场/城镇草地、断淬渠石、炉喉沙的地形表面与浮台木板 |
+| Kenney UI Pack Pixel Adventure（节选 1 张面板格，`assets/ui/panel.png`，压暗作九宫格底） | https://kenney.nl/assets/ui-pack-pixel-adventure | Kenney | CC0 1.0 | 全部 UI 面板（铁匠铺/商店/背包/暂停/设置/舆图/死亡/对话） |
 
 ## 候选（未引入 · 排期中）
 

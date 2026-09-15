@@ -1,5 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
+[ext_resource type="StyleBoxTexture" path="res://assets/ui/panel_style.tres" id="2_panelstyle"]
 [ext_resource type="Script" path="res://scripts/ui/dialogue_box.gd" id="1_dlg"]
 
 [node name="DialogueBox" type="CanvasLayer"]
@@ -16,6 +17,7 @@ anchor_bottom = 1.0
 mouse_filter = 2
 
 [node name="Panel" type="Panel" parent="Root"]
+theme_override_styles/panel = ExtResource("2_panelstyle")
 offset_left = 16.0
 offset_top = 244.0
 offset_right = 624.0

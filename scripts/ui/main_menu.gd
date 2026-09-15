@@ -113,6 +113,7 @@ func _build_confirm_panel() -> void:
 	_confirm.add_child(dim)
 
 	var panel := Panel.new()
+	panel.add_theme_stylebox_override("panel", load("res://assets/ui/panel_style.tres"))
 	# 视口 640×360，420×150 的板手工居中即可（CanvasLayer 锚点那坑的教训：显式定位最稳）
 	panel.position = Vector2(110, 105)
 	panel.size = Vector2(420, 150)

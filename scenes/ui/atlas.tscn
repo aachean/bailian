@@ -1,14 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
+[ext_resource type="StyleBoxTexture" path="res://assets/ui/panel_style.tres" id="90_panelstyle"]
 [ext_resource type="Script" path="res://scripts/ui/atlas.gd" id="1_atlas"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0.07, 0.07, 0.1, 0.98)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.47, 0.4, 0.26, 1)
 
 [node name="Atlas" type="CanvasLayer"]
 layer = 22
@@ -41,7 +34,7 @@ offset_left = -280.0
 offset_top = -146.0
 offset_right = 280.0
 offset_bottom = 146.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+theme_override_styles/panel = ExtResource("90_panelstyle")
 
 [node name="Title" type="Label" parent="Root/Panel"]
 layout_mode = 1
