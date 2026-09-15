@@ -129,7 +129,7 @@ func _setup_skin_frames() -> void:
 			n2.visible = false
 	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_skin.scale = Vector2(-1.5, 1.5)   # x -1：素材面朝左，抵消 _apply_facing 的翻转；帧 32x64
-	_skin.position = Vector2(0.0, 20.0 - 64.0 * 1.5 * 0.5)
+	_skin.position = Vector2(0.0, -2.0 - 64.0 * 1.5 * 0.5)   # 帧底 -2：与骑士视觉脚位平齐   # 帧底 +8：与骑士视觉脚位平齐
 	_skin.visible = true
 	var d := DirAccess.open(data.sprite_dir)
 	if d == null:

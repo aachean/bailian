@@ -268,7 +268,6 @@ func _ready() -> void:
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
 	_health.revived.connect(_on_revived)
-	_health.hp_changed.connect(_update_hp_bar)
 	# 碎片 / 强化 / 等级经验是「属于玩家」的数据，住在 PlayerState（autoload）里 ——
 	# 切场景会重建玩家节点，存在节点上的东西会丢（实测丢过）
 	level = PlayerState.level
@@ -508,8 +507,6 @@ func _level_up_fx() -> void:
 	tw.tween_callback(lbl.queue_free)
 
 
-func _update_hp_bar(_hp: int, _max_hp: int) -> void:
-	($HealthBar/Fill as ColorRect).scale.x = clampf(_health.ratio(), 0.0, 1.0)
 
 
 ## 手里那把刀的样子。攻击时挥出的光刃跟着【当前武器】走：换了武器，

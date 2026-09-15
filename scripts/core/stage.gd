@@ -178,6 +178,24 @@ func _build_barriers() -> void:
 		add_child(b)
 		_barriers.append(b)
 
+		# 屏障视觉：一根贯通上下的暗色石柱带，玩家隔着老远就知道「过不去」。
+		# 隐形墙是被否掉过的设计 —— 撞上去必须先看得见
+		var pillar := ColorRect.new()
+		pillar.name = "BarrierVisual%d" % (i + 1)
+		pillar.color = Color(0.16, 0.15, 0.19, 0.96)
+		pillar.mouse_filter = 2
+		pillar.position = Vector2(float(i + 1) * SCREEN_WIDTH - 9.0, bounds.position.y)
+		pillar.size = Vector2(18.0, bounds.size.y)
+		add_child(pillar)
+		for edge in ["L", "R"]:
+			var hl := ColorRect.new()
+			hl.name = "BarrierHL%d%s" % [i + 1, edge]
+			hl.color = Color(0.38, 0.36, 0.42, 0.9) if edge == "L" else Color(0.05, 0.05, 0.07, 0.9)
+			hl.mouse_filter = 2
+			hl.position = pillar.position + (Vector2.ZERO if edge == "L" else Vector2(15.0, 0.0))
+			hl.size = Vector2(3.0, bounds.size.y)
+			add_child(hl)
+
 
 # ── 推进 ───────────────────────────────────────────────────────
 
