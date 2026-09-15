@@ -36,6 +36,10 @@ enum Kind { ATTACK, DODGE }
 @export var hitstop_frames: int = 6
 ## 重击：飘字更大更亮。第 3 段用
 @export var heavy: bool = false
+## 命中屏震强度（0..1，叠加进相机震动预算）。M4 打击感：
+## 数字只有一个家 —— 招式多重震多狠，写在招式自己的表里。
+## 只对 ATTACK 类有意义；治疗 / 格挡的判定框不砸人，保持 0
+@export var shake_gain: float = 0.0
 ## 能不能被下一段取消。第 3 段为 false —— 那是这套连招的收招硬直，是刻意的
 @export var chainable: bool = true
 

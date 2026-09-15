@@ -24,3 +24,4 @@ lunge_decay_frames = 14
 cooldown_frames = 70
 mp_cost = 22
 unlock_level = 5
+shake_gain = 0.3

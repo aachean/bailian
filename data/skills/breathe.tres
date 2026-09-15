@@ -25,3 +25,4 @@ cooldown_frames = 420
 mp_cost = 40
 unlock_level = 42
 heal_amount = 45
+shake_gain = 0.0

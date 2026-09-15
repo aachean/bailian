@@ -26,3 +26,4 @@ invincible_to = 0
 cooldown_frames = 90
 mp_cost = 30
 unlock_level = 1
+shake_gain = 0.35

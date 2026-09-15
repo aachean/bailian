@@ -28,3 +28,4 @@ unlock_level = 20
 projectile_scene = ExtResource("2_wave")
 projectile_speed = 460.0
 projectile_life = 1.0
+shake_gain = 0.28

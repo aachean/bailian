@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/components/hit_fx.gd" id="1_fx"]
+
+[node name="HitFx" type="Node2D"]
+script = ExtResource("1_fx")
+
+[node name="P" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 10
+lifetime = 0.38
+one_shot = true
+explosiveness = 1.0

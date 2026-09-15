@@ -109,6 +109,7 @@ godot --headless --fixed-fps 60 --path . res://tests/test_m11.tscn   # 音效四
 godot --headless --fixed-fps 60 --path . res://tests/test_m12.tscn   # 暂停菜单两项 + 设置面板（10 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m13.tscn   # 断淬渠 / 炉喉：四步法 / 锯齿 / 配置变体 / 坐标系（11 条）
 godot --headless --fixed-fps 60 --path . res://tests/test_m14.tscn   # 经济：元宝 / 商店买卖 / 出售规矩 / 消耗品拾取 / 存档（9 条）
+godot --headless --fixed-fps 60 --path . res://tests/test_m15.tscn   # 打击感：屏震 / 命中火花 / 死亡爆点 / 特效回收（6 条）
 godot --headless --fixed-fps 60 --path . res://tests/probe_delivered.tscn   # 交付状态探针
 ```
 

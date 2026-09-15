@@ -163,6 +163,9 @@ var _spawn_point: Vector2 = Vector2.ZERO
 ## 掉到这条线以下视为掉出世界（场景高 360，地面在 320 附近）
 const FALL_KILL_Y := 800.0
 
+## 命中火花（M4 打击感）。一次性粒子爆点，命中点 / 受击点各撒一把
+const HIT_FX := preload("res://scenes/components/hit_fx.tscn")
+
 
 ## 读档恢复（stage.gd 调用）：血量与位置回到离开那一刻。
 ## 状态一律回到 FREE —— 存档瞬间可能在闪避/硬直里，那些不该被「续」上。
@@ -226,6 +229,25 @@ func spawn_point() -> Vector2:
 @onready var _hitbox: Hitbox = $Hitbox
 @onready var _health: Health = $Health
 @onready var _shape_node: CollisionShape2D = $CollisionShape2D
+@onready var _camera: Camera2D = $Camera
+
+# ── 屏震（M4 打击感）──────────────────────────────────────────
+#
+# trauma 模型：0..1 的「震动预算」，命中加一点、挨打加更多，逐帧衰减；
+# 相机偏移 = 上限 × trauma²。平方让小震动真的小、大震动才放得开 ——
+# 线性衰减的屏震里每一下都在抖，几秒后就麻木了。
+
+## 相机最大偏移（像素，trauma=1 时）
+const SHAKE_MAX_OFFSET := 10.0
+## 每帧衰减量。0.045 ≈ 半秒多从最强震回平静
+const SHAKE_DECAY := 0.045
+## 轻命中 / 重命中 / 挨打 / 重击挨打的震动预算（招式自己的 shake_gain 会叠在轻命中上）
+const SHAKE_HIT := 0.22
+const SHAKE_HEAVY_MULT := 1.7
+const SHAKE_HURT := 0.5
+const SHAKE_HURT_HEAVY := 0.8
+
+var _trauma := 0.0
 
 
 func _ready() -> void:
@@ -547,6 +569,17 @@ func _physics_process(delta: float) -> void:
 		# 结果是连招莫名其妙断在第二段。这个 bug 是自动验收抓出来的。
 		_latch_action_input()
 		return
+
+	# 屏震衰减。放在顿帧早退**之后**：顿帧冻住的是整个世界，震动物理也一起冻 ——
+	# 「命中那一刻全世界停半拍」正是打击感本身
+	if _trauma > 0.0:
+		_trauma = maxf(_trauma - SHAKE_DECAY, 0.0)
+		var s := _trauma * _trauma
+		_camera.offset = Vector2(
+			randf_range(-1.0, 1.0) * SHAKE_MAX_OFFSET * s,
+			randf_range(-1.0, 1.0) * SHAKE_MAX_OFFSET * s)
+		if _trauma <= 0.0:
+			_camera.offset = Vector2.ZERO
 
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
@@ -965,13 +998,20 @@ func _swing_sfx(sk: SkillData) -> void:
 
 
 ## 命中时把双方一起冻住几帧。打击感主要来自这里，不是来自数值
-func _on_hit_landed(target: Node2D, _damage: int, _point: Vector2, _heavy: bool) -> void:
+func _on_hit_landed(target: Node2D, _damage: int, point: Vector2, heavy: bool) -> void:
 	# 音效放在最前面 —— 下面「没顿帧就 return」那条早退不该把声音一起吞掉。
 	# 设计原则 6.1：有效命中至少给两项反馈（顿帧 + 声音 + 伤害数字）
 	Audio.play(&"hit")
+	# M4 打击感：命中火花 + 屏震。份量按招式走（SkillData.shake_gain），
+	# 重击再乘一档 —— 第三段连招砸在身上，屏幕必须比第一段晃得狠
+	_spawn_hit_fx(point, Color(1.0, 0.62, 0.25) if heavy else Color(1.0, 0.9, 0.5),
+		16 if heavy else 10, 190.0 if heavy else 140.0)
 	var frames := 0
+	var gain := SHAKE_HIT
 	if _current != null:
 		frames = _current.hitstop_frames
+		gain = _current.shake_gain
+	add_shake(gain * (SHAKE_HEAVY_MULT if heavy else 1.0))
 	if frames <= 0:
 		return
 	apply_hitstop(frames)
@@ -984,6 +1024,26 @@ func apply_hitstop(frames: int) -> void:
 	_hitstop = maxi(_hitstop, frames)
 
 
+# ── 屏震与命中特效（M4 打击感）────────────────────────────────
+
+## 加一笔震动预算（0..1）。小怪死亡等外部事件也会 duck-typing 调这里，
+## 与 apply_hitstop 同一套协作方式。招式自己的份量写在 SkillData.shake_gain
+func add_shake(amount: float) -> void:
+	_trauma = clampf(_trauma + amount, 0.0, 1.0)
+
+
+## 在命中点撒一把火花。颜色就是反馈：金的 = 普通命中，橙的 = 重击，红的 = 你挨打了
+func _spawn_hit_fx(point: Vector2, color: Color, count: int, speed: float) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var fx: Node2D = HIT_FX.instantiate()
+	fx.setup(color, count, speed)
+	host.add_child(fx)
+	fx.global_position = point
+
+
+
 ## 被敌人的判定框打中（Health.damaged）。做四件事：
 ## 打断当前动作 → 进入硬直 → 沿受击方向弹开 → 闪一下。
 ## 受击后的短暂无敌由 Health 内部负责（防同一次挥砍连扣），
@@ -993,6 +1053,9 @@ func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir:
 	# 挨打是负反馈 —— 玩家必须**立刻**知道自己中招了（6.2 的首响应）。
 	# 这声比命中更响：命中有连招会响好几下，挨打才是要命的那个
 	Audio.play(&"hurt")
+	# M4 打击感：挨打的屏震比命中狠（重击挨打最狠），红花飞溅 —— 这下「疼」有着落了
+	add_shake(SHAKE_HURT_HEAVY if _heavy else SHAKE_HURT)
+	_spawn_hit_fx(point, Color(0.92, 0.3, 0.28), 12, 160.0)
 	_level_flash = false
 	if state == State.ATTACK or state == State.DODGE:
 		_end_action()

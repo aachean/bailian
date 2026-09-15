@@ -12,6 +12,7 @@ enum State { PATROL, CHASE, ATTACK, HURT, DEAD }
 
 const DAMAGE_NUMBER := preload("res://scenes/ui/damage_number.tscn")
 const PICKUP := preload("res://scenes/components/pickup.tscn")
+const HIT_FX := preload("res://scenes/components/hit_fx.tscn")
 
 ## 后仰弹簧参数，与靶子一致 —— 挨打的观感应该敌我相同
 const RECOIL_STIFF := 1500.0
@@ -313,7 +314,22 @@ func apply_saved(d: Dictionary) -> void:
 		_refresh_bar()
 
 
+## 死亡爆点 + 轻震（M4 打击感）：尸体位置撒一把碎屑，屏幕跟着轻晃一下。
+## 死亡必须有存在感 —— 不然杀怪和杀空气分不开
+func _death_burst() -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var fx: Node2D = HIT_FX.instantiate()
+	fx.setup(Color(0.62, 0.72, 0.85), 14, 120.0)
+	host.add_child(fx)
+	fx.global_position = global_position
+	var pl := get_tree().get_first_node_in_group("player")
+	if pl != null and pl.has_method("add_shake"):
+		pl.call("add_shake", 0.12)
+
 func _on_died() -> void:
+	_death_burst()
 	_dead_pose()
 	_drop_shards()
 	_drop_gold()
