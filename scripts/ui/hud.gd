@@ -380,8 +380,11 @@ func refresh_skill_panel() -> void:
 		var slot_txt := ("[%d]" % (slot + 1)) if slot >= 0 else ""
 		var name := tr(sk.name_key) if sk != null else "?"
 		if not unlocked:
+			# 未解锁要把**条件**说出来（几级能开），不然玩家只能对着灰色瞎猜
 			lbl.text = "%s%s  %s" % [
-				CURSOR_MARK if sel else INDENT, tr("UI_SKILL_LOCKED"), name]
+				CURSOR_MARK if sel else INDENT,
+				I18n.t(&"UI_SKILL_LOCKED_AT", [sk.unlock_level]) if sk != null else tr("UI_SKILL_LOCKED"),
+				name]
 			lbl.modulate = Color(0.5, 0.48, 0.45, 1)
 		else:
 			lbl.text = "%s%s  %s" % [CURSOR_MARK if sel else INDENT, name, slot_txt]

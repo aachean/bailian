@@ -546,11 +546,16 @@ func _t16_locked_skill_cannot_toggle() -> void:
 	var carried := _count_carried()
 	var ironwall_locked: bool = not PlayerState.carries(IRONWALL) \
 		and not bool(_player.call("is_skill_unlocked", IRONWALL))
+	# 锁定行必须把**怎么解锁**写出来（几级开），不能只写「未解锁」让玩家瞎猜
+	var shows_level := false
+	for t in (_player.get_node("HUD") as Object).call("panel_texts"):
+		if "Lv.12" in str(t):
+			shows_level = true
 	_press("skill_panel")
 	await _pframes(3)
 	_release("skill_panel")
 	await _pframes(2)
-	_check("16", "未解锁的技能 J 也装不上（与数字键同一扇门）",
-		carried == 0 and ironwall_locked,
-		"Lv1 对铁壁按 J：携带 %d 件，铁壁在带=%s" % [
-			carried, str(PlayerState.carries(IRONWALL))])
+	_check("16", "未解锁的技能 J 装不上，且行文本标明几级解锁",
+		carried == 0 and ironwall_locked and shows_level,
+		"Lv1 对铁壁按 J：携带 %d 件，铁壁在带=%s，行文本带解锁等级=%s" % [
+			carried, str(PlayerState.carries(IRONWALL)), str(shows_level)])
