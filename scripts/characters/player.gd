@@ -353,8 +353,8 @@ func _apply_character_look() -> void:
 # idle 常驻 / atk_windup 攻击前摇 / atk_strike 判定窗起插入并带一记挤压。
 # 方向翻转沿用 Visuals.scale.x 的老机制 —— 素材统一面朝右，翻容器就够。
 
-## 精灵图显示高度。64 = 色块时代（32px）的两倍，细节才读得出来
-const SKIN_HEIGHT := 64.0
+## 精灵图显示高度。64 在实机上被评「看不清」——手绘插画的细节密度需要 88
+const SKIN_HEIGHT := 88.0
 
 var _skin: Sprite2D = null
 var _skin_frames: Dictionary = {}

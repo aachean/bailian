@@ -99,7 +99,7 @@ func _setup_skin() -> void:
 	_skin.name = "Skin"
 	visuals.add_child(_skin)
 	visuals.move_child(_skin, 0)
-	for n in ["Body", "Head", "Eye", "Flash"]:
+	for n in ["Body", "Head", "Eye", "Flash", "Swipe"]:
 		var n2 := visuals.get_node_or_null(n)
 		if n2 != null:
 			n2.visible = false
