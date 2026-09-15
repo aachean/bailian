@@ -61,6 +61,16 @@ ENEMY_Y = 288.0             # 小怪站位：站上去会落一点点，与砺�
 PLAT_Y = (268.0, 240.0)     # 两档浮台。抬升 52 / 28（都在 60 的预算内）
 
 
+# ── 地形贴图（M4 美术接入，Kenney New Platformer Pack，CC0）────
+# role → assets/tiles/ 下的文件名。断淬渠石 / 炉喉沙；浮台统一木板。
+# 调色板颜色保留（背景等仍在用），地形视觉不再用它
+TILES = {
+    "grass": {"ground": "grass_top", "step": "grass_center", "plat": "grass_plat", "plat_s": "grass_plat"},
+    "stone": {"ground": "stone_top", "step": "stone_center", "plat": "stone_plat", "plat_s": "stone_plat"},
+    "sand": {"ground": "sand_top", "step": "sand_center", "plat": "sand_plat", "plat_s": "sand_plat"},
+}
+
+
 def _terrain(palette, screens):
     """地形规格。返回 [(名字, 中心x, 中心y, 宽, 高, 色, 用哪个 shape)]。
 
@@ -84,6 +94,7 @@ def _terrain(palette, screens):
 
 def _emit(spec):
     palette = spec["palette"]
+    tiles = TILES[spec.get("tiles", "grass")]
     screens = spec["screens"]
     screen_count = len(screens)
     terrain = _terrain(palette, screen_count)
@@ -119,6 +130,12 @@ def _emit(spec):
 
     parts = []
     parts.append("[gd_scene load_steps=%d format=3]\n" % (len(ext) + len(shapes) + 1))
+    tile_ids = {}
+    for role, fname in tiles.items():
+        rid = "tile_%s" % role
+        tile_ids[role] = rid
+        ext.append(('Texture2D', "res://assets/tiles/%s.png" % fname, rid))
+
     for kind, path, rid in ext:
         parts.append('[ext_resource type="%s" path="%s" id="%s"]' % (kind, path, rid))
     parts.append("")
@@ -136,13 +153,16 @@ def _emit(spec):
         parts.append("position = Vector2(%s, %s)" % (_num(cx), _num(cy)))
         parts.append("collision_layer = 4")
         parts.append("collision_mask = 0\n")
-        parts.append('[node name="Visual" type="ColorRect" parent="%s"]' % name)
+        parts.append('[node name="Visual" type="TextureRect" parent="%s"]' % name)
         parts.append("offset_left = %s" % _num(-w / 2.0))
         parts.append("offset_top = %s" % _num(-h / 2.0))
         parts.append("offset_right = %s" % _num(w / 2.0))
         parts.append("offset_bottom = %s" % _num(h / 2.0))
         parts.append("mouse_filter = 2")
-        parts.append("color = Color(%s)\n" % color)
+        # 64px 的 tile 在 24px 高的地面矩形里只露出顶部 —— 正好是石/沙的表面层
+        parts.append("texture = ExtResource(\"%s\")" % tile_ids[shape])
+        parts.append("stretch_mode = 1")
+        parts.append("")
         parts.append('[node name="CollisionShape2D" type="%s" parent="%s"]' % ("CollisionShape2D", name))
         parts.append('shape = SubResource("%s")\n' % shapes[shape])
 
@@ -203,6 +223,7 @@ DUANCUIQU = {
         "plat": "0.3, 0.34, 0.38, 1",
         "plat_s": "0.28, 0.32, 0.36, 1",
     },
+    "tiles": "stone",
     "screens": [
         # 屏 1 —— 引入：熟面孔开道，第三批让掷火者**单独**站远一点，先看清它会远程
         [
@@ -248,6 +269,7 @@ LUHOU = {
         "plat": "0.37, 0.28, 0.25, 1",
         "plat_s": "0.34, 0.26, 0.23, 1",
     },
+    "tiles": "sand",
     "screens": [
         # 屏 1 —— 喘息：开场略低于实力，全是熟悉的种类
         [

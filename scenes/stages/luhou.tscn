@@ -11,6 +11,10 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/boss_luhou.tscn" id="4_boss_luhou"]
 [ext_resource type="PackedScene" path="res://scenes/core/npc.tscn" id="8_npc"]
 [ext_resource type="Resource" path="res://data/dialogue/hunter_outro.tres" id="9_dialogue"]
+[ext_resource type="Texture2D" path="res://assets/tiles/sand_top.png" id="tile_ground"]
+[ext_resource type="Texture2D" path="res://assets/tiles/sand_center.png" id="tile_step"]
+[ext_resource type="Texture2D" path="res://assets/tiles/sand_plat.png" id="tile_plat"]
+[ext_resource type="Texture2D" path="res://assets/tiles/sand_plat.png" id="tile_plat_s"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(4800, 24)
@@ -34,13 +38,14 @@ position = Vector2(2400, 332)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Ground"]
+[node name="Visual" type="TextureRect" parent="Ground"]
 offset_left = -2400
 offset_top = -12
 offset_right = 2400
 offset_bottom = 12
 mouse_filter = 2
-color = Color(0.3, 0.24, 0.22, 1)
+texture = ExtResource("tile_ground")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
 shape = SubResource("RectangleShape2D_ground")
@@ -50,13 +55,14 @@ position = Vector2(300, 292)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Step1"]
+[node name="Visual" type="TextureRect" parent="Step1"]
 offset_left = -80
 offset_top = -20
 offset_right = 80
 offset_bottom = 20
 mouse_filter = 2
-color = Color(0.38, 0.29, 0.26, 1)
+texture = ExtResource("tile_step")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Step1"]
 shape = SubResource("RectangleShape2D_step")
@@ -66,13 +72,14 @@ position = Vector2(620, 268)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat1a"]
+[node name="Visual" type="TextureRect" parent="Plat1a"]
 offset_left = -60
 offset_top = -6
 offset_right = 60
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.37, 0.28, 0.25, 1)
+texture = ExtResource("tile_plat")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat1a"]
 shape = SubResource("RectangleShape2D_plat")
@@ -82,13 +89,14 @@ position = Vector2(880, 240)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat1b"]
+[node name="Visual" type="TextureRect" parent="Plat1b"]
 offset_left = -55
 offset_top = -6
 offset_right = 55
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.34, 0.26, 0.23, 1)
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat1b"]
 shape = SubResource("RectangleShape2D_plat_s")
@@ -98,13 +106,14 @@ position = Vector2(1580, 268)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat2a"]
+[node name="Visual" type="TextureRect" parent="Plat2a"]
 offset_left = -60
 offset_top = -6
 offset_right = 60
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.37, 0.28, 0.25, 1)
+texture = ExtResource("tile_plat")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat2a"]
 shape = SubResource("RectangleShape2D_plat")
@@ -114,13 +123,14 @@ position = Vector2(1840, 240)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat2b"]
+[node name="Visual" type="TextureRect" parent="Plat2b"]
 offset_left = -55
 offset_top = -6
 offset_right = 55
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.34, 0.26, 0.23, 1)
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat2b"]
 shape = SubResource("RectangleShape2D_plat_s")
@@ -130,13 +140,14 @@ position = Vector2(2540, 268)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat3a"]
+[node name="Visual" type="TextureRect" parent="Plat3a"]
 offset_left = -60
 offset_top = -6
 offset_right = 60
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.37, 0.28, 0.25, 1)
+texture = ExtResource("tile_plat")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat3a"]
 shape = SubResource("RectangleShape2D_plat")
@@ -146,13 +157,14 @@ position = Vector2(2800, 240)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat3b"]
+[node name="Visual" type="TextureRect" parent="Plat3b"]
 offset_left = -55
 offset_top = -6
 offset_right = 55
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.34, 0.26, 0.23, 1)
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat3b"]
 shape = SubResource("RectangleShape2D_plat_s")
@@ -162,13 +174,14 @@ position = Vector2(3500, 268)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat4a"]
+[node name="Visual" type="TextureRect" parent="Plat4a"]
 offset_left = -60
 offset_top = -6
 offset_right = 60
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.37, 0.28, 0.25, 1)
+texture = ExtResource("tile_plat")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat4a"]
 shape = SubResource("RectangleShape2D_plat")
@@ -178,13 +191,14 @@ position = Vector2(3760, 240)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat4b"]
+[node name="Visual" type="TextureRect" parent="Plat4b"]
 offset_left = -55
 offset_top = -6
 offset_right = 55
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.34, 0.26, 0.23, 1)
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat4b"]
 shape = SubResource("RectangleShape2D_plat_s")
@@ -194,13 +208,14 @@ position = Vector2(4460, 268)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat5a"]
+[node name="Visual" type="TextureRect" parent="Plat5a"]
 offset_left = -60
 offset_top = -6
 offset_right = 60
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.37, 0.28, 0.25, 1)
+texture = ExtResource("tile_plat")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat5a"]
 shape = SubResource("RectangleShape2D_plat")
@@ -210,13 +225,14 @@ position = Vector2(4720, 240)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Plat5b"]
+[node name="Visual" type="TextureRect" parent="Plat5b"]
 offset_left = -55
 offset_top = -6
 offset_right = 55
 offset_bottom = 6
 mouse_filter = 2
-color = Color(0.34, 0.26, 0.23, 1)
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Plat5b"]
 shape = SubResource("RectangleShape2D_plat_s")

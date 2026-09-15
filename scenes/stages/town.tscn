@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
@@ -8,6 +8,7 @@
 [ext_resource type="Resource" path="res://data/dialogue/smith_repeat.tres" id="7_smith_repeat"]
 [ext_resource type="PackedScene" path="res://scenes/core/atlas_pedestal.tscn" id="8_pedestal"]
 [ext_resource type="PackedScene" path="res://scenes/core/shop_stand.tscn" id="9_shop"]
+[ext_resource type="Texture2D" path="res://assets/tiles/grass_top.png" id="10_grasstop"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1280, 24)
@@ -21,13 +22,15 @@ position = Vector2(640, 332)
 collision_layer = 4
 collision_mask = 0
 
-[node name="Visual" type="ColorRect" parent="Ground"]
+[node name="Visual" type="TextureRect" parent="Ground"]
+
 offset_left = -640.0
 offset_top = -12.0
 offset_right = 640.0
 offset_bottom = 12.0
 mouse_filter = 2
-color = Color(0.31, 0.29, 0.26, 1)
+texture = ExtResource("10_grasstop")
+stretch_mode = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
 shape = SubResource("RectangleShape2D_ground")

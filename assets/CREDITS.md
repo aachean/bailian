@@ -18,8 +18,9 @@
 | 素材 | 来源 | 作者 | 许可 | 用途 |
 |---|---|---|---|---|
 | Noto Sans SC（子集化） | https://github.com/google/fonts | Google | SIL OFL 1.1（`assets/fonts/OFL.txt` 随附） | 界面中文字体 |
+| Kenney New Platformer Pack（节选 10 张地形贴图，`assets/tiles/`） | https://kenney.nl/assets/new-platformer-pack | Kenney | CC0 1.0 | 砺场/城镇草地、断淬渠石、炉喉沙的地形表面与浮台木板 |
 
-## 候选（未引入 · 等关卡切完再一次性接）
+## 候选（未引入 · 排期中）
 
 分层方案见 `docs/adr/0009` 与开发计划 §3.7：**地形 / UI / 音效走素材包，角色 / Boss / 立绘 / 图标自己生成。**
 
