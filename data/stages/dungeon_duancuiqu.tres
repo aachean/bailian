@@ -10,3 +10,5 @@ scene_path = "res://scenes/stages/duancuiqu.tscn"
 screen_count = 4
 rec_level = 12
 rec_weapon = 2
+
+backdrop = &"stone"

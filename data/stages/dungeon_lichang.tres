@@ -7,3 +7,5 @@ script = ExtResource("1_byt73")
 id = &"lichang"
 name_key = &"DUNGEON_LICHANG"
 scene_path = "res://scenes/stages/lichang.tscn"
+
+backdrop = &"grass"

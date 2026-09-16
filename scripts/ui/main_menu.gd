@@ -47,7 +47,16 @@ var _no_btn: Button = null
 @onready var _back_btn: Button = $Slots/Box/Back
 
 
+const Backdrop := preload("res://scripts/core/backdrop.gd")
+
+
 func _ready() -> void:
+	# 主菜单背景（暮色山门）。无相机 → 远景/中景静止，只做底图
+	var bd: Node2D = Backdrop.new()
+	bd.name = "Backdrop"
+	bd.theme = &"title"
+	add_child(bd)
+	move_child(bd, 0)
 	_start_btn.pressed.connect(_on_start)
 	_continue_btn.pressed.connect(_on_continue)
 	_load_btn.pressed.connect(_on_load)

@@ -36,6 +36,10 @@ extends Resource
 ## 两边对不上时以场景为准，但那样界面会显示错数字，所以有一条断言盯着它们相等
 @export var screen_count: int = 3
 
+@export_group("观感")
+## 背景主题（assets/backgrounds/<名>/）：grass / stone / sand。空 = 不挂背景
+@export var backdrop: StringName = &""
+
 @export_group("门槛提示（只用来上色，不拦人）")
 ## 推荐等级 / 推荐武器强化等级。不够就在舆图上标红，**但绝不禁止进入**
 ## （docs/adr/0009 §5：硬门票会把「刷」变成义务）

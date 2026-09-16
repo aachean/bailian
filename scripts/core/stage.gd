@@ -52,6 +52,10 @@ const HINT_COOLDOWN_FRAMES := 150
 ## 相机活动范围（世界坐标）。设成场景实际尺寸，视野跟着玩家走、到边就停。
 @export var bounds: Rect2 = Rect2(0, 0, 960, 360)
 
+@export_group("观感")
+## 背景主题（手写场景用：城镇 = town）。副本走 dungeon_data.backdrop，优先于这里
+@export var backdrop_theme: StringName = &""
+
 ## 一波里最后一只倒之后，再等这么多帧才判「这一波清了」——
 ## 让掉落、飘字、后仰演完
 const CLEAR_DELAY_FRAMES := 24
@@ -102,6 +106,7 @@ func _ready() -> void:
 		cam.limit_right = int(bounds.end.x)
 		cam.limit_bottom = int(bounds.end.y)
 		cam.reset_smoothing()
+	_build_backdrop()
 	_collect_screens()
 	_build_barriers()
 	_build_banner()
@@ -158,6 +163,25 @@ func _collect_screens() -> void:
 ## 迟早对不上），二是**它能被误当成装饰**。这里动态建，位置永远只有一个来源。
 ##
 ## 层取地形层（4）：玩家与怪都撞得到 —— 怪也出不去，它本来就该待在这一屏里。
+## 背景：天空 + 远景 + 中景（两层视差）。副本按数据、手写场景按 backdrop_theme
+func _build_backdrop() -> void:
+	var theme_name: StringName = &""
+	if dungeon_data != null:
+		theme_name = dungeon_data.backdrop
+	if String(theme_name).is_empty():
+		theme_name = backdrop_theme
+	if String(theme_name).is_empty():
+		return
+	if not ResourceLoader.exists("res://assets/backgrounds/%s/sky.png" % theme_name):
+		push_warning("背景主题「%s」没有资源，跳过" % theme_name)
+		return
+	var bd: Node2D = preload("res://scripts/core/backdrop.gd").new()
+	bd.name = "Backdrop"
+	bd.theme = theme_name
+	add_child(bd)
+	move_child(bd, 0)
+
+
 func _build_barriers() -> void:
 	_barriers.clear()
 	for i in range(maxi(_screens.size() - 1, 0)):
@@ -178,24 +202,7 @@ func _build_barriers() -> void:
 		add_child(b)
 		_barriers.append(b)
 
-		# 屏障视觉：一根贯通上下的暗色石柱带，玩家隔着老远就知道「过不去」。
-		# 隐形墙是被否掉过的设计 —— 撞上去必须先看得见
-		var pillar := ColorRect.new()
-		pillar.name = "BarrierVisual%d" % (i + 1)
-		pillar.color = Color(0.16, 0.15, 0.19, 0.96)
-		pillar.mouse_filter = 2
-		pillar.position = Vector2(float(i + 1) * SCREEN_WIDTH - 9.0, bounds.position.y)
-		pillar.size = Vector2(18.0, bounds.size.y)
-		add_child(pillar)
-		for edge in ["L", "R"]:
-			var hl := ColorRect.new()
-			hl.name = "BarrierHL%d%s" % [i + 1, edge]
-			hl.color = Color(0.38, 0.36, 0.42, 0.9) if edge == "L" else Color(0.05, 0.05, 0.07, 0.9)
-			hl.mouse_filter = 2
-			hl.position = pillar.position + (Vector2.ZERO if edge == "L" else Vector2(15.0, 0.0))
-			hl.size = Vector2(3.0, bounds.size.y)
-			add_child(hl)
-
+	
 
 # ── 推进 ───────────────────────────────────────────────────────
 

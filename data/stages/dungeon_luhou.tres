@@ -10,3 +10,5 @@ scene_path = "res://scenes/stages/luhou.tscn"
 screen_count = 5
 rec_level = 25
 rec_weapon = 4
+
+backdrop = &"sand"
