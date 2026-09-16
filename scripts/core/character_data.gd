@@ -85,13 +85,11 @@ const CHARACTER_DIR := "res://data/characters"
 ## 不是 CharacterData 的 .tres 静默跳过（目录以后可能住别的数据）
 static func all() -> Array[CharacterData]:
 	var out: Array[CharacterData] = []
-	var dir := DirAccess.open(CHARACTER_DIR)
-	if dir == null:
-		push_error("CharacterData: 角色目录打不开 %s" % CHARACTER_DIR)
-		return out
+	# ResDir.files 剥掉导出包的 .remap 后缀（见 res_dir.gd）——
+	# 导出包里目录列出的是 archer.tres.remap，按 .tres 匹配会全部落空
 	var names := []
-	for f in dir.get_files():
-		if f.ends_with(".tres"):
+	for f in ResDir.files(CHARACTER_DIR):
+		if f.ends_with(".tres") or f.ends_with(".res"):
 			names.append(f)
 	names.sort()
 	for f in names:

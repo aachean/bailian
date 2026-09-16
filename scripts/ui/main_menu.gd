@@ -176,6 +176,7 @@ func _refresh_texts(_locale: String = "") -> void:
 	_prev_btn.disabled = _page <= 0
 	_next_btn.disabled = _page >= SLOT_PAGES - 1
 	_yes_btn.text = tr("UI_CONFIRM_YES")
+	_back_btn.text = tr("UI_CHAR_BACK")
 	_no_btn.text = tr("UI_CONFIRM_NO")
 	_refresh_continue()
 	_refresh_slot_buttons()
@@ -312,6 +313,7 @@ func _open_character_page() -> void:
 	_title.visible = false
 	$Panel.visible = false
 	_char_title.text = tr("UI_CHAR_TITLE")
+	back_btn_from_char_page().text = tr("UI_CHAR_BACK")
 	var all := CharacterData.all()
 	for i in _char_btns.size():
 		var c := all[i] if i < all.size() else null

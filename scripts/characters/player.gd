@@ -420,11 +420,9 @@ func _setup_skin() -> void:
 ## 读帧序列目录：返回 {动画名: [Texture,...]}。
 ## half1/half2 特例：attack_N 按编号中点劈成攻击前摇/判定两段
 func _load_anim_sequences(dir: String, wanted: Dictionary) -> Dictionary:
-	var d := DirAccess.open(dir)
-	if d == null:
-		return {}
 	var files: Dictionary = {}
-	for f in d.get_files():
+	# ResDir.files 会把导出包的 .import/.remap 后缀剥掉（见 res_dir.gd）
+	for f in ResDir.files(dir):
 		if not f.ends_with(".png"):
 			continue
 		var m := f.replace(".png", "").split("_")

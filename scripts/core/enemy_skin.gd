@@ -38,14 +38,13 @@ func setup(sprite_dir: String) -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	scale = Vector2(-px_scale, px_scale)
 	position = Vector2(0.0, feet_y - FRAME_H * px_scale * 0.5)
-	var d := DirAccess.open(sprite_dir)
-	if d == null:
-		visible = false
-		return
 	var walk: Array = []
-	for f in d.get_files():
+	for f in ResDir.files(sprite_dir):
 		if f.begins_with("walk_") and f.ends_with(".png"):
 			walk.append([int(f.trim_prefix("walk_").trim_suffix(".png")), f])
+	if walk.is_empty():
+		visible = false
+		return
 	walk.sort_custom(func(a, b): return a[0] < b[0])
 	_walk = []
 	for e in walk:

@@ -23,12 +23,8 @@ var _fps := 6.0
 ## dir = 帧序列目录（如 res://assets/npcs/old_man）
 ## feet_y = **脚**落在父节点本地的 y（NPC 的碰撞/色块脚底在 +18，默认对齐它）
 func setup(dir: String, feet_y := 18.0, px_scale := 1.5) -> bool:
-	var d := DirAccess.open(dir)
-	if d == null:
-		push_warning("NPC 帧序列目录不存在：%s" % dir)
-		return false
 	var list: Array = []
-	for f in d.get_files():
+	for f in ResDir.files(dir):
 		if f.begins_with("idle_") and f.ends_with(".png"):
 			list.append([int(f.trim_prefix("idle_").trim_suffix(".png")), f])
 	if list.is_empty():
