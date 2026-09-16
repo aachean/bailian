@@ -1,37 +1,26 @@
 extends Node
-## UI 统一巡检：副本 HUD（含提示条）+ 城镇 + 主菜单。
+## 怪种换装巡检：三个副本各停一处，把该屏幕的怪都照进来。
+
+const PLACES := [
+	["lichang", "res://scenes/stages/lichang.tscn", Vector2(400, 260)],
+	["duancuiqu", "res://scenes/stages/duancuiqu.tscn", Vector2(700, 260)],
+	["luhou", "res://scenes/stages/luhou.tscn", Vector2(700, 260)],
+]
 
 func _ready() -> void:
 	SaveManager.current_slot = 3
 	SaveManager.start_new_game(3, "res://scenes/stages/town.tscn")
-	var lv: Node = load("res://scenes/stages/lichang.tscn").instantiate()
-	add_child(lv)
-	await _frames(12)
-	var player: Node2D = lv.get_node("Player")
-	player.global_position = Vector2(905.0, 288.0)
-	player.set("velocity", Vector2.ZERO)
-	await _frames(6)
-	# 触发提示条
-	lv.call("_banner", "这一屏还没清空 —— 打完了才能往前走")
-	await _frames(10)
-	await _shot("ui_1_hud.png")
-	lv.queue_free()
-	await _frames(4)
-
-	var mm: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
-	add_child(mm)
-	await _frames(8)
-	await _shot("ui_2_menu.png")
-	mm.queue_free()
-	await _frames(4)
-
-	var pm: Node = load("res://scenes/ui/pause_menu.tscn").instantiate()
-	add_child(pm)
-	await _frames(6)
-	if pm.has_method("open"):
-		pm.call("open")
-	await _frames(6)
-	await _shot("ui_3_pause.png")
+	for place in PLACES:
+		var lv: Node = load(place[1]).instantiate()
+		add_child(lv)
+		await _frames(12)
+		var player: Node2D = lv.get_node("Player")
+		player.global_position = place[2]
+		player.set("velocity", Vector2.ZERO)
+		await _frames(20)
+		await _shot("mob_%s.png" % place[0])
+		lv.queue_free()
+		await _frames(4)
 	print("all done")
 	get_tree().quit()
 

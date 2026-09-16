@@ -28,3 +28,5 @@ drop_items = Array[String](["res://data/items/wood_charm.tres", "res://data/item
 drop_gold = 4
 drop_heal_chance = 0.0
 drop_mana_chance = 0.14
+
+sprite_dir = "res://assets/enemies/goblin/mage"

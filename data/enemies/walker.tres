@@ -27,4 +27,4 @@ drop_heal_chance = 0.10
 drop_mana_chance = 0.0
 
 
-sprite_dir = "res://assets/enemies/goblin/walker"
+sprite_dir = "res://assets/enemies/goblin/peasant"

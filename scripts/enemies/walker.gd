@@ -36,8 +36,6 @@ const RECOIL_KICK_HEAVY := 1.6
 
 ## 精灵模式下的贴图节点（_setup_skin 建；空 sprite_path 时保持 null）
 var _skin: Sprite2D = null
-var _skin_walk: Array = []
-var _skin_frame_clock := 0.0
 
 ## 掉到这条线以下就是掉出世界，走各自的善后流程。
 ## 场景高 360，地面在 320 附近 —— 800 已经是「肯定出世界」的深度
@@ -117,38 +115,18 @@ func _setup_skin() -> void:
 	_skin.position = Vector2(0.0, 20.0 - 52.0 * 0.5)   # 底边对齐旧色块脚底（+20）
 
 
-## 帧序列模式（sprite_dir）：walk_N 循环 + idle/hurt/dead 单帧。
-## 32px 原生 ×2 整数缩放，nearest。
+## 帧序列模式：交给共享组件 EnemySkin（spearman 系用同一份）
 func _setup_skin_frames() -> void:
-	_skin = Sprite2D.new()
-	_skin.name = "Skin"
+	_skin = EnemySkin.new()
 	visuals.add_child(_skin)
-	visuals.move_child(_skin, 0)
+	visuals.move_child(_skin, 0)   # 垫底：技能特效要压在角色上面
 	for n in ["Body", "Head", "Eye", "Flash", "Swipe"]:
 		var n2 := visuals.get_node_or_null(n)
 		if n2 != null:
 			n2.visible = false
-	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_skin.scale = Vector2(-1.5, 1.5)   # x -1：素材面朝左，抵消 _apply_facing 的翻转；帧 32x64
-	_skin.position = Vector2(0.0, -2.0 - 64.0 * 1.5 * 0.5)   # 帧底 -2：与骑士视觉脚位平齐（帧 32x64，脚贴帧底）
+	_skin.setup(data.sprite_dir)
 	# 帧序列模式下小人实际头顶在 -44（帧上半是空白），血条贴头顶上方一点
 	bar.position.y = -54.0
-	_skin.visible = true
-	var d := DirAccess.open(data.sprite_dir)
-	if d == null:
-		return
-	var walk: Array = []
-	for f in d.get_files():
-		if f.begins_with("walk_") and f.ends_with(".png"):
-			walk.append([int(f.trim_prefix("walk_").trim_suffix(".png")), f])
-	walk.sort_custom(func(a, b): return a[0] < b[0])
-	_skin_walk = []
-	for e in walk:
-		_skin_walk.append(load(data.sprite_dir + "/" + str(e[1])))
-	var idle_path := data.sprite_dir + "/idle_0.png"
-	if ResourceLoader.exists(idle_path):
-		_skin.texture = load(idle_path)
-
 
 func _physics_process(delta: float) -> void:
 	if _hitstop > 0:
@@ -317,23 +295,6 @@ func _enter(s: int) -> void:
 
 func _dist(player: Node2D) -> float:
 	return absf(player.global_position.x - global_position.x)
-
-
-## 帧推进：死亡 KO 静帧 → 受击帧（闪白期）→ walk 循环
-func _tick_skin_frames(delta: float) -> void:
-	if state == State.DEAD:
-		var d0 := data.sprite_dir + "/dead_0.png"
-		if ResourceLoader.exists(d0):
-			_skin.texture = load(d0)
-		return
-	var h0 := data.sprite_dir + "/hurt_0.png"
-	if _flash > 0.2 and ResourceLoader.exists(h0):
-		_skin.texture = load(h0)
-		return
-	if _skin_walk.is_empty():
-		return
-	_skin_frame_clock += delta * 10.0
-	_skin.texture = _skin_walk[int(_skin_frame_clock) % _skin_walk.size()]
 
 
 func _apply_facing() -> void:
@@ -526,8 +487,8 @@ func _process(delta: float) -> void:
 	if _skin != null:
 		var f := minf(_flash, 1.0)
 		_skin.self_modulate = Color(1.0 + f, 1.0 + f, 1.0 + f)
-	if _skin_walk.size() > 0:
-		_tick_skin_frames(delta)
+	if _skin != null:
+		_skin.tick(delta, state == State.DEAD, _flash)
 	if not is_equal_approx(_alpha, _target_alpha):
 		_alpha = move_toward(_alpha, _target_alpha, 5.5 * delta)
 		modulate.a = _alpha

@@ -47,6 +47,8 @@ var _gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity", 
 var _recoil := 0.0
 var _recoil_v := 0.0
 var _flash := 0.0
+## 精灵帧序列（data.sprite_dir 非空时创建；shared 组件）
+var _skin: EnemySkin = null
 var _alpha := 1.0
 var _target_alpha := 1.0
 var _rng := RandomNumberGenerator.new()
@@ -54,6 +56,22 @@ var _rng := RandomNumberGenerator.new()
 var _dormant := false
 var _base_layer := 0
 var _base_mask := 0
+
+
+## 帧序列精灵：与 walker 系共用 EnemySkin 组件（弧矢兵/掷火者用同一套）
+func _setup_skin() -> void:
+	if data.sprite_dir.is_empty():
+		return
+	_skin = EnemySkin.new()
+	visuals.add_child(_skin)
+	visuals.move_child(_skin, 0)
+	for n in ["Body", "Head", "Eye"]:
+		var n2 := visuals.get_node_or_null(n)
+		if n2 != null:
+			n2.visible = false
+	_skin.setup(data.sprite_dir)
+	# 帧序列模式下小人实际头顶在 -44（帧上半是空白），血条贴头顶上方一点
+	bar.position.y = -54.0
 
 
 func _ready() -> void:
@@ -70,6 +88,7 @@ func _ready() -> void:
 	health.revived.connect(_on_revived)
 	_home_x = global_position.x
 	_refresh_bar()
+	_setup_skin()
 
 
 func _physics_process(delta: float) -> void:
@@ -327,6 +346,8 @@ func _on_revived() -> void:
 
 func _process(delta: float) -> void:
 	_flash = move_toward(_flash, 0.0, 7.0 * delta)
+	if _skin != null:
+		_skin.tick(delta, state == State.DEAD, _flash)
 	flash.modulate.a = _flash
 	if not is_equal_approx(_alpha, _target_alpha):
 		_alpha = move_toward(_alpha, _target_alpha, 5.5 * delta)
