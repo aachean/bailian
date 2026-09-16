@@ -157,9 +157,13 @@ def _emit(spec):
         parts.append("offset_left = %s" % _num(-w / 2.0))
         parts.append("offset_top = %s" % _num(-h / 2.0))
         parts.append("offset_right = %s" % _num(w / 2.0))
-        parts.append("offset_bottom = %s" % _num(h / 2.0))
+        # 视觉向下加厚：碰撞面不动（还能照原样踩），只是把体积画出来 ——
+        # 12px 薄板在黑底上看不见，是「能跳上去但看不到」的直接原因
+        _vis_extra = {"ground": 20.0, "step": 4.0, "plat": 10.0, "plat_s": 10.0}.get(shape, 0.0)
+        parts.append("offset_bottom = %s" % _num(h / 2.0 + _vis_extra))
         parts.append("mouse_filter = 2")
-        # 64px 的 tile 在 24px 高的地面矩形里只露出顶部 —— 正好是石/沙的表面层
+        # 贴图按**显示尺寸**生成（tools/gen_terrain_tiles.py）：
+        # ground/step 44px、plat 22px，TILE 平铺 1:1 不缩放
         parts.append("texture = ExtResource(\"%s\")" % tile_ids[shape])
         parts.append("stretch_mode = 1")
         parts.append("")

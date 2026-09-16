@@ -114,6 +114,7 @@ func _setup_skin() -> void:
 	var tex_h := float(_skin.texture.get_height())
 	var s := 52.0 / tex_h          # 小怪比玩家（64）矮一头
 	_skin.scale = Vector2(-s, s)
+	_skin.position = Vector2(0.0, 20.0 - 52.0 * 0.5)   # 底边对齐旧色块脚底（+20）
 
 
 ## 帧序列模式（sprite_dir）：walk_N 循环 + idle/hurt/dead 单帧。
@@ -129,7 +130,9 @@ func _setup_skin_frames() -> void:
 			n2.visible = false
 	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_skin.scale = Vector2(-1.5, 1.5)   # x -1：素材面朝左，抵消 _apply_facing 的翻转；帧 32x64
-	_skin.position = Vector2(0.0, -2.0 - 64.0 * 1.5 * 0.5)   # 帧底 -2：与骑士视觉脚位平齐   # 帧底 +8：与骑士视觉脚位平齐
+	_skin.position = Vector2(0.0, -2.0 - 64.0 * 1.5 * 0.5)   # 帧底 -2：与骑士视觉脚位平齐（帧 32x64，脚贴帧底）
+	# 帧序列模式下小人实际头顶在 -44（帧上半是空白），血条贴头顶上方一点
+	bar.position.y = -54.0
 	_skin.visible = true
 	var d := DirAccess.open(data.sprite_dir)
 	if d == null:
@@ -145,7 +148,6 @@ func _setup_skin_frames() -> void:
 	var idle_path := data.sprite_dir + "/idle_0.png"
 	if ResourceLoader.exists(idle_path):
 		_skin.texture = load(idle_path)
-	_skin.position = Vector2(0.0, 20.0 - 52.0 * 0.5)   # 底边对齐旧色块脚底（+20）
 
 
 func _physics_process(delta: float) -> void:

@@ -1,4 +1,5 @@
 extends Node
+## 屏障位置实拍 + 地形/敌人视觉尺寸现场核查。
 
 func _ready() -> void:
 	var lv: Node = load("res://scenes/stages/lichang.tscn").instantiate()
@@ -10,11 +11,14 @@ func _ready() -> void:
 	player.set("velocity", Vector2.ZERO)
 	for i in 20:
 		await get_tree().physics_frame
+	for m in lv.find_children("*", "CharacterBody2D", true, false):
+		if m.global_position.x > 900.0:
+			continue
+		var sk: Sprite2D = m.get_node_or_null("Visuals/Skin")
+		if sk != null:
+			print("%-9s skin_pos_y=%.1f scale=%s" % [m.name, sk.position.y, sk.scale])
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	img.save_png("res://build/shots/check_barrier.png")
-	# 打印场景里第 1/2 屏的地面与背景色情况
-	for scr in lv.get_node("Screens").get_children() if lv.has_node("Screens") else []:
-		print("screen:", scr.name, scr.position)
-	print("done")
+	print("shot done")
 	get_tree().quit()
