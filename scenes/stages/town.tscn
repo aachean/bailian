@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
@@ -9,6 +9,11 @@
 [ext_resource type="PackedScene" path="res://scenes/core/atlas_pedestal.tscn" id="8_pedestal"]
 [ext_resource type="PackedScene" path="res://scenes/core/shop_stand.tscn" id="9_shop"]
 [ext_resource type="Texture2D" path="res://assets/tiles/grass_top.png" id="10_grasstop"]
+[ext_resource type="Texture2D" path="res://assets/props/house_forge.png" id="11_forge"]
+[ext_resource type="Texture2D" path="res://assets/props/house_small.png" id="12_small"]
+[ext_resource type="PackedScene" path="res://scenes/core/signpost.tscn" id="13_signpost"]
+[ext_resource type="Resource" path="res://data/dialogue/sign_basic.tres" id="14_sign_basic"]
+[ext_resource type="Resource" path="res://data/dialogue/sign_combat.tres" id="15_sign_combat"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1280, 24)
@@ -37,46 +42,29 @@ stretch_mode = 1
 shape = SubResource("RectangleShape2D_ground")
 
 [node name="House1" type="Node2D" parent="."]
-position = Vector2(300, 242)
+position = Vector2(430, 320)
 
-[node name="Visual" type="ColorRect" parent="House1"]
-offset_left = -60.0
-offset_top = -45.0
-offset_right = 60.0
-offset_bottom = 45.0
-mouse_filter = 2
-color = Color(0.4, 0.34, 0.28, 1)
-
-[node name="Roof1" type="ColorRect" parent="House1"]
+[node name="Visual" type="TextureRect" parent="House1"]
 offset_left = -66.0
-offset_top = -53.0
+offset_top = -100.0
 offset_right = 66.0
-offset_bottom = -43.0
+offset_bottom = 0.0
 mouse_filter = 2
-color = Color(0.3, 0.25, 0.21, 1)
-
+texture = ExtResource("11_forge")
 [node name="House2" type="Node2D" parent="."]
-position = Vector2(620, 252)
+position = Vector2(180, 320)
 
-[node name="Visual" type="ColorRect" parent="House2"]
-offset_left = -48.0
-offset_top = -35.0
-offset_right = 48.0
-offset_bottom = 35.0
-mouse_filter = 2
-color = Color(0.36, 0.31, 0.26, 1)
-
-[node name="Roof2" type="ColorRect" parent="House2"]
+[node name="Visual" type="TextureRect" parent="House2"]
 offset_left = -54.0
-offset_top = -43.0
+offset_top = -80.0
 offset_right = 54.0
-offset_bottom = -33.0
+offset_bottom = 0.0
 mouse_filter = 2
-color = Color(0.27, 0.23, 0.19, 1)
-
+texture = ExtResource("12_small")
 [node name="Smith" parent="." instance=ExtResource("5_npc")]
 position = Vector2(480, 302)
 name_key = &"NPC_SMITH"
+sprite_dir = "res://assets/npcs/old_man"
 dialogue = ExtResource("6_smith_intro")
 repeat_dialogue = ExtResource("7_smith_repeat")
 
@@ -88,6 +76,16 @@ position = Vector2(930, 306)
 
 [node name="AtlasPedestal" parent="." instance=ExtResource("8_pedestal")]
 position = Vector2(1080, 306)
+
+[node name="SignBasic" parent="." instance=ExtResource("13_signpost")]
+position = Vector2(330, 302)
+name_key = &"NPC_SIGN_BASIC"
+dialogue = ExtResource("14_sign_basic")
+
+[node name="SignCombat" parent="." instance=ExtResource("13_signpost")]
+position = Vector2(1000, 302)
+name_key = &"NPC_SIGN_COMBAT"
+dialogue = ExtResource("15_sign_combat")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(120, 280)

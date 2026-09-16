@@ -12,10 +12,19 @@ extends Area2D
 ## 切场景会重建 NPC，存在节点上的状态会丢（这个坑在碎片那轮踩过）。
 
 @export var name_key: StringName = &""
+## 帧序列目录（如 res://assets/npcs/old_man）。非空时用像素精灵顶掉色块 ——
+## 色块是原型期的占位，精灵才是正稿；留空则维持色块（测试场景还会用）
+@export var sprite_dir: String = ""
+## 精灵缩放：村民帧 48x48、内容高 34px，1.5 倍 ≈ 51px（主角 55 / 小怪 52）
+@export var sprite_scale := 1.5
+## 静态单图（告示牌这类）：sprite_dir 为空时才用。1:1 显示，底边贴地
+@export var sprite_file: String = ""
+@export var sprite_file_scale := 1.0
 @export var dialogue: DialogueData = null
 @export var repeat_dialogue: DialogueData = null
 
 var _player: Node2D = null
+var _skin: NpcSkin = null
 ## 对话刚关掉之后的锁帧 —— 关对话的那一下 J 还在 just_pressed 状态里，
 ## 不锁的话 NPC 下一帧就把它当成「开始对话」，对话会自己又弹开
 var _lock := 0
@@ -25,7 +34,30 @@ var _was_open := false
 @onready var _hint_label: Label = $Hint
 
 
+## 精灵模式：非空 sprite_dir 时像素精灵上阵，色块（原型占位）退位
+func _setup_skin() -> void:
+	if sprite_dir.is_empty() and sprite_file.is_empty():
+		return
+	_skin = NpcSkin.new()
+	_skin.name = "Skin"
+	add_child(_skin)   # 建在色块之后 → 自然盖在上面，不必再挪顺序
+	var ok := false
+	if not sprite_dir.is_empty():
+		ok = _skin.setup(sprite_dir, 18.0, sprite_scale)
+	else:
+		ok = _skin.setup_static(sprite_file, 18.0, sprite_file_scale)
+	if not ok:
+		_skin.queue_free()
+		_skin = null
+		return
+	for n in ["Body", "Head"]:
+		var n2 := get_node_or_null(n)
+		if n2 != null:
+			n2.visible = false
+
+
 func _ready() -> void:
+	_setup_skin()
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	if not GameSettings.language_changed.is_connected(_refresh):
@@ -45,7 +77,9 @@ func _on_body_exited(body: Node2D) -> void:
 		_refresh()
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
+	if _skin != null:
+		_skin.tick(delta)
 	if _lock > 0:
 		_lock -= 1
 	# 边沿检测：对话从「开着」变成「关着」的那一帧起锁一小会儿。

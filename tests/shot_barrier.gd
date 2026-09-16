@@ -1,54 +1,48 @@
 extends Node
-## 三项修复验证：怪脚贴地 / 玩家与怪不重叠 / 新头像。
+## 城镇巡检：房子贴图 + 告示牌（走近 → J 阅读）。
 
 func _ready() -> void:
 	SaveManager.current_slot = 3
 	SaveManager.start_new_game(3, "res://scenes/stages/town.tscn")
-	var lv: Node = load("res://scenes/stages/lichang.tscn").instantiate()
+	var lv: Node = load("res://scenes/stages/town.tscn").instantiate()
 	add_child(lv)
 	await _frames(12)
 	var player: Node2D = lv.get_node("Player")
-	var mob: Node2D = null
-	for m in get_tree().get_nodes_in_group("enemy"):
-		if m.global_position.x > 400.0 and m.global_position.y < 400.0:
-			mob = m
-			break
-	if mob != null:
-		# 站到怪左边 44px：如果还重叠说明碰撞没生效
-		player.global_position = Vector2(mob.global_position.x - 44.0, 240.0)
-		player.set("velocity", Vector2.ZERO)
-		print("怪原点 %s 碰撞底 %.1f" % [mob.global_position, mob.global_position.y + 20.0])
-		var sk: Sprite2D = mob.get_node_or_null("Visuals/Skin")
-		if sk != null:
-			print("Skin 中心 %.1f → 显示底边 %.1f" % [sk.position.y, sk.position.y + 48.0])
-	await _frames(25)
-	# 让玩家朝右走两步，看是否被怪挡住
-	Input.action_press("move_right")
-	await _frames(30)
-	Input.action_release("move_right")
-	await _frames(6)
-	if mob != null:
-		print("玩家 x=%.1f 怪 x=%.1f 间距=%.1f" % [
-			player.global_position.x, mob.global_position.x,
-			mob.global_position.x - player.global_position.x])
-	if mob != null:
-		var bar: Node2D = mob.get_node_or_null("HealthBar")
-		var bg: ColorRect = mob.get_node_or_null("HealthBar/BG")
-		if bar != null:
-			print("HealthBar 局部 y=%.1f 全局 y=%.1f" % [bar.position.y, bar.global_position.y])
-		if bg != null:
-			print("BG pos=%s size=%s" % [bg.position, bg.size])
-		print("怪原点 y=%.1f  Skin 顶=%.1f" % [mob.global_position.y, mob.global_position.y - 76.0])
-	var psk: Sprite2D = player.get_node_or_null("Visuals/Skin")
-	if psk != null:
-		print("主角 Skin: scale=%s pos=%.1f tex=%s size=%s 可见=%s" % [
-			psk.scale, psk.position.y,
-			psk.texture.resource_path.get_file() if psk.texture else "nil",
-			str(psk.texture.get_size()) if psk.texture else "-", psk.visible])
-		print("主角原点 y=%.1f 碰撞底 y=%.1f" % [player.global_position.y, player.global_position.y + 16.0])
-	else:
-		print("主角没有 Skin 节点")
-	await _shot("verify_fix.png")
+
+	# 1) 全景：民居 + 铁匠铺 + 老铁匠
+	player.global_position = Vector2(300.0, 300.0)
+	player.set("velocity", Vector2.ZERO)
+	await _frames(14)
+	print("--- 顶层子节点 ---")
+	for c in lv.get_children():
+		print("   %s (%s)" % [c.name, c.get_class()])
+	for n in ["House1", "House2", "SignBasic", "SignCombat", "Smith"]:
+		var node: Node = lv.get_node_or_null(n)
+		if node != null:
+			var vis: Node = node.get_node_or_null("Visual") if node.get_node_or_null("Visual") else node.get_node_or_null("Skin")
+			print("%-11s pos=%s 视觉=%s" % [n, node.position, vis.get_class() if vis else "-"])
+	await _shot("town_1_overview.png")
+
+	# 2) 走近第一块告示牌（应在范围内 → 出现「按 J 交谈」）
+	player.global_position = Vector2(300.0, 300.0)
+	await _frames(10)
+	var sign1: Node = lv.get_node("SignBasic")
+	print("告示牌1 提示文字='%s'" % sign1.get_node("Hint").text)
+	print("告示牌1 名字='%s'" % sign1.get_node("Name").text)
+	var sk: Sprite2D = sign1.get_node_or_null("Skin")
+	print("告示牌1 Skin=%s tex=%s pos=%.1f 色块隐藏=%s" % [
+		str(sk != null), sk.texture.resource_path.get_file() if sk and sk.texture else "-",
+		sk.position.y if sk else 0.0, str(sign1.get_node_or_null("Body") == null)])
+	await _shot("town_2_sign_hint.png")
+
+	# 3) 按 J 读牌
+	Input.action_press("attack")
+	await _frames(3)
+	Input.action_release("attack")
+	await _frames(8)
+	var box: Node = get_tree().get_first_node_in_group("dialogue_box")
+	print("对话开着=%s" % (box != null and box.call("is_open")))
+	await _shot("town_3_sign_open.png")
 	print("done")
 	get_tree().quit()
 

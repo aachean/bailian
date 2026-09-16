@@ -159,3 +159,8 @@ SKILL_HEAVY_BOLT,"碎甲重矢","Armor Splitter"
 SKILL_SKY_PIERCE,"穿云箭","Sky Piercer"
 
 UI_BAG_WRONG_WEAPON,"%s 不是这个角色能使的武器（K 可以卖掉）","%s cannot wield this weapon (K to sell)"
+
+NPC_SIGN_BASIC,告示牌 · 基本操作,Signpost · Basics
+NPC_SIGN_COMBAT,告示牌 · 战斗要领,Signpost · Combat
+SIGN_BASIC_1,出门前先记熟这几手 ——,Learn these before you head out —
+SIGN_COMBAT_1,再往前就是淬火岭，这几手是要命的 ——,Quench Ridge lies ahead — these are the ones that keep you alive —

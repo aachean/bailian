@@ -223,6 +223,7 @@ shape = SubResource("RectangleShape2D_plat_s")
 [node name="Hunter" parent="Screen1" instance=ExtResource("8_npc")]
 position = Vector2(140, 302)
 name_key = &"NPC_HUNTER"
+sprite_dir = "res://assets/npcs/man"
 dialogue = ExtResource("9_hunter")
 
 [node name="Wave1" type="Node2D" parent="Screen1" groups=["wave"]]

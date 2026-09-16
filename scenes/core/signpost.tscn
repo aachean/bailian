@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/npc.gd" id="1_npc"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_zone"]
+size = Vector2(84, 84)
+
+[node name="Signpost" type="Area2D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_npc")
+sprite_file = "res://assets/props/signpost.png"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_zone")
+
+[node name="Name" type="Label" parent="."]
+offset_left = -100.0
+offset_top = -66.0
+offset_right = 100.0
+offset_bottom = -48.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
+horizontal_alignment = 1
+text = ""
+
+[node name="Hint" type="Label" parent="."]
+offset_left = -80.0
+offset_top = 24.0
+offset_right = 80.0
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.9, 0.9, 0.85, 1)
+horizontal_alignment = 1
+text = ""
