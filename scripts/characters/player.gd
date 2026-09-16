@@ -354,19 +354,31 @@ func _apply_character_look() -> void:
 # 像素素材纪律：nearest 过滤 + 整数倍缩放（scale 2 = 40px 原生 ×2）——
 # 挤压/倾斜这类非整数形变一律不上，会把像素弄花。方向翻转沿用 Visuals.scale.x。
 
-## 显示缩放：Mattz 帧 96x84、**帧内小人只占 y25~62**（37px 高）。
-## 1.5 倍 → 小人约 55px，比小怪（52px）略高一档。
-const SKIN_SCALE := 1.5
-const SKIN_FRAME_H := 84.0
-## 帧内小人**脚底**的 y（实测 62）。帧底之下还有 22px 留白 ——
-## 位置必须按「脚」算而不是按「帧底」算，否则主角整整陷进地里 22px
-const SKIN_FOOT_Y := 62.0
+## 帧参数（缩放 / 帧高 / 帧内脚底 y）**从 CharacterData 读** —— 每个角色的素材
+## 尺寸不同（剑客 96x84 帧内脚在 62、游侠 40x29 帧内脚在 25），写死常量
+## 就等于「加角色必须改代码」，那 M4 的架构验证就白做了。
+var _skin_scale := 1.5
+var _skin_frame_h := 84.0
+var _skin_foot_y := 62.0
+
+## 动画回退链：素材包不一定每个动画都有（游侠包只有 run 没有 walk、
+## 只有一段 attack）。缺了就找替身，**不为此复制帧文件** ——
+## 复制出来的帧是冗余，改一处必忘一处。
+const ANIM_FALLBACK := {
+	&"walk": [&"run"],
+	&"attack2": [&"attack", &"windup"],
+	&"attack3": [&"attack", &"windup"],
+	&"hurt": [&"idle"],
+	&"defend": [&"idle"],
+}
 
 var _skin: Sprite2D = null
 var _skin_anims: Dictionary = {}     # StringName -> Array[Texture2D]
 var _skin_anim := &""
 var _anim_clock := 0.0
 var _anim_fps := 8.0
+## 单次播放（死亡这类不循环的）：播完停在最后一帧，别绕回第一帧
+var _anim_once := false
 var _walk_clock := 0.0
 
 
@@ -396,8 +408,11 @@ func _setup_skin() -> void:
 		return
 	# 像素素材：nearest + 整数倍缩放。脚底对齐旧色块脚底（Visuals 原点，+16）
 	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_skin.scale = Vector2(SKIN_SCALE, SKIN_SCALE)
-	_skin.position = Vector2(0.0, 16.0 - (SKIN_FOOT_Y - SKIN_FRAME_H * 0.5) * SKIN_SCALE)
+	_skin_scale = character.sprite_scale
+	_skin_frame_h = character.sprite_frame_h
+	_skin_foot_y = character.sprite_foot_y
+	_skin.scale = Vector2(_skin_scale, _skin_scale)
+	position_skin()
 	_skin.visible = true
 	_set_skin_anim(&"idle", 6.0)
 
@@ -435,18 +450,39 @@ func _load_anim_sequences(dir: String, wanted: Dictionary) -> Dictionary:
 	return out
 
 
+## 按「帧内脚底」对齐到碰撞底（+16）。公式里的每一项都有出处：
+##   16 = 碰撞体半高（脚在原点下方 16）
+##   _skin_foot_y - 帧高/2 = 帧内脚相对帧中心的偏移
+func position_skin() -> void:
+	if _skin == null:
+		return
+	_skin.position = Vector2(0.0, 16.0 - (_skin_foot_y - _skin_frame_h * 0.5) * _skin_scale)
+
+
 func _skin_active() -> bool:
 	return _skin != null and _skin.visible and _skin_anims.size() > 0
 
 
 ## 切动画（同名不重置）。帧推进在 _physics_process 的 _tick_skin_anim
-func _set_skin_anim(anim: StringName, fps := 8.0) -> void:
-	if not _skin_active() or _skin_anim == anim or not _skin_anims.has(anim):
+func _set_skin_anim(anim: StringName, fps := 8.0, once := false) -> void:
+	if not _skin_active():
 		return
-	_skin_anim = anim
+	var target: StringName = anim
+	if not _skin_anims.has(target):
+		target = &""
+		for alt: StringName in ANIM_FALLBACK.get(anim, []):
+			if _skin_anims.has(alt):
+				target = alt
+				break
+		if target == &"":
+			return          # 连替身都没有：保持当前帧，比闪回 idle 自然
+	if _skin_anim == target:
+		return
+	_skin_anim = target
 	_anim_fps = fps
+	_anim_once = once
 	_anim_clock = 0.0
-	_skin.texture = _skin_anims[anim][0]
+	_skin.texture = _skin_anims[target][0]
 
 
 ## 兜底连招（角色数据整体缺失时用剑客三段，至少能打）
@@ -713,7 +749,10 @@ func _physics_process(delta: float) -> void:
 	if _skin_active() and _skin_anim != &"":
 		_anim_clock += delta * _anim_fps
 		var frames: Array = _skin_anims[_skin_anim]
-		_skin.texture = frames[int(_anim_clock) % frames.size()]
+		if _anim_once:
+			_skin.texture = frames[mini(int(_anim_clock), frames.size() - 1)]
+		else:
+			_skin.texture = frames[int(_anim_clock) % frames.size()]
 
 	if dodge_cooldown > 0:
 		dodge_cooldown -= 1
@@ -1246,6 +1285,9 @@ func _on_died() -> void:
 	deaths += 1
 	_end_action()
 	state = State.DEAD
+	## 死亡动画播一次停住。此前 dead 帧装了却从不播（死后冻结在 idle 帧），
+	## 白瞎了素材包里的 4 帧倒地动作
+	_set_skin_anim(&"dead", 8.0, true)
 	_revive_t = revive_delay
 	_visuals.modulate = Color(0.45, 0.45, 0.5, 0.6)
 

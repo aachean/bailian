@@ -29,6 +29,15 @@ extends Resource
 ## 全部由 tools/process_art.py 后处理产出（透明底、脚在图底）
 @export var sprite_dir: String = ""
 
+@export_group("精灵帧参数（每个角色的素材尺寸不同，别互抄）")
+## 显示缩放。**整数倍最清晰**（1x 素材配 2.0/3.0，2x 素材配 1.0）
+@export var sprite_scale := 1.5
+## 贴图帧高（像素）
+@export var sprite_frame_h := 84.0
+## **帧内小人脚底**的 y（从贴图 bbox 量，不是帧高！）——
+## 位置按「脚」算：帧底留白不扣掉，角色会整整陷进地里
+@export var sprite_foot_y := 62.0
+
 @export_group("初始装备（res:// 路径）")
 ## 初始武器。老铁匠的见面礼按它发货（对话 give_item 写的是剑客的铁剑，
 ## dialogue_box 发奖时按当前角色换成这里这份）—— 弓手不该背着铁剑出门
