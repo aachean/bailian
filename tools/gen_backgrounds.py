@@ -119,11 +119,17 @@ def townline(w, h, base_y, color, seed=4):
     return im
 
 
-def gate(w, h, base_y, color, seed=5):
-    """山门剪影（主菜单）：门楼 + 双柱，居中一个大门洞。"""
+def gate(w, h, base_y, color, seed=5, center_x=None):
+    """山门剪影（主菜单）：门楼 + 双柱，居中一个大门洞。
+
+    center_x 必须传**视口中心**（320），不是图的中点（480）—— 山门是单个
+    居中物件，按图的中点摆会被视口右边缘截断（实机上只剩柱子和半个屋檐，
+    看起来像几何碎片）。其他主题的 mid（树线/柱列/屋脊）是沿整条线重复的，
+    局部截断无所谓，所以只有这里需要这个参数。
+    """
     im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    cx = w // 2
+    cx = center_x if center_x is not None else w // 2
     d.rectangle([cx - 180, base_y - 30, cx - 130, h], fill=color)     # 左柱
     d.rectangle([cx + 130, base_y - 30, cx + 180, h], fill=color)     # 右柱
     d.rectangle([cx - 220, base_y - 52, cx + 220, base_y - 26], fill=color)  # 横梁
@@ -194,7 +200,7 @@ def main():
         elif m["kind"] == "town":
             mid = townline(W_TILE, H_VIEW, m["base"], hexc(m["color"]))
         else:
-            mid = gate(W_TILE, H_VIEW, m["base"], hexc(m["color"]))
+            mid = gate(W_TILE, H_VIEW, m["base"], hexc(m["color"]), center_x=W_VIEW // 2)
         mid = _tile2(mid)
         mid.save(os.path.join(d, "mid.png"))
         print(f"{theme}: sky {W_VIEW}x{H_VIEW} / far / mid {W_TILE}x{H_VIEW}")

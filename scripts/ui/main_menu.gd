@@ -57,6 +57,19 @@ func _ready() -> void:
 	bd.theme = &"title"
 	add_child(bd)
 	move_child(bd, 0)
+	# 版本号：测试版必须能报版本（没有它，反馈「玩不了」时无从问起）。
+	# 显式 position/size 而不是 anchors —— 这个项目在 Control 定位上踩过坑，别赌
+	var ver := Label.new()
+	ver.name = "Version"
+	ver.text = "v%s" % ProjectSettings.get_setting("application/config/version", "dev")
+	ver.add_theme_font_size_override("font_size", 11)
+	ver.add_theme_color_override("font_color", Color(0.72, 0.7, 0.64, 0.8))
+	ver.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vp := get_viewport_rect().size
+	ver.position = Vector2(vp.x - 152.0, vp.y - 32.0)
+	ver.size = Vector2(140.0, 20.0)
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(ver)
 	_start_btn.pressed.connect(_on_start)
 	_continue_btn.pressed.connect(_on_continue)
 	_load_btn.pressed.connect(_on_load)
