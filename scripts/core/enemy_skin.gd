@@ -18,8 +18,10 @@ extends Sprite2D
 
 ## 显示缩放（32x64 帧 × 1.5 ≈ 96px 高，比玩家略矮）
 @export var px_scale := 1.5
-## 脚底对齐：帧底再往上抬的像素数（与玩家视觉脚位平齐）
-@export var feet_lift := 2.0
+## 脚底相对**怪原点**的 y。walker/spearman 的碰撞体是 28x40（中心在原点），
+## 所以脚底在原点 +20 —— 帧底必须对齐到这里，否则怪悬空（飘在半空）。
+## 这个值必须从碰撞体推出来，别凭手感调（凭手感调错过三次）。
+@export var feet_y := 20.0
 
 const FRAME_H := 64.0
 
@@ -35,7 +37,7 @@ func setup(sprite_dir: String) -> void:
 	name = "Skin"
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	scale = Vector2(-px_scale, px_scale)
-	position = Vector2(0.0, -feet_lift - FRAME_H * px_scale * 0.5)
+	position = Vector2(0.0, feet_y - FRAME_H * px_scale * 0.5)
 	var d := DirAccess.open(sprite_dir)
 	if d == null:
 		visible = false

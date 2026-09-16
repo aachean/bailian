@@ -71,7 +71,9 @@ func _setup_skin() -> void:
 			n2.visible = false
 	_skin.setup(data.sprite_dir)
 	# 帧序列模式下小人实际头顶在 -44（帧上半是空白），血条贴头顶上方一点
-	bar.position.y = -54.0
+	# 血条贴头顶：实测帧内小人占 y29~64（高 35px，脚贴帧底），
+	# 头顶 = 原点 +20 - 35*1.5 = -32.5，血条再往上留 7px 间隙
+	bar.position.y = -40.0
 
 
 func _ready() -> void:
