@@ -30,7 +30,7 @@ offset_top = 6.0
 offset_right = 136.0
 offset_bottom = 18.0
 mouse_filter = 2
-color = Color(0.11, 0.1, 0.1, 0.85)
+color = Color(0.1, 0.075, 0.063, 0.92)
 
 [node name="MPBG" type="ColorRect" parent="Status"]
 offset_left = 8.0
@@ -38,7 +38,7 @@ offset_top = 26.0
 offset_right = 136.0
 offset_bottom = 38.0
 mouse_filter = 2
-color = Color(0.11, 0.1, 0.1, 0.85)
+color = Color(0.1, 0.075, 0.063, 0.92)
 
 [node name="HPBar" type="Node2D" parent="Status"]
 position = Vector2(8, 12)
@@ -49,7 +49,7 @@ offset_top = -6.0
 offset_right = 128.0
 offset_bottom = 6.0
 mouse_filter = 2
-color = Color(0.78, 0.26, 0.22, 1)
+color = Color(0.78, 0.27, 0.23, 1)
 
 [node name="MPBar" type="Node2D" parent="Status"]
 position = Vector2(8, 32)
@@ -60,7 +60,7 @@ offset_top = -6.0
 offset_right = 128.0
 offset_bottom = 6.0
 mouse_filter = 2
-color = Color(0.3, 0.5, 0.85, 1)
+color = Color(0.23, 0.43, 0.78, 1)
 
 [node name="HPText" type="Label" parent="Status"]
 offset_left = 8.0
@@ -69,7 +69,7 @@ offset_right = 136.0
 offset_bottom = 21.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 9
-theme_override_colors/font_color = Color(1, 1, 1, 0.95)
+theme_override_colors/font_color = Color(0.93, 0.86, 0.7, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
@@ -84,7 +84,7 @@ offset_right = 136.0
 offset_bottom = 41.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 9
-theme_override_colors/font_color = Color(1, 1, 1, 0.95)
+theme_override_colors/font_color = Color(0.93, 0.86, 0.7, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1

@@ -197,11 +197,8 @@ func _build_skill_bar() -> void:
 		# 代码建的 Panel 默认是主题那套浅灰底，和 HUD 其他面板格格不入 ——
 		# 手上一块深底 + 暗金边，风格才连得上。底色比面板更透一点：
 		# 它压在场景上，太实会挡住地面的地形
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.11, 0.11, 0.14, 0.86)
-		sb.border_color = Color(0.4, 0.35, 0.26, 1.0)
-		sb.set_border_width_all(1)
-		cell.add_theme_stylebox_override("panel", sb)
+		# 技能格：与主面板同族的像素九宫格（原先是代码画的灰方块，和面板两套语言）
+		cell.add_theme_stylebox_override("panel", load("res://assets/ui/slot_style.tres"))
 
 		var icon := SkillIcon.new()
 		icon.name = "Icon"

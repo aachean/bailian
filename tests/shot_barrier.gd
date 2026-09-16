@@ -1,34 +1,37 @@
 extends Node
-## 五处背景巡检：三个副本 + 城镇 + 主菜单，各截一张。
-
-const PLACES := [
-	["lichang", "res://scenes/stages/lichang.tscn", Vector2(905, 288)],
-	["duancuiqu", "res://scenes/stages/duancuiqu.tscn", Vector2(900, 288)],
-	["luhou", "res://scenes/stages/luhou.tscn", Vector2(900, 288)],
-	["town", "res://scenes/stages/town.tscn", Vector2(420, 288)],
-]
-
+## UI 统一巡检：副本 HUD（含提示条）+ 城镇 + 主菜单。
 
 func _ready() -> void:
 	SaveManager.current_slot = 3
 	SaveManager.start_new_game(3, "res://scenes/stages/town.tscn")
-	for place in PLACES:
-		var lv: Node = load(place[1]).instantiate()
-		add_child(lv)
-		await _frames(10)
-		var player: Node2D = lv.get_node_or_null("Player")
-		if player != null:
-			player.global_position = place[2]
-			player.set("velocity", Vector2.ZERO)
-		await _frames(12)
-		await _shot("bg_%s.png" % place[0])
-		lv.queue_free()
-		await _frames(4)
+	var lv: Node = load("res://scenes/stages/lichang.tscn").instantiate()
+	add_child(lv)
+	await _frames(12)
+	var player: Node2D = lv.get_node("Player")
+	player.global_position = Vector2(905.0, 288.0)
+	player.set("velocity", Vector2.ZERO)
+	await _frames(6)
+	# 触发提示条
+	lv.call("_banner", "这一屏还没清空 —— 打完了才能往前走")
+	await _frames(10)
+	await _shot("ui_1_hud.png")
+	lv.queue_free()
+	await _frames(4)
 
 	var mm: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
 	add_child(mm)
 	await _frames(8)
-	await _shot("bg_mainmenu.png")
+	await _shot("ui_2_menu.png")
+	mm.queue_free()
+	await _frames(4)
+
+	var pm: Node = load("res://scenes/ui/pause_menu.tscn").instantiate()
+	add_child(pm)
+	await _frames(6)
+	if pm.has_method("open"):
+		pm.call("open")
+	await _frames(6)
+	await _shot("ui_3_pause.png")
 	print("all done")
 	get_tree().quit()
 

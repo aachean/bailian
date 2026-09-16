@@ -396,13 +396,15 @@ func _build_banner() -> void:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.modulate.a = 0.0
-	lbl.position = Vector2(0.0, 92.0)
+	lbl.position = Vector2(0.0, 86.0)
 	cl.add_child(lbl)
 	# 宽度**跟着视口**（而不是写死屏宽）：屏比视口宽，写 SCREEN_WIDTH 会让字
 	# 居中到屏幕外。
 	# **别改成锚点**（set_anchors_preset）：父节点是 CanvasLayer，不是 Control，
 	# 锚点在这条路径上不生效 —— 实测框宽会停在 0，字从左边溢出屏幕（拍出来了才看见）
-	lbl.size = Vector2(get_viewport().get_visible_rect().size.x, 26.0)
+	# 提示条走统一面板样式（原先是一行裸字，和面板不是一套语言）
+	lbl.add_theme_stylebox_override("normal", load("res://assets/ui/banner_style.tres"))
+	lbl.size = Vector2(get_viewport().get_visible_rect().size.x, 34.0)
 	_banner_label = lbl
 
 
@@ -413,7 +415,7 @@ func _banner(text: String) -> void:
 		return
 	# 每写一次就校一次宽度：窗口大小与拉伸模式都可能变，"居中的那行字"
 	# 一旦框宽不对就会跑到屏幕外，而且不报错
-	_banner_label.size = Vector2(get_viewport().get_visible_rect().size.x, 26.0)
+	_banner_label.size = Vector2(get_viewport().get_visible_rect().size.x, 34.0)   # 面板样式要 34 高
 	_banner_label.text = text
 	_banner_label.modulate.a = 1.0
 	if _banner_tween != null and _banner_tween.is_valid():
