@@ -354,9 +354,13 @@ func _apply_character_look() -> void:
 # 像素素材纪律：nearest 过滤 + 整数倍缩放（scale 2 = 40px 原生 ×2）——
 # 挤压/倾斜这类非整数形变一律不上，会把像素弄花。方向翻转沿用 Visuals.scale.x。
 
-## 像素缩放倍数（原生帧高 29 × 2 = 58px 显示）
-const SKIN_SCALE := 2.0
-const SKIN_FRAME_H := 29.0
+## 显示缩放：Mattz 帧 96x84、**帧内小人只占 y25~62**（37px 高）。
+## 1.5 倍 → 小人约 55px，比小怪（52px）略高一档。
+const SKIN_SCALE := 1.5
+const SKIN_FRAME_H := 84.0
+## 帧内小人**脚底**的 y（实测 62）。帧底之下还有 22px 留白 ——
+## 位置必须按「脚」算而不是按「帧底」算，否则主角整整陷进地里 22px
+const SKIN_FOOT_Y := 62.0
 
 var _skin: Sprite2D = null
 var _skin_anims: Dictionary = {}     # StringName -> Array[Texture2D]
@@ -382,8 +386,10 @@ func _setup_skin() -> void:
 		if n2 != null:
 			n2.visible = false
 	_skin_anims = _load_anim_sequences(character.sprite_dir, {
-		&"idle": &"idle", &"run": &"run", &"jump": &"jump", &"dead": &"x",
+		&"idle": &"idle", &"walk": &"walk", &"run": &"run", &"jump": &"jump",
 		&"windup": &"attack_half1", &"strike": &"attack_half2",
+		&"attack2": &"attack2", &"attack3": &"attack3",
+		&"hurt": &"hurt", &"defend": &"defend", &"dead": &"dead",
 	})
 	if _skin_anims.is_empty():
 		_skin.visible = false
@@ -391,7 +397,7 @@ func _setup_skin() -> void:
 	# 像素素材：nearest + 整数倍缩放。脚底对齐旧色块脚底（Visuals 原点，+16）
 	_skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_skin.scale = Vector2(SKIN_SCALE, SKIN_SCALE)
-	_skin.position = Vector2(0.0, 16.0 - SKIN_FRAME_H * SKIN_SCALE * 0.5)
+	_skin.position = Vector2(0.0, 16.0 - (SKIN_FOOT_Y - SKIN_FRAME_H * 0.5) * SKIN_SCALE)
 	_skin.visible = true
 	_set_skin_anim(&"idle", 6.0)
 
@@ -942,7 +948,14 @@ func _start_attack(index: int) -> void:
 	_swing_sfx(_current)
 	state = State.ATTACK
 	_state_frame = 0
-	_set_skin_anim(&"windup", 18.0)
+	if _current != null and _current.guard_reduction > 0.0:
+		_set_skin_anim(&"defend", 14.0)   # 铁壁这类格挡技：举盾姿态
+	elif attack_index == 1:
+		_set_skin_anim(&"attack2", 16.0)
+	elif attack_index == 2:
+		_set_skin_anim(&"attack3", 16.0)
+	else:
+		_set_skin_anim(&"windup", 18.0)
 	_attack_queued = false
 	_dodge_queued = false
 	_jump_buffer_timer = 0.0
@@ -966,7 +979,7 @@ func _attack_process(delta: float) -> void:
 
 	if sk.is_active_at(t):
 		_hitbox.activate(sk, self, _facing)
-		_set_skin_anim(&"strike", 18.0)
+		_set_skin_anim(&"strike", 18.0) if attack_index == 0 else null
 		_blade.modulate.a = 1.0
 		# 剑气这类技能在判定窗口的第一帧甩出投射物（窗口有 4 帧，只该发一道）
 		if not _projectile_fired and sk.projectile_scene != null:
@@ -1207,7 +1220,7 @@ func _spawn_hit_fx(point: Vector2, color: Color, count: int, speed: float) -> vo
 ## 硬直帧数比无敌窗口长，所以连招惩罚依然成立 —— 这是有意的。
 func _on_damaged(_amount: int, _hp_left: int, point: Vector2, _heavy: bool, dir: int) -> void:
 	hurts_taken += 1
-	_set_skin_anim(&"idle", 6.0)   # 出招被打断时把姿势收回来
+	_set_skin_anim(&"hurt", 14.0)   # 受击姿态（硬直结束回 FREE 后自动接 idle）
 	# 挨打是负反馈 —— 玩家必须**立刻**知道自己中招了（6.2 的首响应）。
 	# 这声比命中更响：命中有连招会响好几下，挨打才是要命的那个
 	Audio.play(&"hurt")

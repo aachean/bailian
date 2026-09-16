@@ -39,6 +39,15 @@ func _ready() -> void:
 		if bg != null:
 			print("BG pos=%s size=%s" % [bg.position, bg.size])
 		print("怪原点 y=%.1f  Skin 顶=%.1f" % [mob.global_position.y, mob.global_position.y - 76.0])
+	var psk: Sprite2D = player.get_node_or_null("Visuals/Skin")
+	if psk != null:
+		print("主角 Skin: scale=%s pos=%.1f tex=%s size=%s 可见=%s" % [
+			psk.scale, psk.position.y,
+			psk.texture.resource_path.get_file() if psk.texture else "nil",
+			str(psk.texture.get_size()) if psk.texture else "-", psk.visible])
+		print("主角原点 y=%.1f 碰撞底 y=%.1f" % [player.global_position.y, player.global_position.y + 16.0])
+	else:
+		print("主角没有 Skin 节点")
 	await _shot("verify_fix.png")
 	print("done")
 	get_tree().quit()
