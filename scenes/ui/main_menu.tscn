@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="StyleBoxTexture" path="res://assets/ui/panel_style.tres" id="3_panelstyle"]
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/settings_panel.tscn" id="2_settings"]
+[ext_resource type="PackedScene" path="res://scenes/ui/credits_panel.tscn" id="4_credits"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -52,6 +53,11 @@ text = "读取存档"
 custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "设置"
+
+[node name="Credits" type="Button" parent="Panel/Box"]
+custom_minimum_size = Vector2(180, 28)
+layout_mode = 2
+text = "素材致谢"
 
 [node name="Quit" type="Button" parent="Panel/Box"]
 custom_minimum_size = Vector2(180, 28)
@@ -107,3 +113,5 @@ layout_mode = 2
 text = "返回"
 
 [node name="SettingsPanel" parent="." instance=ExtResource("2_settings")]
+
+[node name="CreditsPanel" parent="." instance=ExtResource("4_credits")]

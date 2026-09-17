@@ -39,6 +39,8 @@ var _no_btn: Button = null
 @onready var _load_btn: Button = $Panel/Box/Load
 @onready var _settings_btn: Button = $Panel/Box/Settings
 @onready var _settings: Node = $SettingsPanel
+@onready var _credits_btn: Button = $Panel/Box/Credits
+@onready var _credits: Node = $CreditsPanel
 @onready var _quit_btn: Button = $Panel/Box/Quit
 @onready var _title: Label = $Title
 @onready var _slots: Panel = $Slots
@@ -74,6 +76,7 @@ func _ready() -> void:
 	_continue_btn.pressed.connect(_on_continue)
 	_load_btn.pressed.connect(_on_load)
 	_settings_btn.pressed.connect(_on_settings)
+	_credits_btn.pressed.connect(_on_credits)
 	_quit_btn.pressed.connect(_on_quit)
 	_back_btn.pressed.connect(_close_slots)
 	_build_slot_rows()
@@ -171,12 +174,13 @@ func _refresh_texts(_locale: String = "") -> void:
 	_load_btn.text = tr("UI_MENU_LOAD")
 	_quit_btn.text = tr("UI_MENU_QUIT")
 	_settings_btn.text = tr("UI_MENU_SETTINGS")
+	_credits_btn.text = tr("UI_CREDITS")
 	_slots_title.text = tr("UI_SLOTS_TITLE_NEW") if _slot_mode == SlotMode.START else tr("UI_SLOTS_TITLE_LOAD")
 	_page_label.text = tr("UI_SLOT_PAGE") % [_page + 1, SLOT_PAGES]
 	_prev_btn.disabled = _page <= 0
 	_next_btn.disabled = _page >= SLOT_PAGES - 1
 	_yes_btn.text = tr("UI_CONFIRM_YES")
-	_back_btn.text = tr("UI_CHAR_BACK")
+	_back_btn.text = tr("UI_BACK")
 	_no_btn.text = tr("UI_CONFIRM_NO")
 	_refresh_continue()
 	_refresh_slot_buttons()
@@ -313,7 +317,7 @@ func _open_character_page() -> void:
 	_title.visible = false
 	$Panel.visible = false
 	_char_title.text = tr("UI_CHAR_TITLE")
-	back_btn_from_char_page().text = tr("UI_CHAR_BACK")
+	back_btn_from_char_page().text = tr("UI_BACK")
 	var all := CharacterData.all()
 	for i in _char_btns.size():
 		var c := all[i] if i < all.size() else null
@@ -452,6 +456,13 @@ func _enter_slot(slot: int) -> void:
 func _on_settings() -> void:
 	if _settings != null:
 		_settings.call("open")
+
+
+## 素材致谢。面板是独立场景 —— 与设置面板同一个道理：
+## 以后暂停菜单也要放这个入口时，共用同一份，不会漂成两套署名
+func _on_credits() -> void:
+	if _credits != null:
+		_credits.call("open")
 
 
 func _on_quit() -> void:
