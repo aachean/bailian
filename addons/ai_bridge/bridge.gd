@@ -2,7 +2,7 @@ extends Node
 ## AiBridge —— 让外部程序（AI）实时操控本游戏并观察反馈的「进程内桥」。
 ##
 ## 只在启动时带用户参数 `--ai-bridge` 才生效，正常游玩零开销：
-##   Godot_..._console.exe --path D:/workbuddy_projects/bailian -- --ai-bridge
+##   <Godot 控制台版 exe> --path <本仓库目录> -- --ai-bridge
 ##
 ## 为什么不用 OS 级键鼠模拟（pyautogui / SendInput）作为主通道：
 ##   1. 受窗口焦点、DPI 缩放、键盘布局影响，换台机器就崩；
