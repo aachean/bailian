@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MapData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/dungeon_data.gd" id="1_dd"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_canjianlin.tres" id="2_cjl"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_xiushi.tres" id="3_xs"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_zhongxin.tres" id="4_zx"]
+[ext_resource type="Script" path="res://scripts/core/map_data.gd" id="5_map"]
+
+[resource]
+script = ExtResource("5_map")
+id = &"sword_tomb"
+name_key = &"MAP_SWORD_TOMB"
+dungeons = Array[ExtResource("1_dd")]([ExtResource("2_cjl"), ExtResource("3_xs"), ExtResource("4_zx")])

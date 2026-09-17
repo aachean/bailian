@@ -49,6 +49,8 @@ const WARN := Color(0.95, 0.52, 0.45, 1)
 ##   back    回安全区（可选）
 var _rows: Array[Dictionary] = []
 var _cursor := 0
+## 当前看的是第几张地图。**←→ 切换**（页签左右并排，切地图只换右列内容）
+var _map_idx := 0
 ## 这一份是通关之后弹出来的？true = 必须选一个去处，Esc 变成「回安全区」
 var _must_choose := false
 
@@ -126,12 +128,29 @@ func _unhandled_input(event: InputEvent) -> void:
 				_move(-1)
 			KEY_DOWN, KEY_S:
 				_move(1)
+			KEY_LEFT, KEY_A:
+				_switch_map(-1)
+			KEY_RIGHT, KEY_D:
+				_switch_map(1)
 			KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				_activate()
 
 
 ## 光标只在可选行之间走 —— 没开 / 没开工的副本只是「看得见的路标」，
 ## 落在上面会让玩家以为选了它就能进
+## 换一张地图看：重建右列，光标落在新地图第一行可选项。
+## 只有一张地图时什么都不做（不给玩家一个没有第二项的切换）
+func _switch_map(delta: int) -> void:
+	var ms := GameProgress.maps()
+	if ms.size() < 2:
+		return
+	_map_idx = wrapi(_map_idx + delta, 0, ms.size())
+	_build()
+	_fit_panel()
+	_cursor = _row_of(null)
+	refresh()
+
+
 func _move(dir: int) -> void:
 	var n := _rows.size()
 	if n == 0:
@@ -186,16 +205,28 @@ func _leave_to(path: String) -> void:
 ## 按地图数据建行。内容不会在界面开着的时候变，所以只在打开时建一次，
 ## 之后刷新只改文字
 func _build() -> void:
-	for c in _list.get_children():
-		c.queue_free()
-	for c in _tabs.get_children():
-		c.queue_free()
+	# **必须 remove_child 之后再 queue_free**：queue_free 是延迟的，
+		
+	# 只标记不摘除 —— 紧接着 add_child 的新节点会排在旧节点后面，
+	# 于是 refresh() 里 get_children()[i] 命中的是「正要被释放的旧 Label」，
+	# 文字全填到旧节点上，界面一片空白（切地图时才暴露，因为那时会第二次 _build）
+	for host in [_list, _tabs]:
+		for c in host.get_children():
+			host.remove_child(c)
+			c.queue_free()
 	_rows.clear()
 
-	var m := GameProgress.map()
+	var ms := GameProgress.maps()
+	if ms.is_empty():
+		return
+	_map_idx = clampi(_map_idx, 0, ms.size() - 1)
+	# 页签列出**全部**地图，当前那张金字、其余压暗 —— 玩家要看得见「后面还有一章」
+	for i in ms.size():
+		var cur := i == _map_idx
+		_tabs.add_child(_make_label(tr(ms[i].name_key), GOLD if cur else DIM, cur))
+	var m := ms[_map_idx]
 	if m == null:
 		return
-	_tabs.add_child(_make_label(tr(m.name_key), GOLD, true))
 	for d in m.dungeons:
 		if d == null:
 			continue
@@ -243,8 +274,7 @@ func _fit_panel() -> void:
 func refresh() -> void:
 	_title.text = tr("UI_ATLAS_TITLE")
 	_hint.text = tr("UI_ATLAS_HINT_CLEAR") if _must_choose else tr("UI_ATLAS_HINT")
-	var m := GameProgress.map()
-	if m == null:
+	if GameProgress.maps().is_empty():
 		return
 	var kids := _list.get_children()
 	for i in mini(_rows.size(), kids.size()):

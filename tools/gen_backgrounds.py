@@ -139,6 +139,35 @@ def gate(w, h, base_y, color, seed=5, center_x=None):
     return im
 
 
+def swordline(w, h, base_y, color, seed=7, gap=22):
+    """剑冢的中景：插了一地的断剑。
+
+    每把剑 = 细剑身 + 护手 + 柄，30~58px 高足够辨出剑形；
+    约三成是断的（剑身上擦掉一段 —— 用 alpha=0 的矩形「擦除」）。
+    横向按 gap 周期排、偏移量限制在格内（不贴边）——
+    这样 _tile2 把图复制一遍时接缝处不会出现半截剑。
+    """
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    rnd = random.Random(seed)
+    n = w // gap
+    for i in range(n):
+        x = i * gap + rnd.randrange(3, gap - 5)
+        hh = rnd.choice([26, 34, 42, 50, 58])
+        tilt = rnd.choice([-2, 0, 0, 0, 0, 2])
+        top = base_y - hh
+        # 比例是辨识度的关键：**剑身占主体**（hh-7），柄只有 5px、护手 2px。
+        # 早先柄 9px + 护手 ±4 画出来是「十字架」——护手宽、柄长就成十字了
+        d.line([(x + tilt, top + 7), (x, base_y)], fill=color, width=3)      # 剑身
+        d.rectangle([x - 3, top + 5, x + 3, top + 7], fill=color)            # 护手（窄）
+        d.line([(x + tilt, top), (x + tilt, top + 5)], fill=color, width=3)  # 柄（短）
+        if rnd.random() < 0.3:
+            cut = top + 12 + rnd.randrange(0, max(1, hh - 24))
+            d.rectangle([x - 3, cut, x + 3, cut + 6], fill=(0, 0, 0, 0))     # 断口
+    d.rectangle([0, base_y, w, h], fill=color)                            # 剑根以下的土坡
+    return im
+
+
 # ── 主题表 ────────────────────────────────────────────────────
 # far = (底色, 山脊幅度, 频率, 基准线, 锯齿)
 THEMES = {
@@ -161,6 +190,26 @@ THEMES = {
         sky=("#e8a468", "#fadfb4"),
         far=dict(color="#7d6c86", amp=54, freq=2.8, base=208, jag=2),
         mid=dict(kind="town", color="#3a2c33", base=276),
+    ),
+    "tomb": dict(
+        # 剑冢：阴天的荒原 —— 冷灰蓝的天、更灰的远山、近黑的剑影
+        sky=("#6b7280", "#c9ccd2"),
+        far=dict(color="#5a6070", amp=44, freq=2.4, base=214, jag=3),
+        mid=dict(kind="sword", color="#22222a", base=272),
+    ),
+    "tomb_rust": dict(
+        # 锈蚀甬道：暗锈红 —— 铁蚀穿了，天也是锈的
+        sky=("#4a3230", "#a87a68"),
+        far=dict(color="#3d2a28", amp=40, freq=2.6, base=212, jag=3),
+        mid=dict(kind="sword", color="#1c1214", base=270),
+    ),
+    "tomb_deep": dict(
+        # 冢心：近黑 —— 全章最深的一层，天光只剩一线
+        # 天空压到最暗，但**剑影要留出对比** —— 一开始写成近黑(#07070a)，
+        # 结果和天色糊在一起、剑完全看不见（截图才发现）
+        sky=("#1e1e28", "#5a5a66"),
+        far=dict(color="#14141c", amp=52, freq=2.2, base=216, jag=4),
+        mid=dict(kind="sword", color="#2e2e3a", base=274),
     ),
     "title": dict(
         sky=("#161a38", "#6a3a5c"),
@@ -199,6 +248,8 @@ def main():
             mid = pillars(W_TILE, H_VIEW, m["base"], hexc(m["color"]))
         elif m["kind"] == "town":
             mid = townline(W_TILE, H_VIEW, m["base"], hexc(m["color"]))
+        elif m["kind"] == "sword":
+            mid = swordline(W_TILE, H_VIEW, m["base"], hexc(m["color"]))
         else:
             mid = gate(W_TILE, H_VIEW, m["base"], hexc(m["color"]), center_x=W_VIEW // 2)
         mid = _tile2(mid)

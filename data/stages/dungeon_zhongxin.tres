@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="DungeonData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/dungeon_data.gd" id="1_ca8sn"]
+
+[resource]
+script = ExtResource("1_ca8sn")
+id = &"zhongxin"
+name_key = &"DUNGEON_ZHONGXIN"
+scene_path = "res://scenes/stages/zhongxin.tscn"
+screen_count = 5
+rec_level = 55
+rec_weapon = 8
+
+backdrop = &"tomb_deep"

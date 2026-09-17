@@ -111,8 +111,8 @@ DUNGEON_LICHANG,"砺场","Whetstone Yard"
 DUNGEON_DUANCUIQU,"断淬渠","Broken Quench"
 DUNGEON_LUHOU,"炉喉","Furnace Throat"
 UI_ATLAS_TITLE,"舆图","Atlas"
-UI_ATLAS_HINT,"↑↓ 选关　·　J 进入　·　Esc 关闭","↑↓ select　·　J enter　·　Esc close"
-UI_ATLAS_HINT_CLEAR,"副本已通关 —— ↑↓ 选下一个副本，J 进入；Esc 回安全区","Dungeon cleared — ↑↓ pick next, J enter, Esc back to town"
+UI_ATLAS_HINT,"↑↓ 选关　·　←→ 换地图　·　J 进入　·　Esc 关闭","↑↓ select　·　←→ maps　·　J enter　·　Esc close"
+UI_ATLAS_HINT_CLEAR,"副本已通关 —— ↑↓ 选下一个副本，←→ 换地图，J 进入；Esc 回安全区","Dungeon cleared — ↑↓ pick next, ←→ maps, J enter; Esc back to town"
 UI_ATLAS_BACK,"回安全区","Back to town"
 UI_ATLAS_LOCKED,"未解锁","Locked"
 UI_ATLAS_CLEARED,"已通关","Cleared"
@@ -165,3 +165,7 @@ NPC_SIGN_COMBAT,告示牌 · 战斗要领,Signpost · Combat
 SIGN_BASIC_1,出门前先记熟这几手 ——,Learn these before you head out —
 SIGN_COMBAT_1,再往前就是淬火岭，这几手是要命的 ——,Quench Ridge lies ahead — these are the ones that keep you alive —
 UI_CHAR_BACK,返回,Back
+MAP_SWORD_TOMB,剑冢,Sword Tomb
+DUNGEON_CANJIANLIN,残剑林,Broken Blade Grove
+DUNGEON_XIUSHI,锈蚀甬道,Rusted Corridor
+DUNGEON_ZHONGXIN,冢心,Heart of the Tomb

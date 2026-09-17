@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="DungeonData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/dungeon_data.gd" id="1_ca8sn"]
+
+[resource]
+script = ExtResource("1_ca8sn")
+id = &"canjianlin"
+name_key = &"DUNGEON_CANJIANLIN"
+scene_path = "res://scenes/stages/canjianlin.tscn"
+screen_count = 3
+rec_level = 30
+rec_weapon = 5
+
+backdrop = &"tomb"

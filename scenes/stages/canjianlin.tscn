@@ -1,0 +1,271 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/stage.gd" id="1_stage"]
+[ext_resource type="Resource" path="res://data/stages/dungeon_canjianlin.tres" id="2_dungeon"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker_elite.tscn" id="4_walker_elite"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/spearman.tscn" id="4_spearman"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/dasher_elite.tscn" id="4_dasher_elite"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/caster.tscn" id="4_caster"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/boss_canjian.tscn" id="4_boss_canjian"]
+[ext_resource type="Texture2D" path="res://assets/tiles/stone_top.png" id="tile_ground"]
+[ext_resource type="Texture2D" path="res://assets/tiles/stone_center.png" id="tile_step"]
+[ext_resource type="Texture2D" path="res://assets/tiles/stone_plat.png" id="tile_plat"]
+[ext_resource type="Texture2D" path="res://assets/tiles/stone_plat.png" id="tile_plat_s"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(2880, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_step"]
+size = Vector2(160, 40)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat"]
+size = Vector2(120, 12)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plat_s"]
+size = Vector2(110, 12)
+
+[node name="Canjianlin" type="Node2D"]
+script = ExtResource("1_stage")
+dungeon_data = ExtResource("2_dungeon")
+bounds = Rect2(0, 0, 2880, 360)
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(1440, 332)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Ground"]
+offset_left = -1440
+offset_top = -12
+offset_right = 1440
+offset_bottom = 32
+mouse_filter = 2
+texture = ExtResource("tile_ground")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="Step1" type="StaticBody2D" parent="."]
+position = Vector2(300, 292)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Step1"]
+offset_left = -80
+offset_top = -20
+offset_right = 80
+offset_bottom = 24
+mouse_filter = 2
+texture = ExtResource("tile_step")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Step1"]
+shape = SubResource("RectangleShape2D_step")
+
+[node name="Plat1a" type="StaticBody2D" parent="."]
+position = Vector2(620, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Plat1a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 16
+mouse_filter = 2
+texture = ExtResource("tile_plat")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat1a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat1b" type="StaticBody2D" parent="."]
+position = Vector2(880, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Plat1b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 16
+mouse_filter = 2
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat1b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Plat2a" type="StaticBody2D" parent="."]
+position = Vector2(1580, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Plat2a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 16
+mouse_filter = 2
+texture = ExtResource("tile_plat")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat2a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat2b" type="StaticBody2D" parent="."]
+position = Vector2(1840, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Plat2b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 16
+mouse_filter = 2
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat2b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Plat3a" type="StaticBody2D" parent="."]
+position = Vector2(2540, 268)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Plat3a"]
+offset_left = -60
+offset_top = -6
+offset_right = 60
+offset_bottom = 16
+mouse_filter = 2
+texture = ExtResource("tile_plat")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat3a"]
+shape = SubResource("RectangleShape2D_plat")
+
+[node name="Plat3b" type="StaticBody2D" parent="."]
+position = Vector2(2800, 240)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="TextureRect" parent="Plat3b"]
+offset_left = -55
+offset_top = -6
+offset_right = 55
+offset_bottom = 16
+mouse_filter = 2
+texture = ExtResource("tile_plat_s")
+stretch_mode = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Plat3b"]
+shape = SubResource("RectangleShape2D_plat_s")
+
+[node name="Screen1" type="Node2D" parent="." groups=["screen"]]
+
+[node name="Wave1" type="Node2D" parent="Screen1" groups=["wave"]]
+
+[node name="WalkerElite500" parent="Screen1/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(500, 288)
+
+[node name="WalkerElite660" parent="Screen1/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(660, 288)
+
+[node name="Spearman820" parent="Screen1/Wave1" instance=ExtResource("4_spearman")]
+position = Vector2(820, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen1" groups=["wave"]]
+
+[node name="WalkerElite520" parent="Screen1/Wave2" instance=ExtResource("4_walker_elite")]
+position = Vector2(520, 288)
+
+[node name="Spearman720" parent="Screen1/Wave2" instance=ExtResource("4_spearman")]
+position = Vector2(720, 288)
+
+[node name="Spearman880" parent="Screen1/Wave2" instance=ExtResource("4_spearman")]
+position = Vector2(880, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen1" groups=["wave"]]
+
+[node name="DasherElite700" parent="Screen1/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(700, 288)
+
+[node name="Spearman560" parent="Screen1/Wave3" instance=ExtResource("4_spearman")]
+position = Vector2(560, 288)
+
+[node name="Screen2" type="Node2D" parent="." groups=["screen"]]
+position = Vector2(960, 0)
+
+[node name="Wave1" type="Node2D" parent="Screen2" groups=["wave"]]
+
+[node name="DasherElite1300" parent="Screen2/Wave1" instance=ExtResource("4_dasher_elite")]
+position = Vector2(340, 288)
+
+[node name="WalkerElite1500" parent="Screen2/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(540, 288)
+
+[node name="Spearman1660" parent="Screen2/Wave1" instance=ExtResource("4_spearman")]
+position = Vector2(700, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen2" groups=["wave"]]
+
+[node name="WalkerElite1200" parent="Screen2/Wave2" instance=ExtResource("4_walker_elite")]
+position = Vector2(240, 288)
+
+[node name="WalkerElite1440" parent="Screen2/Wave2" instance=ExtResource("4_walker_elite")]
+position = Vector2(480, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen2" groups=["wave"]]
+
+[node name="DasherElite1280" parent="Screen2/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(320, 288)
+
+[node name="DasherElite1490" parent="Screen2/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(530, 288)
+
+[node name="Spearman1640" parent="Screen2/Wave3" instance=ExtResource("4_spearman")]
+position = Vector2(680, 288)
+
+[node name="Caster1790" parent="Screen2/Wave3" instance=ExtResource("4_caster")]
+position = Vector2(830, 288)
+
+[node name="Screen3" type="Node2D" parent="." groups=["screen"]]
+position = Vector2(1920, 0)
+
+[node name="Wave1" type="Node2D" parent="Screen3" groups=["wave"]]
+
+[node name="WalkerElite2200" parent="Screen3/Wave1" instance=ExtResource("4_walker_elite")]
+position = Vector2(280, 288)
+
+[node name="DasherElite2330" parent="Screen3/Wave1" instance=ExtResource("4_dasher_elite")]
+position = Vector2(410, 288)
+
+[node name="Spearman2450" parent="Screen3/Wave1" instance=ExtResource("4_spearman")]
+position = Vector2(530, 288)
+
+[node name="Wave2" type="Node2D" parent="Screen3" groups=["wave"]]
+
+[node name="Caster2280" parent="Screen3/Wave2" instance=ExtResource("4_caster")]
+position = Vector2(360, 288)
+
+[node name="DasherElite2480" parent="Screen3/Wave2" instance=ExtResource("4_dasher_elite")]
+position = Vector2(560, 288)
+
+[node name="Wave3" type="Node2D" parent="Screen3" groups=["wave"]]
+
+[node name="Spearman2560" parent="Screen3/Wave3" instance=ExtResource("4_spearman")]
+position = Vector2(640, 288)
+
+[node name="DasherElite2660" parent="Screen3/Wave3" instance=ExtResource("4_dasher_elite")]
+position = Vector2(740, 288)
+
+[node name="BossCanjian2770" parent="Screen3/Wave3" instance=ExtResource("4_boss_canjian")]
+position = Vector2(850, 288)
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+position = Vector2(60, 280)

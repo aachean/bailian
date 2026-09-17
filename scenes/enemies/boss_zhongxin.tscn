@@ -1,0 +1,68 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="1_base"]
+[ext_resource type="Resource" path="res://data/enemies/boss_zhongxin.tres" id="2_data"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_boss_zhongxin_body"]
+size = Vector2(56, 70)
+
+[node name="BossZhongxin" instance=ExtResource("1_base")]
+data = ExtResource("2_data")
+
+[node name="CollisionShape2D" parent="." index="0"]
+shape = SubResource("RectangleShape2D_boss_zhongxin_body")
+
+[node name="Visuals" parent="." index="1"]
+
+[node name="Body" parent="Visuals" index="0"]
+offset_left = -28.0
+offset_top = -35.0
+offset_right = 28.0
+offset_bottom = 35.0
+color = Color(0.25, 0.23, 0.28, 1)
+
+[node name="Head" parent="Visuals" index="1"]
+offset_left = -14.0
+offset_top = -46.0
+offset_right = 14.0
+offset_bottom = -33.0
+color = Color(0.36, 0.33, 0.38, 1)
+
+[node name="Eye" parent="Visuals" index="2"]
+offset_left = 3.0
+offset_top = -42.0
+offset_right = 11.0
+offset_bottom = -34.0
+color = Color(0.9, 0.4, 0.85, 1)
+
+[node name="Swipe" parent="Visuals" index="3"]
+offset_left = 26.0
+offset_top = -20.0
+offset_right = 82.0
+offset_bottom = 16.0
+color = Color(0.75, 0.82, 0.86, 1)
+
+[node name="Flash" parent="Visuals" index="4"]
+offset_left = -28.0
+offset_top = -46.0
+offset_right = 28.0
+offset_bottom = 35.0
+
+[node name="HealthBar" parent="." index="2"]
+position = Vector2(0, -60)
+
+[node name="BG" parent="HealthBar" index="0"]
+offset_left = -34.0
+offset_top = -3.0
+offset_right = 34.0
+offset_bottom = 3.0
+
+[node name="Fill" parent="HealthBar" index="1"]
+offset_left = -33.0
+offset_top = -2.0
+offset_right = 33.0
+offset_bottom = 2.0
+color = Color(0.72, 0.24, 0.62, 1)
+
+[node name="Hitbox" parent="." index="3"]
+target_mask = 1

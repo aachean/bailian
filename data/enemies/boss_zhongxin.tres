@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/enemy_data.gd" id="1_data"]
+[ext_resource type="Resource" path="res://data/skills/boss_luhou_slam.tres" id="2_skill"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"boss_zhongxin"
+display_name = "冢心剑灵"
+max_hp = 680
+revive_delay = 0.0
+hurt_stun_frames = 3
+patrol_speed = 30.0
+chase_speed = 110.0
+patrol_range = 80.0
+aggro_range = 340.0
+deaggro_range = 520.0
+attack_range = 66.0
+attack_cooldown_frames = 50
+attack_skill = ExtResource("2_skill")
+drop_shards = 45
+exp_reward = 420
+drop_item_chance = 1.0
+drop_items = Array[String](["res://data/items/flame_blade.tres", "res://data/items/jade_talisman.tres", "res://data/items/iron_armor.tres"])
+
+drop_gold = 0
+drop_heal_chance = 0.0
+drop_mana_chance = 0.0
+
+sprite_dir = "res://assets/enemies/goblin/lord"

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""生成淬火岭后两个副本的场景：断淬渠（4 屏）/ 炉喉（5 屏）。
+"""生成副本场景：第一章断淬渠（4 屏）/ 炉喉（5 屏），
+第二章剑冢残剑林（3 屏）/ 锈蚀甬道（4 屏）/ 冢心（5 屏）。
 
     cd <项目根> && python tools/gen_dungeon_scenes.py
 
@@ -48,6 +49,9 @@ ENEMY_SCENES = {
     "dasher_elite":  "res://scenes/enemies/dasher_elite.tscn",
     "brute_elite":   "res://scenes/enemies/brute_elite.tscn",
     "boss_luhou":    "res://scenes/enemies/boss_luhou.tscn",
+    "boss_canjian":  "res://scenes/enemies/boss_canjian.tscn",
+    "boss_xiushi":   "res://scenes/enemies/boss_xiushi.tscn",
+    "boss_zhongxin": "res://scenes/enemies/boss_zhongxin.tscn",
 }
 
 # ── 坐标系：规格表用**绝对坐标**，落盘转成**屏内相对坐标** ────────
@@ -308,7 +312,146 @@ LUHOU = {
     ],
 }
 
-SPECS = [DUANCUIQU, LUHOU]
+# ══════════════════════════════════════════════════════════════
+# 第二章 · 剑冢（第 4~6 关）—— 铸剑的终点：插满断剑的荒原
+#
+# 与第一章的差别只有一个：**从工坊走进了战场**。第一章三关是工序
+# （磨石 → 淬火 → 熔炼），这一章没有工序可讲了，讲的是成品之后的事。
+# 怪种全部沿用（同族毕竟还是那批），新做的是**三个新 Boss** 与更狠的组合：
+# 精英变体铺开当常规兵，重锤/远程的编排比第一章密一档。
+# ══════════════════════════════════════════════════════════════
+
+# 残剑林：3 屏。**开场** —— 走出工坊就是荒原，断剑插了一地。
+# 编配原则沿用四步法：屏 1 第三批让 dasher_elite **单独**出场（低威胁引入），
+# 屏 2 与熟面孔混编（练习），屏 3 考核。锯齿：屏 2 第 2 批是喘息点。
+CANJIANLIN = {
+    "id": "canjianlin",
+    "node": "Canjianlin",
+    "npc": None,
+    "palette": {
+        # 荒原：灰白（地形走 stone 贴图，这里只影响背景）
+        "ground": "0.36, 0.35, 0.33, 1",
+        "step": "0.44, 0.43, 0.40, 1",
+        "plat": "0.42, 0.41, 0.38, 1",
+        "plat_s": "0.39, 0.38, 0.35, 1",
+    },
+    "tiles": "stone",
+    "screens": [
+        # 屏 1 —— 引入：精英小怪开道；第三批 dasher_elite 单独出现
+        [
+            [("walker_elite", 500), ("walker_elite", 660), ("spearman", 820)],
+            [("walker_elite", 520), ("spearman", 720), ("spearman", 880)],
+            [("dasher_elite", 700), ("spearman", 560)],
+        ],
+        # 屏 2 —— 练习 + 喘息：混编；第 2 批两只散开的小怪是喘息点
+        [
+            [("dasher_elite", 1300), ("walker_elite", 1500), ("spearman", 1660)],
+            [("walker_elite", 1200), ("walker_elite", 1440)],
+            [("dasher_elite", 1280), ("dasher_elite", 1490), ("spearman", 1640), ("caster", 1790)],
+        ],
+        # 屏 3 —— 考核：残剑守（远程在后方压，近身在前面缠）
+        [
+            [("walker_elite", 2200), ("dasher_elite", 2330), ("spearman", 2450)],
+            [("caster", 2280), ("dasher_elite", 2480)],
+            [("spearman", 2560), ("dasher_elite", 2660), ("boss_canjian", 2770)],
+        ],
+    ],
+}
+
+# 锈蚀甬道：4 屏。**中段** —— 甬道里全是蚀穿的铁与白骨。
+# 新东西是 **brute_elite**（精英重锤）：屏 1 单独出场引入，屏 2 混编，
+# 屏 3 双远程 + 双重锤制造夹击（峰值），屏 4 考核。
+# 锯齿：屏 2 第 2 批是喘息点。
+XIUSHI = {
+    "id": "xiushi",
+    "node": "Xiushi",
+    "npc": None,
+    "palette": {
+        # 锈蚀：暗锈红
+        "ground": "0.33, 0.23, 0.19, 1",
+        "step": "0.42, 0.29, 0.23, 1",
+        "plat": "0.40, 0.28, 0.22, 1",
+        "plat_s": "0.36, 0.25, 0.20, 1",
+    },
+    "tiles": "stone",
+    "screens": [
+        # 屏 1 —— 引入：重锤精英单独出场（一批只有一只，压力低）
+        [
+            [("walker_elite", 480), ("spearman", 640), ("walker_elite", 800)],
+            [("dasher_elite", 520), ("dasher_elite", 700), ("caster", 880)],
+            [("brute_elite", 760), ("spearman", 560)],
+        ],
+        # 屏 2 —— 练习 + 喘息
+        [
+            [("brute_elite", 1280), ("walker_elite", 1480), ("caster", 1680)],
+            [("walker_elite", 1180), ("walker_elite", 1420)],
+            [("brute_elite", 1260), ("dasher_elite", 1460), ("dasher_elite", 1620), ("spearman", 1780)],
+        ],
+        # 屏 3 —— 转折（压力峰值）：双远程分站 + 双精英重锤
+        [
+            [("caster", 2140), ("caster", 2520)],
+            [("brute_elite", 2200), ("brute_elite", 2450)],
+            [("dasher_elite", 2380), ("spearman", 2560), ("brute_elite", 2700), ("caster", 2860)],
+        ],
+        # 屏 4 —— 考核：蚀骨卫
+        [
+            [("walker_elite", 3200), ("caster", 3320), ("walker_elite", 3440)],
+            [("brute_elite", 3280), ("dasher_elite", 3480), ("dasher_elite", 3600)],
+            [("caster", 3660), ("boss_xiushi", 3760)],
+        ],
+    ],
+}
+
+# 冢心：5 屏。**终章** —— 全类型 + 重锤兵，第二章的考核场。
+# 锯齿：屏 1 开场略低于实力（全是熟悉的精英）、屏 4 再给一次喘息；
+# 峰值在屏 3。Boss 是最强的那只（冢心剑灵）。
+ZHONGXIN = {
+    "id": "zhongxin",
+    "node": "Zhongxin",
+    "npc": None,
+    "palette": {
+        # 冢心：近黑（最深的一层）
+        "ground": "0.19, 0.17, 0.20, 1",
+        "step": "0.27, 0.24, 0.28, 1",
+        "plat": "0.26, 0.23, 0.27, 1",
+        "plat_s": "0.23, 0.20, 0.24, 1",
+    },
+    "tiles": "stone",
+    "screens": [
+        # 屏 1 —— 喘息：开场略低于实力，全是熟悉的精锐
+        [
+            [("walker_elite", 500), ("walker_elite", 660), ("spearman", 820)],
+            [("dasher_elite", 520), ("spearman", 720), ("dasher_elite", 880)],
+            [("walker_elite", 560), ("caster", 760), ("spearman", 900)],
+        ],
+        # 屏 2 —— 练习：重锤兵首次出现（单独一只），第 2 批是**喘息点**
+        [
+            [("brute_heavy", 1560), ("caster", 1880)],
+            [("walker_elite", 1420), ("walker_elite", 1640)],
+            [("brute_heavy", 1480), ("dasher_elite", 1700), ("dasher_elite", 1860)],
+        ],
+        # 屏 3 —— 转折（压力峰值）：双远程 + 双重锤 + 精英夹击
+        [
+            [("caster", 2140), ("caster", 2500)],
+            [("brute_heavy", 2200), ("brute_heavy", 2450)],
+            [("dasher_elite", 2380), ("spearman", 2560), ("brute_elite", 2680), ("caster", 2860)],
+        ],
+        # 屏 4 —— 喘息 + 收尾准备
+        [
+            [("walker_elite", 3200), ("spearman", 3400)],
+            [("dasher_elite", 3320), ("caster", 3560), ("dasher_elite", 3480)],
+            [("brute_elite", 3380), ("spearman", 3520), ("caster", 3780)],
+        ],
+        # 屏 5 —— 考核：冢心剑灵
+        [
+            [("walker_elite", 4280), ("brute_heavy", 4380), ("caster", 4240)],
+            [("dasher_elite", 4360), ("spearman", 4460), ("dasher_elite", 4520)],
+            [("caster", 4600), ("brute_heavy", 4560), ("boss_zhongxin", 4700)],
+        ],
+    ],
+}
+
+SPECS = [DUANCUIQU, LUHOU, CANJIANLIN, XIUSHI, ZHONGXIN]
 
 
 def _check_placement(spec):

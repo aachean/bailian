@@ -1,30 +1,65 @@
 extends Node
-## 导出包内验证：ResDir 规范化后，目录扫描与资源装载是否正常。
+## 剑冢实拍：舆图页签（淬火岭 → 剑冢）+ 残剑林开场 + 冢心 Boss。
 
 func _ready() -> void:
-	for dir in ["res://data/characters", "res://assets/characters/swordsman",
-			"res://assets/enemies/goblin/peasant", "res://assets/npcs/old_man"]:
-		var f := ResDir.files(dir)
-		print("%-42s %d 项: %s" % [dir, f.size(), str(f.slice(0, 3))])
-	var all: Array = CharacterData.all()
-	print("CharacterData.all() → %d 个: %s" % [all.size(), str(all.map(func(c): return str(c.id)))])
-	# 真装载一次（ResDir 给出的名字能否 load）
-	var ok := 0
-	for f in ResDir.files("res://assets/characters/swordsman"):
-		if f.ends_with(".png") and ResourceLoader.exists("res://assets/characters/swordsman/" + f):
-			ok += 1
-	print("swordsman 帧可加载数: %d" % ok)
-	var mm: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
-	add_child(mm)
+	SaveManager.current_slot = 3
+	SaveManager.start_new_game(3, "res://scenes/stages/town.tscn")
+	var town: Node = load("res://scenes/stages/town.tscn").instantiate()
+	add_child(town)
+	await _frames(12)
+	var atlas: Node = town.find_child("Atlas", true, false)
+	atlas.call("open")
 	await _frames(8)
-	mm.call("_open_character_page")
+	await _shot("tomb_1_atlas_a.png")
+	var rows: Array = atlas.call("row_texts")
+	print("淬火岭页：")
+	for r in rows:
+		print("   %s" % r)
+
+	# 按 → 切到剑冢
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_RIGHT
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await _frames(8)
+	await _shot("tomb_2_atlas_b.png")
+	print("剑冢页：")
+	for r in atlas.call("row_texts"):
+		print("   %s" % r)
+	atlas.call("close")
+	town.queue_free()
 	await _frames(4)
-	var page: Control = mm.get("_char_page")
-	for c in page.get_children():
-		if c is VBoxContainer:
-			print("选人页 VBox 子节点数 = %d" % c.get_child_count())
+
+	# 残剑林开场
+	var lv: Node = load("res://scenes/stages/canjianlin.tscn").instantiate()
+	add_child(lv)
+	await _frames(14)
+	var player: Node2D = lv.get_node("Player")
+	player.global_position = Vector2(300.0, 280.0)
+	player.set("velocity", Vector2.ZERO)
+	await _frames(16)
+	await _shot("tomb_3_canjianlin.png")
+	lv.queue_free()
+	await _frames(4)
+
+	# 冢心最后一屏（Boss）
+	lv = load("res://scenes/stages/zhongxin.tscn").instantiate()
+	add_child(lv)
+	await _frames(14)
+	player = lv.get_node("Player")
+	player.global_position = Vector2(4180.0, 240.0)
+	player.set("velocity", Vector2.ZERO)
+	await _frames(22)
+	await _shot("tomb_4_boss.png")
 	print("done")
 	get_tree().quit()
+
+
+func _shot(name: String) -> void:
+	await RenderingServer.frame_post_draw
+	var viewport := get_viewport()
+	viewport.get_texture().get_image().save_png("res://build/shots/" + name)
+	print("saved ", name)
 
 
 func _frames(n: int) -> void:
