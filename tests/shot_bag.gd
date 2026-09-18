@@ -72,17 +72,7 @@ func _ready() -> void:
 	hud.call("toggle_bag")
 	await _frames(3)
 
-	# ── 三、角色面板（属性 + 装备概览） ────────────────────────
-	var ev := InputEventAction.new()
-	ev.action = "panel"
-	ev.pressed = true
-	ev.strength = 1.0
-	Input.parse_input_event(ev)
-	await _frames(4)
-	await _shot("char_panel.png")
-	await _frames(3)
-
-	# ── 四、手里的刀：装上稀有武器挥一刀，光刃按武器品质变色 ──
+	# ── 三、手里的刀：装上稀有武器挥一刀，光刃按武器品质变色 ──
 	PlayerState.set_equipment({}, [])
 	PlayerState.add_item("res://data/items/wp_u5251_4_u9f99u6e0au5251.tres")
 	PlayerState.equip("res://data/items/wp_u5251_4_u9f99u6e0au5251.tres")

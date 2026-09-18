@@ -17,7 +17,16 @@ extends CanvasLayer
 ## 打开时先把 HUD 的面板让开，自己开着的时候别人不开（互查 is_open）。
 
 ## 每栏显示几行
+## 右栏（制书）几行
 const ROWS := 8
+## 左栏几行。**比右栏多** —— 左栏除了 7 件装备货架，还要放还魂丹 + 3 种消耗品。
+## 11×18 = 198px，容器高 204px（Panel 300 − 顶 68 − 底 28 = 204）—— 刚好塞得下。
+##
+## **左栏没有滚动窗口**，超出 GEAR_ROWS 的条目既渲染不出来、光标也移不到。
+## 所以 `_ready` 里有一条自检：条目数一旦超过它，**当场报错**。
+## 少这一条的话，加第 12 种消耗品的后果是「上架了但商店里看不到」，
+## 而且没有任何地方会红 —— 那正是本项目最受不了的一种失败。
+const GEAR_ROWS := 11
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
 const ROW_HEIGHT := 18.0
@@ -53,8 +62,13 @@ var _clock_accum := 0.0
 
 func _ready() -> void:
 	_root.visible = false
-	_build_rows(_list, _rows)
-	_build_rows(_bp_box, _bp_rows)
+	_build_rows(_list, _rows, GEAR_ROWS)
+	_build_rows(_bp_box, _bp_rows, ROWS)
+	# 左栏是固定行数的**无滚动**列 —— 条目一多就会「上架了但看不见」。
+	# 让它在启动时就炸，别等到玩家逛商店发现少了东西（本项目的「不能静默」）
+	assert(_left_entries().size() <= GEAR_ROWS,
+		"商店左栏条目 %d 条，超过 GEAR_ROWS=%d —— 请先给左栏加滚动窗口"
+			% [_left_entries().size(), GEAR_ROWS])
 	if not PlayerState.gold_changed.is_connected(_on_gold_changed):
 		PlayerState.gold_changed.connect(_on_gold_changed)
 	if not PlayerState.equipment_changed.is_connected(_on_gold_changed):
@@ -142,12 +156,24 @@ func _move(dir: int) -> void:
 	refresh()
 
 
-## 左栏条目 = 本期随机货架（装备路径）+ 尾部一条**还魂丹**（常驻消耗）。
-## 还魂丹每图限购 5（200 元宝，账记到最近进的图）
+## 左栏条目 = 本期随机货架（装备路径）+ 常驻的**还魂丹**与**三种消耗品**。
+##
+## 消耗品用的是**预载**形态（原则 5.6 第二条）：买的是「次数」，按 6 / 7 主动用 ——
+## 元宝买的不是背包药水，所以不违反 5.6，两条并存。见 docs/adr/0022 §2.3。
+## `item_hp` / `item_mp` 这两个名字与键位动作名同形，**键位顺序的唯一出处是
+## `PlayerState.POTION_KINDS`**；补给包（血蓝各 5 次）是一个打包价，没有自己的格
 func _left_entries() -> Array:
 	var out: Array = PlayerState.shop_offers.duplicate()
 	out.append("revive")
+	for kind in PlayerState.POTION_KINDS:
+		out.append("item_%s" % kind)
+	out.append("supply")
 	return out
+
+
+## 从 `item_hp` / `item_mp` 反查消耗品种类。名字是拼出来的，就一定从同一处拆回来
+func _entry_potion(entry: String) -> StringName:
+	return StringName(entry.substr("item_".length()))
 
 
 ## 右栏 = 本期的随机制书（PlayerState.shop_bp_offers）。制书不再常驻 ——
@@ -160,12 +186,15 @@ func _bp_list() -> Array:
 ## 买光标那件。两个栏一个键，「为什么没买成」按条目类型区分着说
 func _buy_at_cursor() -> void:
 	var left := _left_entries()
-	var gear_n: int = PlayerState.shop_offers.size()
 	if _cursor < left.size():
-		var entry = left[_cursor]
-		if entry is String and entry == "revive":
+		var entry: String = str(left[_cursor])
+		if entry == "revive":
 			_buy_revive()
-		elif entry is String:
+		elif entry == "supply":
+			_buy_supply()
+		elif entry.begins_with("item_"):
+			_buy_potion(_entry_potion(entry))
+		else:
 			_buy_gear(entry)
 		return
 	_buy_blueprint(str(_bp_list()[_cursor - left.size()]))
@@ -195,6 +224,49 @@ func _current_or_latest_map() -> StringName:
 		return GameProgress.current_map_id
 	var seq := GameProgress.sequence()
 	return seq[seq.size() - 1].id if not seq.is_empty() else &""
+
+
+## 买一份预载符（回血 / 回蓝）。不限购 —— 它是元宝的**可重复 sink**，
+## 限购就修不好 ECONOMY.md 里那个「元宝过剩」的账
+func _buy_potion(kind: StringName) -> void:
+	var price := PlayerState.potion_price(kind)
+	if PlayerState.gold < price:
+		_msg = I18n.t(&"UI_SHOP_POOR", [price - PlayerState.gold])
+		_msg_color = WARN
+		refresh()
+		return
+	if PlayerState.buy_potion(kind):
+		# 报**总剩余次数**而不是「+3」：玩家真正要知道的是「我还能喝几次」
+		_msg = I18n.t(&"UI_SHOP_POTION_OK",
+			[_potion_label(kind), PlayerState.potion_charges(kind)])
+		_msg_color = GOLD
+	else:
+		_msg = tr("UI_SHOP_UNAVAILABLE")
+		_msg_color = WARN
+	refresh()
+
+
+## 买补给包（血蓝各 5 次，一口价 160）
+func _buy_supply() -> void:
+	if PlayerState.gold < PlayerState.SUPPLY_PRICE:
+		_msg = I18n.t(&"UI_SHOP_POOR", [PlayerState.SUPPLY_PRICE - PlayerState.gold])
+		_msg_color = WARN
+		refresh()
+		return
+	if PlayerState.buy_supply():
+		_msg = I18n.t(&"UI_SHOP_SUPPLY_OK", [
+			PlayerState.potion_charges(PlayerState.POTION_HP),
+			PlayerState.potion_charges(PlayerState.POTION_MP)])
+		_msg_color = GOLD
+	else:
+		_msg = tr("UI_SHOP_UNAVAILABLE")
+		_msg_color = WARN
+	refresh()
+
+
+## 消耗品的显示名。**与技能栏的提示、飘字同一份 key** —— 别处再写一遍人话就会漂
+func _potion_label(kind: StringName) -> String:
+	return tr("ITEM_POTION_MP") if kind == PlayerState.POTION_MP else tr("ITEM_POTION_HP")
 
 
 ## 买装备（左栏）。买完从货架上撤下 —— 摆着的东西买走了还摆着，那不是商店是仓库
@@ -252,8 +324,8 @@ func _buy_blueprint(bp_path: String) -> void:
 
 ## 行节点全部由代码建（与铁匠铺同一套做法）：手写 tscn 的嵌套 parent 路径
 ## 容易静默丢节点，能省的静态节点就省掉
-func _build_rows(box: VBoxContainer, into: Array[HBoxContainer]) -> void:
-	for _i in ROWS:
+func _build_rows(box: VBoxContainer, into: Array[HBoxContainer], n: int) -> void:
+	for _i in n:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
 		row.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
@@ -296,14 +368,16 @@ func refresh() -> void:
 	var total := gear.size() + bps.size()
 	if _cursor >= total:
 		_cursor = maxi(total - 1, 0)
-	var cursor_in_bp := _cursor >= PlayerState.shop_offers.size()
+	# **分界线必须用 gear.size()**，不能用 shop_offers.size()：
+	# 左栏除了货架还挂着还魂丹与消耗品，拿货架数当边界会让右栏窗口算错位置
+	var cursor_in_bp := _cursor >= gear.size()
 	if cursor_in_bp:
-		_bp_top = clampi(_cursor - PlayerState.shop_offers.size() - ROWS / 2, 0, maxi(bps.size() - ROWS, 0))
+		_bp_top = clampi(_cursor - gear.size() - ROWS / 2, 0, maxi(bps.size() - ROWS, 0))
 	else:
 		_bp_top = clampi(_bp_top, 0, maxi(bps.size() - ROWS, 0))
 
-	# ── 左栏：装备货架（尾部一条常驻还魂丹）──
-	for r in ROWS:
+	# ── 左栏：装备货架（尾部常驻还魂丹 + 三种消耗品）──
+	for r in GEAR_ROWS:
 		var row := _rows[r]
 		var icon := row.get_child(0) as ItemIcon
 		var lbl := row.get_child(1) as Label
@@ -317,7 +391,9 @@ func refresh() -> void:
 		if gear[r] == "revive":
 			icon.visible = true
 			icon.empty_frame = true
-			icon.kind = &"potion_hp"
+			# **不能借回血符的瓶子**：这一行上面是货架、下面是回血符，
+			# 三行挨着放两个红瓶子，读错行是迟早的事（2026-09-18 顺手拆开）
+			icon.kind = &"revive"
 			icon.queue_redraw()
 			var bought := PlayerState.revive_bought_in(_current_or_latest_map())
 			var mark := CURSOR_MARK if _cursor == r else INDENT
@@ -329,6 +405,40 @@ func refresh() -> void:
 				lbl.modulate = GOLD if can else WARN
 			else:
 				lbl.modulate = NORMAL if can else DIM
+			continue
+		# 消耗品行：回血符 / 回蓝符 / 补给包。价格 + **剩余次数** ——
+		# 买了多少、还能喝几次，是玩家在这三行上唯一要做的判断
+		if gear[r] == "supply":
+			var supply_can := PlayerState.gold >= PlayerState.SUPPLY_PRICE
+			icon.visible = true
+			icon.empty_frame = true
+			icon.kind = &"supply"
+			icon.queue_redraw()
+			lbl.text = "%s%s　%d　%s" % [CURSOR_MARK if _cursor == r else INDENT,
+				tr("UI_SHOP_SUPPLY"), PlayerState.SUPPLY_PRICE,
+				I18n.t(&"UI_SHOP_SUPPLY_STOCK", [
+					PlayerState.potion_charges(PlayerState.POTION_HP),
+					PlayerState.potion_charges(PlayerState.POTION_MP)])]
+			if _cursor == r:
+				lbl.modulate = GOLD if supply_can else WARN
+			else:
+				lbl.modulate = NORMAL if supply_can else DIM
+			continue
+		if str(gear[r]).begins_with("item_"):
+			var kind := _entry_potion(str(gear[r]))
+			var price := PlayerState.potion_price(kind)
+			var pot_can := PlayerState.gold >= price
+			icon.visible = true
+			icon.empty_frame = true
+			icon.kind = &"potion_mp" if kind == PlayerState.POTION_MP else &"potion_hp"
+			icon.queue_redraw()
+			lbl.text = "%s%s　%d　%s %d" % [CURSOR_MARK if _cursor == r else INDENT,
+				_potion_label(kind), price, tr("UI_SHOP_CHARGES"),
+				PlayerState.potion_charges(kind)]
+			if _cursor == r:
+				lbl.modulate = GOLD if pot_can else WARN
+			else:
+				lbl.modulate = NORMAL if pot_can else DIM
 			continue
 		var it := load(str(gear[r])) as ItemData
 		if it == null:

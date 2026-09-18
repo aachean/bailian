@@ -133,6 +133,7 @@ func reset_for_new_game() -> void:
 	blueprints.clear()
 	revive_tokens = 0
 	revive_bought.clear()
+	potions.clear()
 	character_id = ""
 	level = 1
 	exp = 0
@@ -162,6 +163,8 @@ func load_from(d: Dictionary) -> void:
 	blueprints = (d.get("blueprints", []) as Array).duplicate()
 	revive_tokens = int(d.get("revive_tokens", 0))
 	revive_bought = (d.get("revive_bought", {}) as Dictionary).duplicate()
+	# 旧档没有这字段 → 空字典 = 没买过预载（纯增量，不作废进度，见 SaveManager VERSION 13）
+	potions = (d.get("potions", {}) as Dictionary).duplicate()
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
@@ -181,6 +184,7 @@ func save_to() -> Dictionary:
 		"blueprints": blueprints.duplicate(),
 		"revive_tokens": revive_tokens,
 		"revive_bought": revive_bought.duplicate(),
+		"potions": potions.duplicate(),
 		"character_id": character_id,
 		"level": level,
 		"exp": exp,
@@ -681,6 +685,86 @@ func revive_bought_in(map_id: StringName) -> int:
 ## 还魂丹定价（200 元宝）。放这儿是因为唯一动它的两个界面（商店标价 / 买）
 ## 都从这取 —— 别在面板里写第二份 200
 const REVIVE_PRICE := 200
+
+
+# ── 预载消耗品（原则 5.6 的第二条：买「次数」、按 6 / 7 主动用）──────
+#
+# 5.6 原本只有「掉在地上走近直接生效」。2026-09-18 加了第二条，**两条并存**：
+# 免费掉落是保底，买的那一份是长 Boss 战里**可控**的回血手段 ——
+# 那段时间没有小怪可杀，也就没有掉落可捡。
+# 见 docs/adr/0022 §2.3、docs/design-conventions「反馈原则 · 消耗品」。
+
+## 剩余**次数**（不是「几份」—— 一份符 = 3 次）。键是 String(POTION_HP / POTION_MP)。
+##
+## 用字典而不是两个 int：与 flags / materials 同一条路，「加第三种符」是零成本的。
+## 不进 _bonus / 不发 equipment_changed —— 次数不是成长属性，HUD 每次 refresh
+## 都当场重读（与元宝同一条态度），没有需要失效的缓存
+var potions: Dictionary = {}
+
+const POTION_HP := &"hp"
+const POTION_MP := &"mp"
+## 技能栏后两格的顺序就是它：第 6 格 = hp、第 7 格 = mp。
+## **UI 与断言都从这取**，别各写一份顺序
+const POTION_KINDS: Array[StringName] = [&"hp", &"mp"]
+
+## 一份符给几次。补给包同理，血蓝各 5 次
+const POTION_CHARGES := 3
+const SUPPLY_CHARGES := 5
+
+## 定价（元宝）。**唯一出处** —— 商店标价与购买都从这取，别在面板里写第二份
+const POTION_HP_PRICE := 60
+const POTION_MP_PRICE := 50
+const SUPPLY_PRICE := 160
+
+
+## 还剩几次
+func potion_charges(kind: StringName) -> int:
+	return int(potions.get(String(kind), 0))
+
+
+## 一种消耗品的单价。**认不出的 kind 要炸**，不许静默按另一种的价算
+func potion_price(kind: StringName) -> int:
+	match kind:
+		POTION_HP:
+			return POTION_HP_PRICE
+		POTION_MP:
+			return POTION_MP_PRICE
+	push_error("PlayerState: 认不出的消耗品种类 %s" % str(kind))
+	return 0
+
+
+## 加次数（商店买，以后别的来源也走这里）
+func add_potion_charges(kind: StringName, n: int) -> void:
+	if n <= 0:
+		return
+	potions[String(kind)] = potion_charges(kind) + n
+
+
+## 用掉一次。返回 false = 没次数了 —— 调用方**必须**把这件事说出来（不许静默）
+func use_potion(kind: StringName) -> bool:
+	var left := potion_charges(kind)
+	if left <= 0:
+		return false
+	potions[String(kind)] = left - 1
+	return true
+
+
+## 买一份符（回血 / 回蓝）
+func buy_potion(kind: StringName) -> bool:
+	if not spend_gold(potion_price(kind)):
+		return false
+	add_potion_charges(kind, POTION_CHARGES)
+	return true
+
+
+## 买补给包：**一次扣钱、血蓝各加 5 次**。
+## 不做成「扣两次钱」—— 那会出现「付了第一笔、第二笔不够」的半成交状态
+func buy_supply() -> bool:
+	if not spend_gold(SUPPLY_PRICE):
+		return false
+	add_potion_charges(POTION_HP, SUPPLY_CHARGES)
+	add_potion_charges(POTION_MP, SUPPLY_CHARGES)
+	return true
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────

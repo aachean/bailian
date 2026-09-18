@@ -214,13 +214,33 @@ func _fill_equip_row(row: HBoxContainer, i: int, uid: String, mark: String) -> v
 ##
 ## ── 尺寸为什么这么小 ──────────────────────────────────────
 ## 一版是 54×40，五个格子连起来横跨 286px（640 宽屏幕的 45%），
-## 压在左下角把地面和怪都盖住了。收到 40×30 之后横向只占 212px（33%），
-## 高度也矮了一截 —— 底部本来就该是场景，不是面板。
+## 压在左下角把地面和怪都盖住了（神实测反馈「挡视野」）。
+## 2026-09-18 加了 2 个消耗品格（5+2 = 7 格）之后，**格子从 40 收到 32、间距 3 收到 2**：
+## 7×32 + 6×2 = **236px**，仍然在「技能栏横向不超过屏幕 40%（240px @640）」这条线以内。
+##
+## **图标本身没有变小**：SkillIcon / ItemIcon 都是照 16×16 的设计盒画的，
+## 缩放系数取 `min(宽,高)/16` —— 在 30×20 的框里 k = 1.25，画出来只占 18px 宽；
+## 框收到 24×20 之后 k 仍是 1.25，画出来一模一样。**真正只有格子窄了。**
+##
+## 想加第 8 格的人先算这条账：236 + 34 = 270px，那就超线了。
+const CELL_SIZE := Vector2(32.0, 30.0)
+const CELL_GAP := 2
+## 图标框。**高度必须留在 20** —— k 取 min(w,h)/16，高度一掉，
+## 七个技能图标会跟着一起缩（那是要改观感的改动，不该顺手带上）
+const ICON_BOX := Vector2(24.0, 20.0)
+const ICON_POS := Vector2(4.0, 5.0)
+
+
 func _build_skill_bar() -> void:
-	for i in PlayerState.SKILL_SLOT_COUNT:
+	# 间距也从这里定 —— 与 CELL_SIZE 是**同一道宽度预算的两个数**，
+	# 一个住代码一个住 .tscn 的话，改了一处就会算出错的宽度（而宽度超了只能靠肉眼发现）
+	_skill_bar.add_theme_constant_override("separation", CELL_GAP)
+	var total: int = PlayerState.SKILL_SLOT_COUNT + PlayerState.POTION_KINDS.size()
+	for i in total:
+		var potion_index: int = i - PlayerState.SKILL_SLOT_COUNT
 		var cell := Panel.new()
 		cell.name = "Cell%d" % (i + 1)
-		cell.custom_minimum_size = Vector2(40.0, 30.0)
+		cell.custom_minimum_size = CELL_SIZE
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# 代码建的 Panel 默认是主题那套浅灰底，和 HUD 其他面板格格不入 ——
 		# 手上一块深底 + 暗金边，风格才连得上。底色比面板更透一点：
@@ -228,28 +248,52 @@ func _build_skill_bar() -> void:
 		# 技能格：与主面板同族的像素九宫格（原先是代码画的灰方块，和面板两套语言）
 		cell.add_theme_stylebox_override("panel", load("res://assets/ui/slot_style.tres"))
 
-		var icon := SkillIcon.new()
-		icon.name = "Icon"
-		icon.position = Vector2(5.0, 3.0)
-		icon.size = Vector2(30.0, 20.0)
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cell.add_child(icon)
+		if potion_index >= 0:
+			# 消耗品格（栏最后两格）：图标是「符」不是技能，而且它**没有冷却** ——
+			# 格子里唯一会变的量是剩余**次数**，所以用计数代替冷却遮罩
+			var pot := ItemIcon.new()
+			pot.name = "Icon"
+			pot.kind = _potion_icon_kind(potion_index)
+			pot.empty_frame = true
+			pot.position = ICON_POS
+			pot.size = ICON_BOX
+			pot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_child(pot)
 
-		# 冷却遮罩：顶边固定、底边上升（造梦西游式）。ColorRect 的 pivot 默认在左上，
-		# 所以缩 scale.y 就是「从满格缩到无」
-		var cd := ColorRect.new()
-		cd.name = "Cooldown"
-		cd.color = Color(0.05, 0.05, 0.08, 0.75)
-		cd.position = Vector2(5.0, 3.0)
-		cd.size = Vector2(30.0, 20.0)
-		cd.visible = false
-		cd.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cell.add_child(cd)
+			var count := Label.new()
+			count.name = "Count"
+			count.position = Vector2(2.0, 15.0)
+			count.size = Vector2(16.0, 14.0)
+			count.add_theme_font_size_override("font_size", 10)
+			# **数字压在瓶子上**（32px 的格子里没有空角）→ 必须描边，
+			# 否则红瓶子上写白数字那一下就糊成一片
+			count.add_theme_constant_override("outline_size", 3)
+			count.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+			count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_child(count)
+		else:
+			var icon := SkillIcon.new()
+			icon.name = "Icon"
+			icon.position = ICON_POS
+			icon.size = ICON_BOX
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_child(icon)
+
+			# 冷却遮罩：顶边固定、底边上升（造梦西游式）。ColorRect 的 pivot 默认在左上，
+			# 所以缩 scale.y 就是「从满格缩到无」
+			var cd := ColorRect.new()
+			cd.name = "Cooldown"
+			cd.color = Color(0.05, 0.05, 0.08, 0.75)
+			cd.position = ICON_POS
+			cd.size = ICON_BOX
+			cd.visible = false
+			cd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_child(cd)
 
 		var key := Label.new()
 		key.name = "Key"
-		key.position = Vector2(24.0, 16.0)
-		key.size = Vector2(14.0, 12.0)
+		key.position = Vector2(19.0, 17.0)
+		key.size = Vector2(12.0, 12.0)
 		key.text = "%d" % (i + 1)
 		key.add_theme_font_size_override("font_size", 9)
 		key.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
@@ -258,6 +302,13 @@ func _build_skill_bar() -> void:
 
 		_skill_bar.add_child(cell)
 		_skill_cells.append(cell)
+
+
+## 第 i 个消耗品格画哪种符。**「6 = 回血符、7 = 回蓝符」的唯一出处是
+## `PlayerState.POTION_KINDS`** —— 这里和 `player._try_use_potion` 都从它取，
+## 不各写一份顺序（两处顺序一旦不一致，就是「按 6 喝了蓝」那种没人会去查的错）
+func _potion_icon_kind(i: int) -> StringName:
+	return &"potion_hp" if PlayerState.POTION_KINDS[i] == PlayerState.POTION_HP else &"potion_mp"
 
 
 func _row_icon(row: HBoxContainer) -> ItemIcon:
@@ -835,8 +886,14 @@ func _refresh_stats_block(h: Health) -> void:
 	_stats_r.text = "\n".join(lines.slice(4, 7))
 
 
-## 技能栏：5 格各显各的技能。冷却遮罩从满格缩到无（造梦西游式），
-## 蓝不够或空槽时图标变暗 —— 「现在放不出来」要一眼看得出，不弹提示
+## 技能栏：5 格技能 + 2 格消耗品。
+##
+## 技能格显冷却遮罩从满格缩到无（造梦西游式），蓝不够或空槽时图标变暗；
+## 消耗品格显剩余**次数**，次数归零画暗格 + 灰 0。
+## 两者都是「现在按下去有没有用」的答案，**不弹提示 —— 暗就是提示**。
+##
+## 消耗品**满血 / 满蓝时不变暗**：那时按下去会飘字说明原因（见 player.use_potion），
+## 但「次数还在」这件事必须一直看得见，不然玩家会以为符已经用完了。
 func refresh_skill_bar() -> void:
 	var slots: int = PlayerState.SKILL_SLOT_COUNT
 	var mp := int(_player.get("mp"))
@@ -860,6 +917,29 @@ func refresh_skill_bar() -> void:
 			cd.scale.y = clampf(float(left) / float(maxi(total, 1)), 0.05, 1.0)
 		else:
 			cd.visible = false
+	_refresh_potion_cells()
+
+
+## 两个消耗品格：剩余次数 + 用完变暗。
+## 次数当场从 PlayerState 读（与元宝/精铁同一条态度：真相同一份，不缓存）
+func _refresh_potion_cells() -> void:
+	for i in PlayerState.POTION_KINDS.size():
+		var idx: int = PlayerState.SKILL_SLOT_COUNT + i
+		if idx >= _skill_cells.size():
+			return                       # 栏还没建起来（_ready 之前也可能被 refresh 叫到）
+		var cell: Panel = _skill_cells[idx]
+		var icon := cell.get_node_or_null("Icon") as ItemIcon
+		var count := cell.get_node_or_null("Count") as Label
+		if icon == null or count == null:
+			continue
+		var left := PlayerState.potion_charges(PlayerState.POTION_KINDS[i])
+		count.text = "%d" % left
+		# 0 次 = 这张符此刻是废的。整个图标压暗 + 灰数字，与技能格「放不出来」
+		# 同一套语言（ItemIcon 没有 dim 属性，modulate 对它是等价的整体压暗，
+		# 不必为这一处去改八种形状的画法）
+		icon.modulate = Color(0.45, 0.45, 0.45, 1.0) if left <= 0 else Color(1, 1, 1, 1)
+		count.add_theme_color_override("font_color",
+			Color(0.52, 0.5, 0.48, 1) if left <= 0 else Color(1, 1, 1, 0.95))
 
 
 ## 精铁数量。**只认 PlayerState 那一份** —— 玩家节点上没有第二份

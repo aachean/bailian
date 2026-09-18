@@ -24,7 +24,8 @@ const GOLD_COLOR := Color(0.95, 0.78, 0.3)
 const HEAL_COLOR := Color(0.88, 0.32, 0.3)
 const MANA_COLOR := Color(0.4, 0.6, 0.95)
 
-## 非装备形态：&"" 默认（碎片 / 装备），&"gold" 元宝，&"potion_hp"/&"potion_mp" 药水。
+## 非装备形态：&"" 默认（碎片 / 装备），&"gold" 元宝，
+## &"potion_hp"/&"potion_mp" 药水，&"supply" 补给包（两个瓶子并排）。
 ## 为什么进 ItemIcon 而不是另写一个图标类：三种新形态同样要「地上、面板两处同形同色」，
 ## 分家的话迟早漂移 —— 与「同一件装备四处同形同色」是同一条纪律
 var kind: StringName = &""
@@ -69,6 +70,12 @@ func _draw() -> void:
 			return
 		&"potion_mp":
 			_draw_potion(k, MANA_COLOR)
+			return
+		&"supply":
+			_draw_supply(k)
+			return
+		&"revive":
+			_draw_revive(k)
 			return
 		&"material":
 			_draw_ore(k)
@@ -191,6 +198,29 @@ func _draw_potion(k: float, liquid: Color) -> void:
 		Vector2(12.5, 12), Vector2(10.5, 14.6), Vector2(5.5, 14.6), Vector2(3.5, 12),
 	], k), liquid)
 	draw_rect(_rect(5.4, 7.6, 7.0, 12.5, k), glass.lightened(0.3))  # 高光
+
+
+## 补给包：**一大一小两个瓶子并排**（血 + 蓝）。
+## 为什么不借回血符的瓶子：商店左栏里「回血符」和「补给包」就挨着放，
+## 同一个图标会让玩家每次都读错一行 —— 而行数一旦读错，买错东西只是时间问题。
+## 形状复用 `_draw_potion`，靠 `draw_set_transform` 缩小挪位（0.62 是「两个瓶子
+## 塞进 16 宽的设计盒」能取的最大值：9 × 0.62 × 2 = 11.2 < 16）
+func _draw_supply(k: float) -> void:
+	draw_set_transform(Vector2(-2.5, 3.0), 0.0, Vector2(0.62, 0.62))
+	_draw_potion(k, HEAL_COLOR)
+	draw_set_transform(Vector2(7.5, 3.0), 0.0, Vector2(0.62, 0.62))
+	_draw_potion(k, MANA_COLOR)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)      # 复位，别影响后续绘制
+
+
+## 还魂丹：一颗圆丹 + 高光 + 暗边。
+## **不借回血符的瓶子** —— 商店左栏里它就和回血符上下挨着，
+## 两个红瓶子同屏 = 每次买丹都在赌自己没看错行
+func _draw_revive(k: float) -> void:
+	var body := Color(0.95, 0.45, 0.45)
+	draw_circle(Vector2(8, 9) * k, 5.6 * k, body)
+	draw_arc(Vector2(8, 9) * k, 5.6 * k, 0.0, TAU, 20, body.darkened(0.45), maxf(1.0, k))
+	draw_circle(Vector2(6.0, 6.9) * k, 1.7 * k, body.lightened(0.6))
 
 
 ## 剑：亮剑身（主体）+ 细护手 + 短柄。

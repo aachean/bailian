@@ -723,6 +723,73 @@ func drink_mana(amount: int) -> void:
 	_pickup_fx_text("+%d" % amount, Color(0.45, 0.65, 0.95))
 
 
+# ── 预载消耗品（原则 5.6 的第二条：商店买「次数」，按 6 / 7 主动用）──
+#
+# 与上面两个 `drink_*` 的分工：那两个是**掉在地上走近生效**（免费、不由玩家选时机），
+# 这两个是**玩家自己决定什么时候喝**。两条并存，见 docs/adr/0022 §2.3。
+
+## 一次回多少 —— **按上限的比例，不是定值**。
+##
+## 为什么不是定值：这符要在第 1 章到第 5 章都好用，而血上限从 lv1 的 100 涨到 lv100 的 1585。
+## 写死一个数的话，它在第一章还像个符，到后面就变成「按了几乎没反应」的假动作 ——
+## 而那种失效**不会有任何断言变红**。比例天然跟着等级与装备走，五章共用一个数。
+## 上限由 `Health.heal` / `mini` 兜住，不需要另设封顶（4.2）。
+const POTION_HP_RATIO := 0.40
+const POTION_MP_RATIO := 0.60
+
+const FLOAT_HEAL := Color(0.45, 0.95, 0.45)
+const FLOAT_MANA := Color(0.45, 0.65, 0.95)
+## 「按了但没生效」的飘字色。橙而不是红 —— 它是在说明原因，不是在报警
+const FLOAT_WARN := Color(0.95, 0.66, 0.34)
+
+
+## 消耗品格的名字（提示里要说明是哪一张符用完了）。走 i18n，别在代码里写人话
+func potion_name(kind: StringName) -> String:
+	return tr("ITEM_POTION_HP") if kind == PlayerState.POTION_HP else tr("ITEM_POTION_MP")
+
+
+## 读 6 / 7 两个键。**动作名从 POTION_KINDS 拼** ——
+## 「第 6 格是 hp、第 7 格是 mp」这件事只有 PlayerState 那一处定义
+func _try_use_potion() -> void:
+	for kind in PlayerState.POTION_KINDS:
+		if Input.is_action_just_pressed("item_%s" % kind):
+			use_potion(kind)
+			return
+
+
+## 用一次符。返回 true = 真的用掉了（扣了次数 + 回了东西）。
+##
+## **三种「没反应」分着说**（没次数 / 已满 / 成功）—— 合并成一句 silent return 的话，
+## 玩家分不清是没按上、没次数、还是本来就满，这正是本项目最不接受的一种失败。
+## 满血 / 满蓝时**不扣次数**：先扣再判等于白烧一张符。
+##
+## 喝完不换状态、不给动作：喝符是瞬时的，不该出现「喝到一半被打断」这种窗口。
+func use_potion(kind: StringName) -> bool:
+	if PlayerState.potion_charges(kind) <= 0:
+		_pickup_fx_text(I18n.t(&"UI_POTION_EMPTY", [potion_name(kind)]), FLOAT_WARN)
+		return false
+	if kind == PlayerState.POTION_HP:
+		if _health.hp >= _health.max_hp:
+			_pickup_fx_text(tr("UI_POTION_HP_FULL"), FLOAT_WARN)
+			return false
+		PlayerState.use_potion(kind)
+		var healed := _health.heal(int(ceil(float(_health.max_hp) * POTION_HP_RATIO)))
+		Audio.play(&"pickup")
+		# 飘**实际**回的量：满血判定在上面，所以这里一定有得回，不存在「+0」
+		_pickup_fx_text("+%d" % healed, FLOAT_HEAL)
+	else:
+		if mp >= max_mp:
+			_pickup_fx_text(tr("UI_POTION_MP_FULL"), FLOAT_WARN)
+			return false
+		PlayerState.use_potion(kind)
+		var before := mp
+		mp = mini(mp + int(ceil(float(max_mp) * POTION_MP_RATIO)), max_mp)
+		Audio.play(&"pickup")
+		_pickup_fx_text("+%d" % (mp - before), FLOAT_MANA)
+	_refresh_hud()
+	return true
+
+
 ## 拾取飘字（药水用）。与装备飘字同一套动作：上浮 + 淡出
 func _pickup_fx_text(text: String, color: Color) -> void:
 	var host := get_tree().current_scene
@@ -742,6 +809,12 @@ func _pickup_fx_text(text: String, color: Color) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# 预载消耗品（6 / 7）放在**最前面，顿帧早退之前** ——
+	# 喝符不吃顿帧：顿帧是命中那一刻的奖励，而「打到人之后马上灌一口」正是它该生效的时机，
+	# 被那几帧吞掉就是 `_latch_action_input` 那条教训的翻版（按键不许静默丢掉）
+	if state != State.DEAD:
+		_try_use_potion()
+
 	if _hitstop > 0:
 		_hitstop -= 1
 		# 顿帧期间动作冻住，但【按键必须照收】。

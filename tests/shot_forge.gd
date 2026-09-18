@@ -105,13 +105,13 @@ func _ready() -> void:
 	await _frames(4)
 	await _shot("dismantle.png")
 
-	# ── 九、关掉之后：角色面板上「武器强化 +N/上限」长什么样 ──────
+	# ── 九、关掉之后：背包面板左栏的「武器强化 +N/上限」长什么样 ──
+	# C 键角色面板 2026-09-18 已并进 B 背包面板（属性块搬到左栏顶部）——
+	# 这条截图跟着改到 B，别再去按已经删掉的 `panel` action
 	_tap_key(KEY_ESCAPE)
 	await _frames(4)
-	_press("panel")
+	_tap_key(KEY_B)
 	await _frames(4)
-	_release("panel")
-	await _frames(3)
 	await _shot("forge_char_panel.png")
 
 	get_tree().paused = false

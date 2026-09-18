@@ -169,7 +169,7 @@ UI_DEATH_TOWN,"返回城镇","Return to town"
 UI_DEATH_HINT,"↑↓ 选择　·　J 确认","↑↓ select　·　J confirm"
 HUD_GOLD,"元宝","Gold"
 UI_SHOP_TITLE,"商店","Shop"
-UI_SHOP_GEAR,"装备（本期货架）","Gear (this batch)"
+UI_SHOP_GEAR,"货架（装备 · 消耗品）","Stock (gear · items)"
 UI_SHOP_BP,"制作书（常驻）","Blueprints (always stocked)"
 UI_SHOP_REFRESH_IN,"下次刷新","Next restock"
 UI_SHOP_REFRESH_SOON,"即将刷新","Restocking soon"
@@ -360,3 +360,13 @@ MAT_BLACK_IRON,玄铁,玄铁
 MAT_SKY_CRYSTAL,天晶,天晶
 MAT_DRAGON_SOUL,龙魂,龙魂
 MAT_TAICHU,太乙精金,太乙精金
+ITEM_POTION_HP,"回血符","Healing Charm"
+ITEM_POTION_MP,"回蓝符","Mana Charm"
+UI_SHOP_SUPPLY,"补给包","Supply Pack"
+UI_SHOP_CHARGES,"余","left"
+UI_SHOP_SUPPLY_STOCK,"血 %d · 蓝 %d","HP %d · MP %d"
+UI_SHOP_POTION_OK,"%s 到手，余额 %d 次","Got %s — %d charges left"
+UI_SHOP_SUPPLY_OK,"补给包到手：血 %d 次 / 蓝 %d 次","Supply pack — HP %d / MP %d"
+UI_POTION_EMPTY,"%s 用完了（商店可补）","Out of %s — buy more at the shop"
+UI_POTION_HP_FULL,"生命已满","Health is full"
+UI_POTION_MP_FULL,"蓝量已满","Mana is full"
