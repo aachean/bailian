@@ -8,7 +8,7 @@ extends CharacterBody2D
 ## ai_enabled = false 时它就是一只靶子：物理和受击反馈都在，AI 不跑。
 ## 自动验收靠这个开关把「移动测试」和「敌人测试」隔离在同一间房里。
 
-enum State { PATROL, CHASE, ATTACK, HURT, DEAD }
+enum State { PATROL, CHASE, ATTACK, HURT, DEAD, WARN, PHASE, RECOVER }
 
 const DAMAGE_NUMBER := preload("res://scenes/ui/damage_number.tscn")
 const PICKUP := preload("res://scenes/components/pickup.tscn")
@@ -19,6 +19,13 @@ const RECOIL_STIFF := 1500.0
 const RECOIL_DAMP := 30.0
 const RECOIL_KICK := 420.0
 const RECOIL_KICK_HEAVY := 1.6
+
+## 相位期间的后撤速度 = 追击速度 × 这个系数。
+## 用系数而不是绝对速度：**「比追人时更快」才是这条机制的语义**（躲得掉才有威胁），
+## 而追击速度本身住在 .tres（4.4）—— 换一只更快的 Boss 时这里不用动
+const PHASE_RETREAT_MULT := 1.35
+## 相位恢复段的收招速度（像素/秒²），与受击硬直同一档手感
+const PHASE_RECOVER_FRICTION := 900.0
 
 @export_group("数值")
 ## 用哪套数值。留空则加载 data/enemies/walker.tres
@@ -45,6 +52,16 @@ const FALL_KILL_Y := 800.0
 var state: int = State.PATROL
 var attacks_started: int = 0
 var hits_taken: int = 0
+## 已经放过几次相位（自动验收用）。见 EnemyData 的「相位」那一组
+var phases_started: int = 0
+
+## 相位的护罩（只在 EnemyData.has_phase() 的怪身上建，见 _setup_shield）
+var _shield: EnemyShield = null
+## 距离下一次相位还有多少帧。相位结束（RECOVER 走完）时重置成 phase_interval_frames
+var _phase_cd: int = 0
+## 相位后撤的初速度（进 PHASE 那一帧定下来，之后不再变 ——
+## 中途改方向会让「它往哪边躲」这件事没法读）
+var _phase_dash := 0.0
 
 var _frame := 0                 # 当前状态内经过的物理帧
 var _home_x := 0.0              # 出生点（巡逻围绕它）
@@ -92,9 +109,29 @@ func _ready() -> void:
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 	health.revived.connect(_on_revived)
+	# 「挡住了」的当场回执画在护罩上：光环亮一下、粗一圈。
+	# **只靠攻击方那几颗火花不够**（截图实测在 640×360 里几乎看不见），
+	# 而这件事必须出现在**挨打的那个东西身上**
+	health.blocked.connect(_on_blocked)
 	_home_x = global_position.x
 	_refresh_bar()
 	_setup_skin()
+	_setup_shield()
+	_phase_cd = data.phase_interval_frames
+
+
+## 相位的护罩：只有配了相位参数的怪才建（小怪身上挂一个永远不亮的环是白开销）
+func _setup_shield() -> void:
+	if not data.has_phase():
+		return
+	_shield = EnemyShield.new()
+	add_child(_shield)
+	_shield.position = Vector2.ZERO
+
+
+## 相位期间的后撤速度（像素/秒）
+func _retreat_speed() -> float:
+	return data.chase_speed * PHASE_RETREAT_MULT
 
 
 ## 精灵模式（ADR-0015）：data.sprite_path 非空时色块退位。
@@ -147,6 +184,10 @@ func _physics_process(delta: float) -> void:
 		_cooldown -= 1
 	if _turn_cooldown > 0:
 		_turn_cooldown -= 1
+	# 相位倒计时：从出生就开始跑，所以**开局第一次相位也要等一个间隔** ——
+	# 见面就无敌会毁掉「先看清楚它长什么样」这件事
+	if _phase_cd > 0:
+		_phase_cd -= 1
 
 	velocity.y += _gravity * delta
 
@@ -180,6 +221,12 @@ func _physics_process(delta: float) -> void:
 				_enter(State.CHASE)
 		State.DEAD:
 			velocity.x = 0.0
+		State.WARN:
+			_phase_warn(delta)
+		State.PHASE:
+			_phase_run()
+		State.RECOVER:
+			_phase_recover(delta)
 
 	move_and_slide()
 	_update_recoil(delta)
@@ -219,6 +266,12 @@ func _chase() -> void:
 	var player := _player()
 	if player == null or _dist(player) > data.deaggro_range:
 		_enter(State.PATROL)
+		return
+
+	# 相位：间隔到了就起手。**只从 CHASE 起手** —— 巡逻中放是浪费
+	# （玩家可能还没走到这一屏），攻击中途放会吃掉一次已经挥出去的攻击
+	if data.has_phase() and _phase_cd <= 0:
+		_start_phase()
 		return
 
 	# 攻击距离内就站住 —— 哪怕冷却没好也站着等。
@@ -298,13 +351,93 @@ func _enter(s: int) -> void:
 		_hitbox.deactivate()
 		_attack_pose = 0.0
 		swipe.modulate.a = 0.0
+	# 相位的三段状态迁移。**收尾的两条兜底不能省**：
+	# 死亡 / 掉出世界 / 读档都可能从相位中间插进来，漏了就是
+	# 「一只永远无敌的 Boss」或「一个永远亮着的护罩」
+	if s == State.WARN and _shield != null:
+		_shield.set_open(true)
+	if s == State.PHASE:
+		health.invincible = true
+		_phase_dash = _dash_speed()
+	if s == State.RECOVER:
+		health.invincible = false
+		if _shield != null:
+			_shield.break_flash()
+	if state in [State.WARN, State.PHASE] and s not in [State.WARN, State.PHASE, State.RECOVER]:
+		health.invincible = false
+		if _shield != null:
+			_shield.set_open(false)
 	state = s
 	_frame = 0
 	_apply_facing()
 
 
+## 进 PHASE 那一帧定下位移速度与朝向。
+## 后撤时**仍然面朝玩家** —— 背对着跑看起来像在逃命，不像在战斗
+func _dash_speed() -> float:
+	if data.phase_move == EnemyData.PhaseMove.STILL:
+		return 0.0
+	var player := _player()
+	var away := 1.0
+	if player != null:
+		away = -1.0 if player.global_position.x >= global_position.x else 1.0
+	_facing = -1 if away > 0.0 else 1
+	return _retreat_speed() * away
+
+
 func _dist(player: Node2D) -> float:
 	return absf(player.global_position.x - global_position.x)
+
+
+# ── 相位（ADR-0019 的 B 口径 · ADR-0023）────────────────────────
+#
+# 三段，缺一段就是背板：
+#   ① 架势 WARN    —— 护罩渐亮，**仍然可打**（给反应快的玩家的窗口）
+#   ② 相位 PHASE   —— **无敌** + 按 phase_move 位移。打上去是「铛」
+#   ③ 恢复 RECOVER —— 护罩碎、原地硬直，**这是给玩家的反击窗口**
+#
+# 参数（帧数 / 位移方式）全部读 data；「打不到的时间占比」= 1 − boss_active，
+# 由 tools/apply_phase_data.py 从设计表反推后写进 .tres。
+
+## 起手。**一旦起手就走完三段** —— 打中它不会取消相位。
+## 不这么做的话，远程角色站在射程外就能永久取消它，时长预算当场失真
+## （ADR-0019 的 `boss_active` 是按「有相位」算出来的血量）
+func _start_phase() -> void:
+	_hitbox.deactivate()
+	_skill = null
+	phases_started += 1
+	_enter(State.WARN)
+
+
+func _phase_warn(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, PHASE_RECOVER_FRICTION * delta)
+	if _frame >= data.phase_warn_frames:
+		_enter(State.PHASE)
+
+
+func _phase_run() -> void:
+	velocity.x = _phase_dash
+	if _frame >= data.phase_frames:
+		_enter(State.RECOVER)
+
+
+func _phase_recover(delta: float) -> void:
+	# 恢复段：站住挨打。**这是读招成功的奖励** —— 判据是 4.3 那句
+	# 「难度靠机制」，所以机制必须给「做对了」的人一条出路
+	velocity.x = move_toward(velocity.x, 0.0, PHASE_RECOVER_FRICTION * delta)
+	if _frame >= data.phase_recover_frames:
+		_phase_cd = data.phase_interval_frames
+		_enter(State.CHASE)
+
+
+## 护罩张开程度（自动验收用）。没有相位的怪恒 0
+func shield_ratio() -> float:
+	return 0.0 if _shield == null else _shield.open_ratio()
+
+
+## 相位期间是不是无敌（自动验收用）
+func is_phasing() -> bool:
+	return state == State.PHASE
 
 
 func _apply_facing() -> void:
@@ -405,6 +538,13 @@ func _dead_pose() -> void:
 	bar.visible = false
 
 
+## 挨的是护罩（`Health.blocked`）：整个身体一动不动、不掉血、只让环亮一下。
+## **没有这一下，玩家会以为自己没打中** —— 见 EnemyShield.impact 的说明
+func _on_blocked(_point: Vector2, _dir: int) -> void:
+	if _shield != null:
+		_shield.impact()
+
+
 func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: int) -> void:
 	hits_taken += 1
 	_spawn_number(amount, point, heavy)
@@ -412,7 +552,11 @@ func _on_damaged(amount: int, _hp_left: int, point: Vector2, heavy: bool, dir: i
 	_recoil_v += RECOIL_KICK * sign_dir * (RECOIL_KICK_HEAVY if heavy else 1.0)
 	_flash = maxf(_flash, 1.0 if heavy else 0.75)
 	_refresh_bar()
-	if ai_enabled and not health.is_dead:
+	# 架势 / 相位**不被打断**：架势那段本来就该挨打（它是给玩家的窗口），
+	# 相位本来就无敌（打不中，走不到这里）。让伤害把它们打断 =
+	# 「打不到它的时间」由玩家的手速决定，ADR-0019 的时长预算当场失意义
+	if ai_enabled and not health.is_dead \
+			and state != State.WARN and state != State.PHASE:
 		_skill = null
 		_enter(State.HURT)          # 被打断：攻击 / 追击统统让位给硬直
 
@@ -554,6 +698,9 @@ func _on_revived() -> void:
 func _process(delta: float) -> void:
 	_flash = move_toward(_flash, 0.0, 7.0 * delta)
 	flash.modulate.a = _flash
+	# 护罩自己管缓动与重绘（_draw 手画的环，见 enemy_shield.gd）
+	if _shield != null:
+		_shield.tick(delta)
 	# 精灵模式下旧 Flash 色块已藏，受击闪白改走 self_modulate 提亮（>1 过饱和发白）
 	if _skin != null:
 		var f := minf(_flash, 1.0)

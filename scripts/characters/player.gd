@@ -245,6 +245,11 @@ const SHAKE_HIT := 0.22
 const SHAKE_HEAVY_MULT := 1.45
 const SHAKE_HURT := 0.4
 const SHAKE_HURT_HEAVY := 0.6
+## 砍在护罩上（相位的无敌段）。**比命中低一档但要感觉得到** ——
+## 它是一次真的碰撞，不该像砍空气；但它没有造成伤害，不该跟命中同量级
+const SHAKE_BLOCK := 0.14
+## 护罩火花的颜色。冷蓝白，与命中的金/橙刻意分色系（见 EnemyShield.RING_COLOR）
+const BLOCK_SPARK_COLOR := Color(0.62, 0.88, 1.0)
 
 var _trauma := 0.0
 
@@ -266,6 +271,7 @@ func _init() -> void:
 func _ready() -> void:
 	_apply_character_look()
 	_hitbox.hit_landed.connect(_on_hit_landed)
+	_hitbox.hit_blocked.connect(_on_hit_blocked)
 	_body_mask = collision_mask
 	_health.damaged.connect(_on_damaged)
 	_health.died.connect(_on_died)
@@ -1258,6 +1264,25 @@ func _on_hit_landed(target: Node2D, _damage: int, point: Vector2, heavy: bool) -
 ## 公开给攻击方（敌人命中玩家时也会走 duck-typing 调这里）
 func apply_hitstop(frames: int) -> void:
 	_hitstop = maxi(_hitstop, frames)
+
+
+## 砍在相位的护罩上（`Hitbox.hit_blocked`）。
+##
+## ── 为什么单独一条路，不复用 _on_hit_landed ──────────────────
+## 玩家必须一眼分得出「打中了」和「打不动」。两条路的差别就是三样反馈：
+##   · 音：`hit`（咔）→ `clang`（铛，金属、更长、更高）
+##   · 色：金/橙 → 冷蓝白（见 BLOCK_SPARK_COLOR）
+##   · 顿帧：有 → **没有**。顿帧是「打中了」的奖励，给在护罩上等于骗玩家
+## 屏震留着（小一档）—— 它是一次真实的碰撞，砍空气和砍护罩手感不该一样。
+## 这条对应 design-conventions「不能静默的三件事」：打不动这件事**必须被看见**。
+func _on_hit_blocked(_target: Node2D, point: Vector2, heavy: bool) -> void:
+	Audio.play(&"clang")
+	# 颗粒数比命中略多、飞散更快、寿命更短：**冷色的、炸开就没**的火花。
+	# 数量是截图调出来的 —— 6 颗在 640×360 里被角色动作盖住了（2026-09-18）
+	_spawn_hit_fx(point, BLOCK_SPARK_COLOR, 16 if heavy else 12, 240.0)
+	# 护罩自己也会亮一下（walker._on_blocked → EnemyShield.impact）——
+	# 那一下是「打不动」的当场回执，比火花显眼得多
+	add_shake(SHAKE_BLOCK * (SHAKE_HEAVY_MULT if heavy else 1.0))
 
 
 # ── 屏震与命中特效（M4 打击感）────────────────────────────────

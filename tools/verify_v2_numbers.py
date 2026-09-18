@@ -124,6 +124,16 @@ def armor_mult(de: float) -> float:
     return 1.0 - min(de / (100.0 + de), MAX_RED)
 
 
+## `.tres` 里的相位参数 → 「打不到它」的时间占比。
+## 与 `EnemyData.phase_ratio()` 同一个公式（那边是运行期唯一真相，这边只为对账）
+def phase_ratio_of(text: str) -> float:
+    frames = num(fld(text, "phase_frames"))
+    if frames <= 0:
+        return 0.0
+    cycle = num(fld(text, "phase_warn_frames")) + frames + num(fld(text, "phase_interval_frames"))
+    return 0.0 if cycle <= 0 else frames / cycle
+
+
 def skill_damage(text: str) -> int:
     """怪这一次攻击**自带的**那份伤害（近战看技能表 / 纯远程看 projectile_damage）。"""
     if re.search(r"^attack_skill = null$", text, re.MULTILINE):
@@ -252,9 +262,9 @@ def main() -> int:
     else:
         check(True, "小怪/精英伤害随章缩放")
 
-    hr("⑥ 遭遇时长：Boss 血条能撑多久")
+    hr("⑥ 遭遇时长：Boss 血条 × 相位能撑多久")
     loud(f"{'副本':<12}{'rec':>5}{'玩家DPS':>9}{'Boss血':>8}{'护甲系数':>9}"
-         f"{'实际秒':>8}{'今天可达':>9}{'名义目标':>9}{'达成':>7}")
+         f"{'相位占比':>9}{'实际秒':>8}{'名义目标':>9}{'达成':>7}")
     for eid, (ch, rec) in boss_rec.items():
         did = {"boss": "lichang", "boss2": "duancuiqu", "boss_luhou": "luhou",
                "boss_canjian": "canjianlin", "boss_xiushi": "xiushi",
@@ -264,18 +274,22 @@ def main() -> int:
         ## 两边同一个公式 → 比值才有意义，否则算出来的是「两种口径的差」而不是游戏里的差。
         anchor_lv = int(num(sc[ch]["level"]))
         dps = num(sc[ch]["player_dps"]) * (1 + lv_pct(rec)) / (1 + lv_pct(anchor_lv))
+        t = txt(REPO / "data" / "enemies" / f"{eid}.tres")
         e = enemies[eid]
-        actual = e["hp"] / (dps * armor_mult(e["df"]) * UPTIME)
-        ## 今天可达 = 名义目标 × boss_active —— 相位机制没实现时玩家 100% 时间能打到它，
-        ## 所以这段时间就是此刻能兑现的那一份
-        reachable = num(sc[ch]["boss_s"]) * num(sc[ch]["boss_active"])
+        ## 相位把「打不到它」的那一份真的做进游戏了（ADR-0023）：
+        ## 实际时长 = 血 / (等效DPS × 占比) × 1/(1-相位占比)
+        pr = phase_ratio_of(t)
+        actual = e["hp"] / (dps * armor_mult(e["df"]) * UPTIME * (1.0 - pr))
         nominal = num(sc[ch]["boss_s"])
         loud(f"{did:<12}{rec:>5}{dps:>9.0f}{e['hp']:>8}{armor_mult(e['df']):>9.2f}"
-             f"{actual:>8.0f}{reachable:>9.0f}{nominal:>9.0f}{actual / reachable * 100:>6.0f}%")
-        check(actual / reachable >= 0.8, f"{did} 实际 {actual:.0f}s / 今天可达 {reachable:.0f}s")
-    print("\n  两列目标的差别 = **相位债务**：设计表把时长的一部分记在「Boss 有相位/走位、")
-    print("  玩家打不到它」上（boss_active 0.85→0.65），而那条机制**未实现**。")
-    print("  把 ch3-5 的血量灌进来之前必须先做它，否则再按 B 口径配一遍还是要回头改。")
+             f"{pr:>9.2f}{actual:>8.0f}{nominal:>9.0f}{actual / nominal * 100:>6.0f}%")
+        ## 相位占比必须等于 1 − boss_active（设计表那一列的物理落点）
+        want_pr = 1.0 - num(sc[ch]["boss_active"])
+        check(abs(pr - want_pr) <= 0.02,
+              f"{did} 相位占比 {pr:.2f} = 1−boss_active({want_pr:.2f})")
+        check(0.8 <= actual / nominal <= 1.2,
+              f"{did} 实际 {actual:.0f}s / 名义 {nominal:.0f}s（±20%）")
+    print("\n  「相位占比」= Boss 打不到的时间（旧口径里那个老板着一格「今天可达」的年代结束了）。")
 
     hr("⑦ 红线（ADR-0019 / design-principles 4.2）")
     worst = max(e["df"] for e in enemies.values())

@@ -10,6 +10,16 @@ extends Node
 
 ## dir = 被击退的水平方向（+1 向右 / -1 向左 / 0 未知）。受击方靠它决定往哪边后仰
 signal damaged(amount: int, hp_left: int, point: Vector2, heavy: bool, dir: int)
+## 打上来了，但被**硬无敌**挡下（相位的护罩 / 闪避的无敌帧）。
+##
+## ── 为什么单独一个信号，而不是让 take_damage 返回个负数 ──────────
+## 「没打动」有三种完全不同的原因，收益也完全不同：
+##   · 硬无敌（相位护罩）→ **必须出声** —— 玩家看得见护罩，得知道「这一下被挡住了」
+##   · 受击后无敌窗口   → 不出声（那是同一次挥砍的第 2~4 帧，玩家刚看到那一下打中了）
+##   · 已经死了         → 不出声（尸体在淡出，玩家不会以为自己砍中了什么）
+## 三者混在一个返回值里，调用方就只能靠猜。见 design-conventions「不能静默的三件事」：
+## **「不能做」和「已经记下」都不能静默。**
+signal blocked(point: Vector2, dir: int)
 signal died
 signal revived
 signal hp_changed(hp: int, max_hp: int)
@@ -51,17 +61,27 @@ func ratio() -> float:
 	return 0.0 if max_hp <= 0 else clampf(float(hp) / float(max_hp), 0.0, 1.0)
 
 
-func can_be_hit() -> bool:
-	return not is_dead and not invincible and _post_hit <= 0.0
-
-
 ## 扣血。返回实际造成的伤害；0 表示这次没打中（无敌 / 已死 / 已在受击无敌里）。
 ## 攻击方靠这个返回值决定「算不算命中」，所以要严格区分 0 和「打出了 0 点伤害」。
 ## 护甲在这一层生效：攻击方算出的伤害先去减伤，再落到血上。
 ## 放在 Health 而不是攻击方，是因为「挨打的人有多硬」属于挨打的人。
 ## **玩家与敌人共用这一套**（敌人填 def 就自动生效，见 docs/adr/0020）
+##
+## ⚠️ 三种「返回 0」**故意写开、不合并**（2026-09-18，ADR-0023）：
+## 原来这里是一句 `if not can_be_hit(): return 0`，而 `can_be_hit()` 把
+## 「死了 / 硬无敌 / 受击无敌窗口」揉成一个 bool —— 于是加了相位之后，
+## **打不动这件事彻底静默**（砍护罩 = 砍空气，没声音没火花）。
+## 合并是省了一行，代价是丢掉「为什么打不动」这条信息。**别再把它合并回去。**
 func take_damage(amount: int, point: Vector2 = Vector2.ZERO, heavy: bool = false, dir: int = 0) -> int:
-	if not can_be_hit() or amount <= 0:
+	if is_dead or amount <= 0:
+		return 0
+	# 硬无敌（相位的护罩 / 闪避的无敌帧）：**必须发 blocked**，攻击方据此出「铛」的反馈
+	if invincible:
+		blocked.emit(point, dir)
+		return 0
+	# 挨打之后的短暂无敌窗口：安静。那是同一次挥砍的第 2~4 帧，
+	# 玩家刚看见第一下打中了 —— 这里再喊一声反而是噪声
+	if _post_hit > 0.0:
 		return 0
 	var actual := _reduced(amount)
 	var dealt: int = mini(actual, hp)

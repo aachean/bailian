@@ -16,6 +16,16 @@ extends Resource
 ## ③ 断言里的伤害阶梯（小怪 < 精英、小怪 < Boss）
 @export var kind: StringName = &"trash"
 
+## 相位期间怎么位移。
+##
+## ⚠️ **没有「突进/冲锋」这一档，是刻意的**：让 Boss 高速朝玩家冲过去，
+## 它会像推土机一样把玩家一路拱到地图边缘掉出世界 —— `walker._chase` 已经踩过
+## 这个坑（见那里的注释）。要加冲锋之前先把「Boss 推不动玩家」这件事解决掉。
+enum PhaseMove {
+	STILL,     ## 原地亮护罩。最简单的相位，用于**引入**（ch1 前两章）
+	RETREAT,   ## 朝远离玩家的方向快速后撤，逼玩家追 —— 用于**转折/考核**（ch3 起）
+}
+
 @export_group("存活")
 @export var max_hp: int = 30
 ## 被打死之后过多久满血重生。**<= 0 表示不重生。**
@@ -44,6 +54,37 @@ extends Resource
 ## 这只怪的个体倍率。同一档内部的强弱差异走它（重甲 1.2、快攻 0.85），
 ## 改它就是「这只怪比同类更疼」，不会碰到全章的基准
 @export var atk_mult: float = 1.0
+
+@export_group("相位（ADR-0019 的 B 口径：「玩家打不到它」的那一段时间）")
+##
+## ── 这一组字段是干什么的 ───────────────────────────────────────
+## 设计原则 4.3 要求「敌人变强靠机制不靠堆血」，ADR-0019 把这句话变成了一个**时长预算**：
+##   `BossHP = 玩家等效DPS × UPTIME(0.55) × 可打时间占比 × 目标秒数`
+## 其中「可打时间占比」= 下面这组参数算出来的 `1 - phase_ratio()`，
+## 也就是设计表 `enemy_scaling.csv` 里 `boss_active` 那一列（ch1 0.85 → ch5 0.65）。
+## **没有相位，Boss 战就只剩一根更长的血条** —— 那正是 4.3 明令避免的。
+##
+## ── 形态（三段，缺一段就是背板）───────────────────────────────
+##   ① 架势（`phase_warn_frames`）：护罩渐亮，**此时仍然可打** ——
+##      这是给反应快的玩家的窗口，也是「读招」这件事的物理形状。
+##      这一段的伤害**不会打断相位**（否则远程角色能永久取消它，预算就没了）。
+##   ② 相位（`phase_frames`）：**无敌** + 按 `phase_move` 位移。打上去是「铛」。
+##   ③ 恢复（`phase_recover_frames`）：护罩碎、原地硬直不动 ——
+##      **这是给玩家的奖励窗口**：读对招的人该拿到输出机会，
+##      否则相位就只是「等」而不是「考」（4.3 的意图）。
+##
+## ── 为什么必须无敌，不能只靠走位 ──────────────────────────────
+## 弓手（远程）存在。只靠后撤的话，远程角色站在原地就能把相位期间的 DPS 打满，
+## 「可打时间占比」当场失真 —— 时长预算就白算了。
+@export var phase_interval_frames: int = 0
+## 一次相位持续多少帧。**0 = 这只怪没有相位**（小怪 / 未参与时长预算的怪）
+@export var phase_frames: int = 0
+## 架势（相位前摇）帧数。**只加范围/无敌而不给前摇就是背板，不是难度**（4.3）
+@export var phase_warn_frames: int = 18
+## 相位结束后的可反击硬直窗口（帧）
+@export var phase_recover_frames: int = 24
+## 相位期间怎么动。见 PhaseMove
+@export var phase_move: PhaseMove = PhaseMove.STILL
 
 @export_group("AI")
 ## 巡逻速度 / 追击速度（像素/秒）
@@ -105,3 +146,26 @@ func attack_power() -> int:
 ## 放这里是为了让生成脚本与断言能**不看场景**就核对「def 有没有越过 0.6 红线」
 func armor_reduction() -> float:
 	return minf(float(defense) / (100.0 + float(defense)), Health.MAX_DAMAGE_REDUCTION)
+
+
+## 相位占整场战斗时间的比例 = **`1 - boss_active`**（ADR-0019）。
+## 分母是**完整的一轮**：架势 + 相位 + 间隔。架势也算进去了 ——
+## 它虽然可以打，但它占的是「还没进入下一轮」的时间，少算它比例会偏高。
+##
+## 数据落地脚本按这个比例反推 `phase_frames` / `phase_interval_frames`，
+## 断言也靠它对账 `enemy_scaling.csv` 的 `boss_active` —— **两处不许各算一份**
+func phase_ratio() -> float:
+	var cycle := phase_cycle_frames()
+	return 0.0 if cycle <= 0 else float(phase_frames) / float(cycle)
+
+
+## 一轮相位的总帧数（架势 + 相位 + 间隔）。0 = 没有相位
+func phase_cycle_frames() -> int:
+	if phase_frames <= 0:
+		return 0
+	return phase_warn_frames + phase_frames + maxi(phase_interval_frames, 0)
+
+
+## 这只怪有没有相位
+func has_phase() -> bool:
+	return phase_frames > 0

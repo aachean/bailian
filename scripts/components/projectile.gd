@@ -73,6 +73,19 @@ func _physics_process(delta: float) -> void:
 		var point := global_position
 		var dir := 1 if velocity.x >= 0.0 else -1
 		var dmg := int(round((float(damage) + float(attack_flat)) * damage_scale))
+		var dealt := h.take_damage(dmg, point, heavy, dir)
+		if dealt <= 0:
+			# 被硬无敌（相位的护罩）挡下：换一套反馈 —— 冷色火花 + 一声「铛」，
+			# **不给顿帧、不给屏震**，那两样是「打中了」的奖励，给错了就是骗玩家。
+			# 另外两种「没打动」（受击后的无敌窗口 / 已经死了）保持安静：
+			# 前者玩家刚看见那一下打中了，后者尸体在淡出 —— 都不是静默失败
+			# （判据与近战 Hitbox._resolve 完全一致，两处别各写一套）
+			if h.invincible:
+				Audio.play(&"clang")
+				_block_fx(point)
+			_hit_done = true
+			queue_free()
+			return
 		# 命中反馈：声、火花、双方顿帧、屏震 —— 与近战 _on_hit_landed 同一套语言。
 		# 弓箭打人不该是哑的（这正是远程角色要复用的管线）
 		Audio.play(&"hit")
@@ -87,10 +100,21 @@ func _physics_process(delta: float) -> void:
 			source.call("apply_hitstop", hitstop_frames)
 		if shake_gain > 0.0 and is_instance_valid(source) and source.has_method("add_shake"):
 			source.call("add_shake", shake_gain)
-		h.take_damage(dmg, point, false, dir)
 		_hit_done = true
 		queue_free()
 		return
+
+
+## 被挡下的火花：冷蓝白、颗粒少、飞散快。
+## 与命中火花的金/橙刻意拉开色系 —— 玩家不看字也该分得出「打中了」和「打不动」
+func _block_fx(point: Vector2) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var fx: Node2D = HIT_FX.instantiate()
+	fx.setup(Color(0.62, 0.88, 1.0), 6, 210.0, 0.26)
+	host.add_child(fx)
+	fx.global_position = point
 
 
 func _in_bounds() -> bool:

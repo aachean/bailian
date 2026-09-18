@@ -14,6 +14,11 @@ extends Node2D
 ## activate() 会清空命中记录。判定持续的 4 帧里，同一个目标只会被结算第一次。
 
 signal hit_landed(target: Node2D, damage: int, point: Vector2, heavy: bool)
+## 打中了，但被硬无敌挡下（相位的护罩）。**这一声必须有** ——
+## 护罩是看得见的东西，玩家砍上去什么都没有才是真的出问题。
+## 持有者接它出「铛」的火花 + 音效，但**不给顿帧/屏震** ——
+## 那两样是「打中了」的奖励，给错了就等于告诉玩家这一下生效了
+signal hit_blocked(target: Node2D, point: Vector2, heavy: bool)
 
 ## 打谁（碰撞层位掩码）。玩家的判定框打 enemy 层 = 2
 @export_flags_2d_physics var target_mask: int = 2
@@ -122,7 +127,15 @@ func _resolve(body: Node2D) -> void:
 	if h != null:
 		var dealt := h.take_damage(dmg, point, _skill.heavy, dir)
 		if dealt <= 0:
-			return                      # 没打动（无敌 / 已死），不产生任何反馈
+			# 「没打动」分三种，只有硬无敌要出声：
+			#   · 硬无敌（相位护罩）→ 发 hit_blocked，玩家必须知道自己被挡住了
+			#   · 受击后的无敌窗口 → 安静（同一次挥砍的第 2~4 帧，那一下已经结算过了）
+			#   · 已经死了 → 安静（尸体在淡出）
+			# 读一次 `invincible` 而不是去连 Health.blocked：目标每次命中都可能不同，
+			# 连了就得记得断，多一条会泄漏的边
+			if h.invincible:
+				hit_blocked.emit(body, point, _skill.heavy)
+			return
 		dmg = dealt
 
 	hit_landed.emit(body, dmg, point, _skill.heavy)
