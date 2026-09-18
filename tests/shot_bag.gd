@@ -6,20 +6,32 @@ extends Node
 const ROOM := preload("res://scenes/stages/test_room.tscn")
 const PICKUP := preload("res://scenes/components/pickup.tscn")
 
+## 六件正好覆盖六档 —— 这张图就是「六档颜色两两可辨」的验收。
+## 注意 v2 里「铁剑」是**普通**档（v1 是精良），名字一样但档位不一样了
 const DROPS := [
-	"res://data/items/leather_cap.tres",     # 普通
-	"res://data/items/iron_sword.tres",      # 精良
-	"res://data/items/flame_blade.tres",     # 稀有
+	"res://data/items/eq_u5934u76d4_0_u76aeu76d4.tres",   # 皮盔 · 普通（白）
+	"res://data/items/wp_u5251_1_u7cbeu94a2u5251.tres",   # 精钢剑 · 精良（绿）
+	"res://data/items/wp_u5251_2_u7384u94c1u5251.tres",   # 玄铁剑 · 优秀（蓝）
+	"res://data/items/wp_u5251_3_u5bd2u6708u5251.tres",   # 寒月剑 · 极品（紫）
+	"res://data/items/wp_u5251_4_u9f99u6e0au5251.tres",   # 龙渊剑 · 传说（橙）
+	"res://data/items/wp_u5251_5_u8f69u8f95u5251.tres",   # 轩辕剑 · 至尊（红）
 ]
+## 八槽各穿一件 —— 这张图就是「8 行装备塞不塞得下」的唯一验收
 const WEAR := [
-	"res://data/items/iron_sword.tres",
-	"res://data/items/iron_helm.tres",
-	"res://data/items/iron_armor.tres",
+	"res://data/items/wp_u5251_0_u94c1u5251.tres",        # 武器
+	"res://data/items/eq_u5934u76d4_0_u94c1u76d4.tres",   # 头盔
+	"res://data/items/eq_u80f8u7532_1_u94c1u7532.tres",   # 胸甲
+	"res://data/items/eq_u62a4u817f_0_u76aeu62a4u817f.tres",  # 护腿
+	"res://data/items/eq_u9774u5b50_0_u5e03u978b.tres",   # 靴子
+	"res://data/items/eq_u6212u6307_0_u94c1u6212.tres",   # 戒指
+	"res://data/items/eq_u9879u94fe_0_u9ebbu7ef3u9879u94fe.tres",  # 项链
+	"res://data/items/eq_u624bu956f_0_u6728u956f.tres",   # 手镯
 ]
+## 背包里的三件顺便验四种武器图标的另外三种（刀 / 弓 / 杖）
 const IN_BAG := [
-	"res://data/items/wood_charm.tres",
-	"res://data/items/cloth_robe.tres",
-	"res://data/items/leather_cap.tres",
+	"res://data/items/wp_u5200_2_u7384u94c1u5200.tres",   # 玄铁刀
+	"res://data/items/wp_u5f13_0_u730eu5f13.tres",        # 猎弓
+	"res://data/items/wp_u6756_0_u6843u6728u6756.tres",   # 桃木杖
 ]
 
 
@@ -38,7 +50,7 @@ func _ready() -> void:
 		var p: Node2D = PICKUP.instantiate()
 		p.set("item_path", DROPS[i])
 		add_child(p)
-		p.global_position = Vector2(430.0 + 46.0 * float(i), 300.0)
+		p.global_position = Vector2(420.0 + 34.0 * float(i), 300.0)
 	await _frames(6)
 	await _shot("bag_drop.png")
 	for c in get_children():
@@ -73,8 +85,8 @@ func _ready() -> void:
 
 	# ── 四、手里的刀：装上稀有武器挥一刀，光刃按武器品质变色 ──
 	PlayerState.set_equipment({}, [])
-	PlayerState.add_item("res://data/items/flame_blade.tres")
-	PlayerState.equip("res://data/items/flame_blade.tres")
+	PlayerState.add_item("res://data/items/wp_u5251_4_u9f99u6e0au5251.tres")
+	PlayerState.equip("res://data/items/wp_u5251_4_u9f99u6e0au5251.tres")
 	player.global_position = Vector2(430.0, 288.0)
 	# 等真落地再出招：普攻要求站在地上，悬空按 J 什么都不发生（截图会空）
 	var n := 0

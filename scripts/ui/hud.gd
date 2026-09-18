@@ -13,14 +13,18 @@ extends CanvasLayer
 ## process_mode = ALWAYS 才能在暂停里收键）。这条偏离了 design-conventions 里
 ## 「面板不暂停游戏」的旧约定，已改文档并写进 docs/adr/0005。
 
-const BAG_ROWS := 6              # 背包列表一屏几行，超出靠光标滚动
+## 背包列表一屏几行，超出靠光标滚动。
+## **2026-09-18 从 6 收到 5**：八槽之后面板里要塞 8 行装备 + 背包，
+## 6 行会把面板底边压到技能栏上面（「屏幕最底边不放常驻元素」那条不能破）
+const BAG_ROWS := 5
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
-const ROW_HEIGHT := 20.0         # 背包面板一行的高度：图标 16 + 上下各留 2
+## 背包面板一行的高度：图标 16 + 上下各留 0.5。
+## **2026-09-18 从 20 收到 17** —— 八槽之后面板里有 8 行装备 + 6 行背包，
+## 20 会算到 362px 高、把面板顶出 360 的屏幕下沿。17 正好落在 344。
+const ROW_HEIGHT := 17.0
 const ICON_SIZE := 16.0
-const CHAR_ROW_HEIGHT := 17.0    # 角色面板一行。**8 槽之后不能再是 18** ——
-                                 # 8×18=144 会把面板顶出屏幕下沿（360 高），
-                                 # 收到的 17 让「8 行文字 + 8 行装备」正好落在 72..338
+const CHAR_ROW_HEIGHT := 17.0    # 角色面板一行（与背包面板同高，两处行高必须一样）
 
 var _bag_open := false
 ## 背包面板的提示消息（穿不上武器之类）—— 带过期时刻，2.4 秒后回常规提示
@@ -58,6 +62,9 @@ var _has_player := false
 @onready var _stage_label: Label = $Stage
 @onready var _panel: Panel = $CharPanel
 @onready var _panel_text: Label = $CharPanel/Text
+## 属性表的右栏。**八行属性竖着排会跟下面八行装备抢位置**（360 高的屏幕塞不下），
+## 所以拆两栏：左边生存（等级/经验/生命/魔力），右边战力（攻击/防御/元宝/强化）
+@onready var _panel_text2: Label = $CharPanel/Text2
 @onready var _char_equip_box: VBoxContainer = $CharPanel/EquipRows
 @onready var _skill_bar: HBoxContainer = $SkillBar
 @onready var _bag_panel: Panel = $BagPanel
@@ -527,10 +534,9 @@ func refresh_bag() -> void:
 		_bag_hint.text = _bag_msg
 	else:
 		_bag_msg = ""
-		# 键位提示 + 余额：卖东西要看钱进了没有，两笔钱都摆在这行里
-		_bag_hint.text = "%s　·　%s　·　%s ×%d　%s ×%d" % [
-			tr("UI_BAG_HINT"), tr("UI_BAG_SELL"),
-			tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards]
+		# 键位提示。**余额不再重复写在这行**（v2 八槽后面板变长了，这行摆不下）
+		# —— 元宝与精铁本来就常驻在 HUD 右上角，卖完钱立刻能看见进账
+		_bag_hint.text = "%s　·　%s" % [tr("UI_BAG_HINT"), tr("UI_BAG_SELL")]
 	var dim := Color(0.62, 0.6, 0.55, 1)
 	var normal := Color(0.9, 0.88, 0.84, 1)
 
@@ -731,8 +737,11 @@ func refresh_char_panel(h: Health) -> void:
 		"%s ×%d" % [tr("HUD_SHARD"), shards_of()],
 		_weapon_forge_line(),
 	]
-	_panel_text.text = "\n".join(lines)
-	# 装备四行带图标 —— 与背包面板同一个填法、同一套图标、同一个品质色
+	# 两栏：左 = 生存（等级/经验/生命/魔力），右 = 战力（攻击/防御/元宝/强化）。
+	# **每栏 4 行是有原因的**：8 行竖排会顶掉下面的 8 行装备（360 高塞不下）
+	_panel_text.text = "\n".join(lines.slice(0, 4))
+	_panel_text2.text = "\n".join(lines.slice(4, 8))
+	# 装备八行带图标 —— 与背包面板同一个填法、同一套图标、同一个品质色
 	for i in ItemData.SLOT_IDS.size():
 		_fill_equip_row(_char_equip_rows[i], i, PlayerState.equipped_uid(ItemData.SLOT_IDS[i]), "")
 
