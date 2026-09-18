@@ -134,6 +134,7 @@ func reset_for_new_game() -> void:
 	revive_tokens = 0
 	revive_bought.clear()
 	shop_offers.clear()
+	shop_bp_offers.clear()
 	shop_refreshed_at = 0.0
 	character_id = ""
 	level = 1
@@ -165,6 +166,7 @@ func load_from(d: Dictionary) -> void:
 	revive_tokens = int(d.get("revive_tokens", 0))
 	revive_bought = (d.get("revive_bought", {}) as Dictionary).duplicate()
 	shop_offers = (d.get("shop_offers", []) as Array).duplicate()
+	shop_bp_offers = (d.get("shop_bp_offers", []) as Array).duplicate()
 	shop_refreshed_at = float(d.get("shop_refreshed_at", 0.0))
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
@@ -186,6 +188,7 @@ func save_to() -> Dictionary:
 		"revive_tokens": revive_tokens,
 		"revive_bought": revive_bought.duplicate(),
 		"shop_offers": shop_offers.duplicate(),
+		"shop_bp_offers": shop_bp_offers.duplicate(),
 		"shop_refreshed_at": shop_refreshed_at,
 		"character_id": character_id,
 		"level": level,
@@ -523,13 +526,20 @@ func has_blueprint(path: String) -> bool:
 ## stock 是「这家店卖什么档次」的底线清单，offers 是这一批实际摆出来的货
 var shop_offers: Array = []
 
+## 本期的**随机制书货架**（装备路径数组）。制书不再常驻 66 本 ——
+## 每期独立 roll：10% 极品 / 5% 传说 / 1% 至尊（2026-09-18 神定的概率与定价），
+## 出了就随机该档的一件装备。**本期限购 1 本**：买走即从货架上撤下，
+## 再想要只能等下次刷新
+var shop_bp_offers: Array = []
+
 ## 上次刷新的时刻（Unix 秒）。存档 —— 关游戏时间也在走
 var shop_refreshed_at: float = 0.0
 
 
 ## 货架过期了就重抽。**进商店面板前调**（打开时看一眼，不靠时钟轮询）。
-## 抽法：从已建档的掉落档次（普通/精良/优秀）里不重复抽 8 件 ——
-## 极品+永远不进货（途径隔离，ADR-0016），想要就打造。
+## 装备：从已建档的掉落档次（普通/精良/优秀）里不重复抽 7 件 ——
+## 极品+永远不进货（途径隔离，ADR-0016）。
+## 制书：8 个书位独立 roll（10/5/1%），出书才占位。
 ## 首次（没档/刚 reset）：立刻抽一批并把时刻设为现在
 func ensure_shop_fresh() -> void:
 	var hours := 4.0
@@ -539,10 +549,11 @@ func ensure_shop_fresh() -> void:
 	var now := Time.get_unix_time_from_system()
 	if shop_offers.is_empty() or now - shop_refreshed_at >= hours * 3600.0:
 		shop_offers = _roll_shop_offers(7)   # 7 件 + 尾部一条还魂丹 = 左栏 8 行正好
+		shop_bp_offers = _roll_bp_offers(8)
 		shop_refreshed_at = now
 
 
-## 抽一批货架：三档混合（普通偏多）。不重复 —— 同一件摆两份没有意义
+## 抽一批装备货架：三档混合（普通偏多）。不重复 —— 同一件摆两份没有意义
 func _roll_shop_offers(n: int) -> Array:
 	var pool: Array = []
 	for t in [ItemData.Tier.COMMON, ItemData.Tier.COMMON, ItemData.Tier.FINE, ItemData.Tier.UNCOMMON]:
@@ -554,6 +565,31 @@ func _roll_shop_offers(n: int) -> Array:
 			out.append(p)
 		if out.size() >= n:
 			break
+	return out
+
+
+## 抽本期的制书：8 个书位，每位独立 roll 档次（2026-09-18 神定：
+## 极品 10% / 传说 5% / 至尊 1%，其余 84% 这期不出）——
+## 出了就随机该档的一件装备。**独立 roll 天然混合档次**，不会一整批全是同一档
+func _roll_bp_offers(slots: int) -> Array:
+	var out: Array = []
+	for _i in slots:
+		var r := randf()
+		var tier := -1
+		if r < 0.10:
+			tier = ItemData.Tier.RARE
+		elif r < 0.15:
+			tier = ItemData.Tier.EPIC
+		elif r < 0.16:
+			tier = ItemData.Tier.LEGENDARY
+		if tier < 0:
+			continue
+		var pool := GameProgress.drop_pool(tier)
+		if pool.is_empty():
+			continue
+		var path: String = pool.pick_random()
+		if not out.has(path):
+			out.append(path)
 	return out
 
 

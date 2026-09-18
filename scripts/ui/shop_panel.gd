@@ -150,12 +150,11 @@ func _left_entries() -> Array:
 	return out
 
 
-## 右栏 = 逐件制书（66 本，装备路径）。书就是装备本身，索引用 drop_pool 现拼
+## 右栏 = 本期的随机制书（PlayerState.shop_bp_offers）。制书不再常驻 ——
+## 每期 8 个书位独立 roll（极品 10% / 传说 5% / 至尊 1%），买走即撤下，
+## 再想要等下次刷新（2026-09-18 神定）
 func _bp_list() -> Array:
-	var out: Array = []
-	for t in [ItemData.Tier.RARE, ItemData.Tier.EPIC, ItemData.Tier.LEGENDARY]:
-		out.append_array(GameProgress.drop_pool(t))
-	return out
+	return PlayerState.shop_bp_offers
 
 
 ## 买光标那件。两个栏一个键，「为什么没买成」按条目类型区分着说
@@ -238,6 +237,7 @@ func _buy_blueprint(bp_path: String) -> void:
 		refresh()
 		return
 	if PlayerState.unlock_blueprint(bp_path):
+		PlayerState.shop_bp_offers.erase(bp_path)   # 本期限购 1：买走即撤，下期再随机
 		_msg = I18n.t(&"UI_SHOP_BP_OK", [tr(bp_it.name_key)])
 		_msg_color = GOLD
 	else:
@@ -341,10 +341,13 @@ func refresh() -> void:
 		var mark := CURSOR_MARK if _cursor == r else INDENT
 		var afford := PlayerState.gold >= it.gold_price
 		lbl.text = "%s%s　%d" % [mark, tr(it.name_key), it.gold_price]
+		# 名字颜色 = 品质色（档色是唯一色源 tier_color）。选中提亮一档当高亮，
+		# 买不起压暗 —— 颜色仍然在说「这是哪个档」
+		var c: Color = it.tier_color()
 		if _cursor == r:
-			lbl.modulate = GOLD if afford else WARN
+			lbl.modulate = c.lightened(0.35) if afford else c.darkened(0.35)
 		else:
-			lbl.modulate = NORMAL if afford else Color(0.62, 0.6, 0.55, 1)
+			lbl.modulate = c if afford else c.darkened(0.4)
 
 	# ── 右栏：制书（逐件，滚动窗口）──
 	for r in ROWS:
@@ -354,7 +357,7 @@ func refresh() -> void:
 		var idx := _bp_top + r
 		if idx >= bps.size():
 			icon.visible = false
-			lbl.text = ""
+			lbl.text = tr("UI_SHOP_BP_NONE") if (bps.is_empty() and r == 0) else ""
 			lbl.modulate = DIM
 			continue
 		var bp_it := load(str(bps[idx])) as ItemData
@@ -370,10 +373,15 @@ func refresh() -> void:
 		var mark := CURSOR_MARK if sel else INDENT
 		var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
 		var owned := PlayerState.has_blueprint(str(bps[idx]))
-		# 书名就是装备名（制书·寒月剑）；已有的置灰 —— 钱再多也不卖第二本
+		# 书名就是装备名（制书·寒月剑），颜色跟装备的档走；已有的置灰 ——
+		# 钱再多也不卖第二本
 		lbl.text = "%s📖 %s　%d" % [mark,
 			I18n.t(&"UI_BP_TIER", [tr(bp_it.name_key)]), price]
-		lbl.modulate = DIM if owned else (GOLD if sel else NORMAL)
+		if owned:
+			lbl.modulate = DIM
+		else:
+			var c: Color = bp_it.tier_color()
+			lbl.modulate = c.lightened(0.35) if sel else c
 
 
 ## 右上角倒计时：「下次刷新 2:41」（时:分）。过期显示「即将」—— 打开那一刻会换货
@@ -382,8 +390,10 @@ func _update_refresh_label() -> void:
 	if left <= 0.0:
 		_refresh_label.text = tr("UI_SHOP_REFRESH_SOON")
 		return
-	var total_min := int(ceil(left / 60.0))
-	_refresh_label.text = "%s %d:%02d" % [tr("UI_SHOP_REFRESH_IN"), total_min / 60, total_min % 60]
+	# 4:00 会被读成四分钟 —— 摆全 时:分:秒（2026-09-18 神圈注）
+	var total_sec := int(ceil(left))
+	_refresh_label.text = "%s %d:%02d:%02d" % [
+		tr("UI_SHOP_REFRESH_IN"), total_sec / 3600, (total_sec / 60) % 60, total_sec % 60]
 
 
 func _scroll_top(total: int, rows: int) -> int:

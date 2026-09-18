@@ -91,14 +91,15 @@ func slot_key() -> StringName:
 	return SLOT_KEYS[int(slot)]
 
 
-## 品质颜色。白 / 绿 / 蓝 / 紫 / 橙 / 红 —— 六档，与造梦西游的观感一致。
-## **同一件装备在掉落物、图标、面板文字四处都是这个色源**（只有一处定义）
+## 品质颜色。白 / 绿 / 蓝 / 紫 / 黄 / 红 —— 六档（2026-09-18 神定的色板：
+## 传说从橙改黄）。**同一件装备在掉落物、图标、面板文字四处都是这个色源**
+##（只有一处定义）；列表里的名字文字也用它上色
 func tier_color() -> Color:
 	match tier:
 		Tier.LEGENDARY:
 			return Color(0.92, 0.28, 0.30)     # 至尊 · 红
 		Tier.EPIC:
-			return Color(0.95, 0.62, 0.25)     # 传说 · 橙
+			return Color(0.95, 0.85, 0.25)     # 传说 · 黄
 		Tier.RARE:
 			return Color(0.78, 0.55, 0.95)     # 极品 · 紫
 		Tier.UNCOMMON:
@@ -106,7 +107,7 @@ func tier_color() -> Color:
 		Tier.FINE:
 			return Color(0.46, 0.83, 0.42)     # 精良 · 绿
 		_:
-			return Color(0.88, 0.88, 0.84)     # 普通 · 灰白
+			return Color(0.92, 0.92, 0.9)      # 普通 · 白
 
 
 ## 三个区间里有没有一条是有值的（空装备的兜底显示用）

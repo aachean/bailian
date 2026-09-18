@@ -73,6 +73,8 @@ var _has_player := false
 @onready var _equip_box: VBoxContainer = $BagPanel/EquipRows
 @onready var _bag_grid: GridContainer = $BagPanel/BagGrid
 @onready var _bag_detail: Label = $BagPanel/BagDetail
+@onready var _detail_name: Label = $BagPanel/DetailName
+@onready var _detail_text: Label = $BagPanel/DetailText
 @onready var _mat_row: Label = $BagPanel/MatRow
 @onready var _bag_hint: Label = $BagPanel/Hint
 @onready var _skill_panel: Panel = $SkillPanel
@@ -161,8 +163,11 @@ func _make_bag_cell() -> Panel:
 	bg.color = Color(0.14, 0.14, 0.17, 1)
 	cell.add_child(bg)
 	var icon := ItemIcon.new()
-	icon.set_anchors_preset(Control.PRESET_CENTER)
-	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	# **手动居中，别用 anchors preset** —— GridContainer 的子 Panel 还没进树时
+	# size 是 0，PRESET_CENTER 算出的 offset 是 0，图标就从中心点向右下歪出去
+	# （2026-09-18 神截图圈注的「偏右下角」就是它）
+	icon.position = Vector2((BAG_CELL - ICON_SIZE) * 0.5, (BAG_CELL - ICON_SIZE) * 0.5)
+	icon.size = Vector2(ICON_SIZE, ICON_SIZE)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.add_child(icon)
 	_bag_grid.add_child(cell)
@@ -614,6 +619,68 @@ func refresh_bag() -> void:
 			_stat_text(uid, it) if it != null else ""]
 	else:
 		_bag_detail.text = ""
+
+	_refresh_detail_panel(bag, detail_idx)
+
+	# 材料行：五种材料常驻背包（含精铁 —— 它就是 shards，显示在这里，
+	# 主界面右上角只留元宝）。**这里就是材料数量的唯一显示位**
+	var cr := PlayerState.crafting()
+	var parts: Array[String] = []
+	for id in [PlayerState.MAT_REFINED_IRON, &"mat_black_iron", &"mat_sky_crystal", &"mat_dragon_soul", &"mat_taichu"]:
+		parts.append("%s%d" % [tr(cr.mat_key(id)), PlayerState.material_count(id)])
+	_mat_row.text = "　".join(parts)
+
+
+## 左侧详情栏（2026-09-18 神圈注：选中装备要看得见「它是什么、拆了得什么」）。
+## 光标在装备槽行或背包格上都算选中；空格 / 空槽写引导语
+func _refresh_detail_panel(bag: Array, detail_idx: int) -> void:
+	var uid := ""
+	if detail_idx >= 0 and detail_idx < bag.size():
+		uid = str(bag[detail_idx])
+	else:
+		# 光标在装备槽行上 = 详情显示那一槽穿的
+		var slots: int = ItemData.SLOT_IDS.size()
+		if _cursor < slots:
+			uid = PlayerState.equipped_uid(ItemData.SLOT_IDS[_cursor])
+	if uid.is_empty():
+		_detail_name.text = tr("UI_BAG_DETAIL_NONE")
+		_detail_name.modulate = Color(0.62, 0.6, 0.55, 1)
+		_detail_text.text = tr("UI_BAG_DETAIL_HINT")
+		return
+	var it := PlayerState.item_of(uid)
+	if it == null:
+		_detail_name.text = "?"
+		_detail_name.modulate = Color(0.62, 0.6, 0.55, 1)
+		_detail_text.text = ""
+		return
+	# 名字 + 品质名，颜色 = 档色（与图标/掉落物同源）
+	var tier_names := ["普通", "精良", "优秀", "极品", "传说", "至尊"]
+	_detail_name.text = "%s\n%s" % [tr(it.name_key), tier_names[int(it.tier)]]
+	_detail_name.modulate = it.tier_color()
+	# 属性（实例已 roll 的值）+ 强化
+	var lines: Array[String] = []
+	var st := PlayerState.stat_of(uid)
+	if int(st.get("atk", 0)) > 0:
+		lines.append("%s +%d" % [tr("STAT_ATK"), int(st.get("atk", 0))])
+	if int(st.get("hp", 0)) > 0:
+		lines.append("%s +%d" % [tr("STAT_HP"), int(st.get("hp", 0))])
+	if int(st.get("def", 0)) > 0:
+		lines.append("%s +%d" % [tr("STAT_DEF"), int(st.get("def", 0))])
+	var lv := PlayerState.forge_level(uid)
+	if lv > 0:
+		lines.append("%s +%d（%s +%d%%）" % [tr("UI_FORGE_TAG"), lv,
+			tr("STAT_FORGE"), int(round(PlayerState.forge_atk(uid) * 100.0))])
+	lines.append("%s %d" % [tr("HUD_GOLD"), int(it.gold_price)])
+	# 分解产物：让玩家在拆之前就知道能得什么 —— 回收闭环看得见才有人走
+	var yld: Dictionary = PlayerState.disassemble_table().yield_for(int(it.tier))
+	if not yld.is_empty():
+		var dparts: Array[String] = []
+		var cr := PlayerState.crafting()
+		for id in yld:
+			dparts.append("%s×%d" % [tr(cr.mat_key(StringName(String(id)))), int(yld[id])])
+		lines.append("")
+		lines.append("%s：%s" % [tr("UI_BAG_DISMANTLE"), "、".join(dparts)])
+	_detail_text.text = "\n".join(lines)
 
 	# 材料行：五种材料常驻背包（含精铁 —— 它就是 shards，显示在这里，
 	# 主界面右上角只留元宝）。**这里就是材料数量的唯一显示位**

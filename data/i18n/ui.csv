@@ -345,6 +345,11 @@ ITEM_WP_U6756_4_U7384U51A5U6756,"玄冥杖","Dark Water Staff"
 ITEM_WP_U6756_5_U592AU6781U6756,"太极杖","Taiji Staff"
 ITEM_WP_U6756_5_U6DF7U6C8CU6756,"混沌杖","Chaos Staff"
 UI_BP_TIER,制书·%s,%s Blueprint
+UI_SHOP_BP_NONE,（本期没有制书）,(no blueprints this batch)
+UI_BAG_DETAIL_NONE,选中一件装备,"Select a piece"
+UI_BAG_DETAIL_HINT,"↑↓←→ 选中后这里显示名称、属性与分解产物","Name, stats and salvage yield show here"
+UI_BAG_DISMANTLE,分解可得,"Salvage"
+UI_FORGE_TAG,强化,forge
 UI_SHOP_BP_OK,"已买下 %s 的制作书！去铁匠铺打造（Tab 切到打造页）","Bought %s's blueprint! Craft it at the forge (Tab to switch)"
 UI_SHOP_BP_OWNED,"这本书已经买过了","Blueprint already owned"
 MAT_REFINED_IRON,精铁,精铁
