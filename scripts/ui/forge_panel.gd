@@ -84,6 +84,15 @@ func open() -> void:
 	refresh()
 
 
+## 锻造台的入口：直接落在打造页（2026-09-18 神要求补锻造台 ——
+## 打造藏在 Tab 页里玩家找不到，所以给打造单独一座台子）
+func open_craft() -> void:
+	open()
+	_page = 1
+	_cursor = 0
+	refresh()
+
+
 func close() -> void:
 	_root.visible = false
 	_msg = ""

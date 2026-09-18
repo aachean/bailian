@@ -13,6 +13,8 @@ UI_MENU_CONTINUE,"继续游戏","Continue"
 UI_MENU_QUIT,"退出","Quit"
 UI_MENU_LANGUAGE,"语言","Language"
 UI_MENU_SETTINGS,"设置","Settings"
+UI_FORGE_STAND,"锻造台","Forge"
+UI_FORGE_STAND_HINT,"J 打造（制书与材料在背包）","J to craft (books & mats in bag)"
 UI_ANVIL_TITLE,"铁匠铺","Forge"
 UI_ANVIL_HINT,"按 J 打开","Press J to open"
 UI_FORGE_TITLE,"铁匠铺 · 强化","Forge · Upgrade"
@@ -347,7 +349,8 @@ ITEM_WP_U6756_5_U6DF7U6C8CU6756,"混沌杖","Chaos Staff"
 UI_BP_TIER,制书·%s,%s Blueprint
 UI_SHOP_BP_NONE,（本期没有制书）,(no blueprints this batch)
 UI_BAG_DETAIL_NONE,选中一件装备,"Select a piece"
-UI_BAG_DETAIL_HINT,"↑↓←→ 选中后这里显示名称、属性与分解产物","Name, stats and salvage yield show here"
+UI_BAG_DETAIL_HINT,"选中装备
+查看详情","Pick a piece"
 UI_BAG_DISMANTLE,分解可得,"Salvage"
 UI_FORGE_TAG,强化,forge
 UI_SHOP_BP_OK,"已买下 %s 的制作书！去铁匠铺打造（Tab 切到打造页）","Bought %s's blueprint! Craft it at the forge (Tab to switch)"

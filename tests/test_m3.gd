@@ -50,6 +50,7 @@ func _ready() -> void:
 	await _t10_forge_survives_snapshot()
 	await _t11_shards_survive_scene_change()
 	await _t12_hud_shows_player_state()
+	await _t16_forge_station()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -542,3 +543,29 @@ func _t12_hud_shows_player_state() -> void:
 			and mat_row.contains("精铁4") and panel_all.contains("精铁"),
 		"右上「%s」　材料行含精铁4=%s　状态「%s」　面板含精铁行=%s" % [
 			bag, str(mat_row.contains("精铁4")), lv, str(panel_all.contains("精铁"))])
+
+
+## 锻造台（2026-09-18 神要求补上）：打造藏在铁砧面板的 Tab 页里玩家没找到 ——
+## 现在城镇里单独一座台子，走近按 J **直接落打造页**。
+## 断言三件事：台子存在且是打造台；open_craft 落在打造页；打造页的牌子写的是「打造」
+func _t16_forge_station() -> void:
+	var town := TOWN.instantiate()
+	add_child(town)
+	await _pframes(3)
+	var forge := town.get_node_or_null("Forge")
+	var exists := forge != null and bool(forge.get("opens_craft"))
+	var player := town.get_node("Player")
+	var panel := player.get_node("ForgePanel")
+	panel.call("open_craft")
+	await _pframes(2)
+	var opened := bool(panel.call("is_open"))
+	var page := int(panel.get("_page"))
+	var title: String = (panel.get_node("Root/Panel/Title") as Label).text
+	panel.call("close")
+	await _pframes(2)
+	town.queue_free()
+	await _pframes(2)
+	_check("16", "锻造台：城镇里有座打造台，走近按 J 直接落在打造页",
+		exists and opened and page == 1 and title == tr("UI_CRAFT_TITLE"),
+		"台子存在且 opens_craft=%s　面板开=%s　页=%d（1=打造）　标题「%s」" % [
+			str(exists), str(opened), page, title])

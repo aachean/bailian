@@ -71,6 +71,10 @@ repeat_dialogue = ExtResource("7_smith_repeat")
 [node name="Anvil" parent="." instance=ExtResource("4_anvil")]
 position = Vector2(780, 306)
 
+[node name="Forge" parent="." instance=ExtResource("4_anvil")]
+position = Vector2(630, 306)
+opens_craft = true
+
 [node name="ShopStand" parent="." instance=ExtResource("9_shop")]
 position = Vector2(930, 306)
 
