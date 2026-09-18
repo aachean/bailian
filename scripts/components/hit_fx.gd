@@ -22,6 +22,8 @@ var _life := DEFAULT_LIFE
 var _configured := false
 
 var _t := 0.0
+## 还没真正开火（等着调用方把位置摆好）。见 _ready 的说明
+var _pending := false
 
 @onready var _p: CPUParticles2D = $P
 
@@ -48,13 +50,25 @@ func _ready() -> void:
 	_p.scale_amount_min = PARTICLE_SCALE * 0.6
 	_p.scale_amount_max = PARTICLE_SCALE
 	_p.color = _color
-	_p.emitting = true
+	# 粒子的坐标用**局部**空间：默认的 local_coords = false 是**世界**空间，
+	# 而调用方的顺序是「add_child → 再设 global_position」（`player._spawn_hit_fx`）——
+	# 开火发生在 _ready 里，那一刻节点还在 (0,0)，于是整把火花打在世界原点。
+	_p.local_coords = true
+	# ⚠️ **不能在这里 emitting = true**：那一刻位置还没摆好。
+	# 等下一帧（_process 第一次跑时位置已经设好）再点着。
+	# 2026-09-18 截图发现：命中点上一颗火花都看不见 —— 就是这一行的顺序问题
+	_p.emitting = false
+	_pending = true
 	if not _configured:
 		push_warning("HitFx: add_child 前没调 setup —— 用了默认金色小爆点")
 
 
 func _process(delta: float) -> void:
+	if _pending:
+		_pending = false
+		_p.emitting = true
+		_p.restart()
 	_t += delta
 	# 粒子放完再留一小会儿，连节点一起回收（一次性场景，不留垃圾）
-	if _t >= _life + 0.2:
+	if _t >= _life + 0.25:
 		queue_free()
