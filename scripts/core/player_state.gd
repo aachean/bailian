@@ -130,7 +130,7 @@ func reset_for_new_game() -> void:
 	shards = 0
 	gold = 0
 	materials.clear()
-	unlocked_tiers.clear()
+	blueprints.clear()
 	character_id = ""
 	level = 1
 	exp = 0
@@ -157,7 +157,7 @@ func load_from(d: Dictionary) -> void:
 	forge = (d.get("forge", {}) as Dictionary).duplicate()
 	next_uid = int(d.get("next_uid", 0))
 	materials = (d.get("materials", {}) as Dictionary).duplicate()
-	unlocked_tiers = (d.get("unlocked_tiers", []) as Array).duplicate()
+	blueprints = (d.get("blueprints", []) as Array).duplicate()
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
@@ -174,7 +174,7 @@ func save_to() -> Dictionary:
 		"shards": shards,
 		"gold": gold,
 		"materials": materials.duplicate(),
-		"unlocked_tiers": unlocked_tiers.duplicate(),
+		"blueprints": blueprints.duplicate(),
 		"character_id": character_id,
 		"level": level,
 		"exp": exp,
@@ -384,9 +384,12 @@ const MAT_REFINED_IRON := &"mat_refined_iron"
 ## 四种稀有材料的持有量：id → 数量。精铁不在里面（见 MAT_REFINED_IRON）
 var materials: Dictionary = {}
 
-## 已用制书解锁的打造档次（ItemData.Tier 值）。买制书 = 永久解锁，不消耗 ——
-## 「一次性解锁」的语义是「这份档的打造许可到手了」，不是「造一件用一本」
-var unlocked_tiers: Array = []
+## 已到手的**逐件制书**（装备资源路径数组）。神拍板：制书不是「档位」的 ——
+## 打造寒月剑要「寒月剑制作书」，具体到每一件；一本档位书解锁 22 件
+## 等于把 66 件神装一次全放出来，打造就没有「下一件目标」了。
+## 存装备路径而不是另编制书 id：路径本身就是那件装备的唯一键，
+## 打造页 / 商店 / 掉落引用的是同一串，不会出现两套 id 对不上的事
+var blueprints: Array = []
 
 
 func crafting() -> CraftingData:
@@ -461,35 +464,41 @@ func disassemble(uid: String) -> Dictionary:
 	return yld
 
 
-## 打造：材料 + 该档制书（已解锁）→ 一件**全新实例**进背包。
+## 打造：材料 + **这一件**的制书 → 一件**全新实例**进背包。
 ## 返回新 uid（空串 = 造不了；原因只有调用方需要时才查 —— 界面上逐条说）：
-## 档没解锁 / 材料不够 / 路径不是装备。打造不做「缺一件也造，回头补」——
+## 没这本书 / 材料不够 / 路径不是装备。打造不做「缺一件也造，回头补」——
 ## 那等于让玩家欠账，欠账清单是另一套系统
 func craft(path: String) -> String:
 	var it := load(path) as ItemData
 	if it == null:
 		return ""
-	if not unlocked_tiers.has(int(it.tier)):
+	if not has_blueprint(path):
 		return ""
 	if not pay_materials(crafting().cost_for(int(it.tier))):
 		return ""
 	return add_item(path)
 
 
-## 买制书：解锁某档打造。价格真相在 CraftingData.blueprint_price（商店面板标同一份）。
-## 已解锁的再买 = 白花钱，直接拒绝 —— 「重复付费解锁已拥有的东西」不该是可能的事故
-func unlock_tier(tier: int) -> bool:
-	if unlocked_tiers.has(tier):
+## 买制书（逐件）。价格按**装备的档**走（CraftingData.blueprint_price，
+## 商店面板标同一份）—— 书是逐件的，钱仍是档位价：同一档的打造难度一样，
+## 没理由「寒月剑的书比破军剑的贵」。
+## 已有这本书再买 = 白花钱，直接拒绝 —— 「重复付费解锁已拥有的东西」
+## 不该是可能的事故
+func unlock_blueprint(path: String) -> bool:
+	if has_blueprint(path):
 		return false
-	var price := int(crafting().blueprint_price.get(str(tier), 0))
+	var it := load(path) as ItemData
+	if it == null:
+		return false
+	var price := int(crafting().blueprint_price.get(str(int(it.tier)), 0))
 	if price <= 0 or not spend_gold(price):
 		return false
-	unlocked_tiers.append(tier)
+	blueprints.append(path)
 	return true
 
 
-func tier_unlocked(tier: int) -> bool:
-	return unlocked_tiers.has(tier)
+func has_blueprint(path: String) -> bool:
+	return blueprints.has(path)
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────

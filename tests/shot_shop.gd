@@ -17,11 +17,12 @@ func _ready() -> void:
 	var player := town.get_node("Player")
 	var panel := player.get_node("ShopPanel")
 
-	# 三本制书 + 一点元宝：能买一本、买不起一本、已解锁一本 —— 三种状态同框
-	# （注意枚举名：EPIC=传说、LEGENDARY=至尊 —— 别看名字想当然）
+	# 制书逐件：三本制书 + 一点元宝 —— 能买一本、买不起一本、已有一本，三种状态同框
+	# （价格按档：极品 120 / 传说 400 / 至尊 900；书名就是装备名）
 	PlayerState.gold = 500
-	var ok := PlayerState.unlock_tier(ItemData.Tier.EPIC)   # 传说制书 → 已解锁（置灰）
-	print("unlock legend ok=", ok)                                # 别让失败静默过去
+	var legend_bp := str(GameProgress.drop_pool(ItemData.Tier.EPIC)[0])   # EPIC=传说
+	var ok := PlayerState.unlock_blueprint(legend_bp)
+	print("unlock blueprint ok=", ok)                                # 别让失败静默过去
 	PlayerState.gold = 130
 
 	panel.call("open")

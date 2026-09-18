@@ -23,9 +23,6 @@ const NORMAL := Color(0.9, 0.88, 0.84, 1)
 const GOLD := Color(0.93, 0.84, 0.6, 1)
 const WARN := Color(0.95, 0.52, 0.45, 1)
 
-## 可打造档（≥极品）的档次名 i18n key。下标 = ItemData.Tier 枚举值
-const TIER_I18N := {3: "UI_TIER_3", 4: "UI_TIER_4", 5: "UI_TIER_5"}
-
 var _cursor := 0
 var _rows: Array[HBoxContainer] = []
 ## 上一次操作的结果。**不静默**：按了键什么也没发生，玩家分不清是「没反应」还是「钱不够」
@@ -116,16 +113,18 @@ func _move(dir: int) -> void:
 	refresh()
 
 
-## 货架条目：装备（资源路径字符串）在前，制书（["bp", tier] 数组）在后 ——
-## 制书是「解锁」类商品，摆货架尾部；价格真相在 CraftingData（与铁匠铺买同价）
+## 货架条目：装备（资源路径字符串）在前，制书（["bp", 装备路径] 数组）在后 ——
+## 制书是「解锁」类商品，摆货架尾部。**逐件**：66 本（每件可打造装备一本），
+## 不是档位 —— 打造寒月剑要寒月剑的书（神的裁定，2026-09-18）。
+## 列表靠滚动（与铁匠铺打造页同一套），价格按档从 CraftingData 取
 func _entries() -> Array:
 	var out: Array = []
 	var shop := PlayerState.shop()
 	if shop != null:
 		out.append_array(shop.stock)
-		var bps: Dictionary = shop.blueprint_tiers
-		for k in bps:
-			out.append(["bp", int(k)])
+	for t in [ItemData.Tier.RARE, ItemData.Tier.EPIC, ItemData.Tier.LEGENDARY]:
+		for p in GameProgress.drop_pool(t):
+			out.append(["bp", p])
 	return out
 
 
@@ -136,22 +135,28 @@ func _buy_at_cursor() -> void:
 	if _cursor < 0 or _cursor >= list.size():
 		return
 	var entry = list[_cursor]
-	# ── 制书条目：买 = 解锁该档打造（永久），已解锁的拒绝重复付费 ──
+	# ── 制书条目：买 = 拿到**这一件**的打造许可（永久），已有这本书拒绝重复付费 ──
 	if entry is Array:
-		var tier := int(entry[1])
-		var price := int(PlayerState.crafting().blueprint_price.get(str(tier), 0))
-		if PlayerState.tier_unlocked(tier):
+		var bp_path := str(entry[1])
+		var bp_it := load(bp_path) as ItemData
+		if bp_it == null:
+			_msg = tr("UI_SHOP_UNAVAILABLE")
+			_msg_color = WARN
+			refresh()
+			return
+		if PlayerState.has_blueprint(bp_path):
 			_msg = tr("UI_SHOP_BP_OWNED")
 			_msg_color = DIM
 			refresh()
 			return
+		var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
 		if PlayerState.gold < price:
 			_msg = I18n.t(&"UI_SHOP_POOR", [price - PlayerState.gold])
 			_msg_color = WARN
 			refresh()
 			return
-		if PlayerState.unlock_tier(tier):
-			_msg = I18n.t(&"UI_SHOP_BP_OK", [PlayerState.gold])
+		if PlayerState.unlock_blueprint(bp_path):
+			_msg = I18n.t(&"UI_SHOP_BP_OK", [tr(bp_it.name_key)])
 			_msg_color = GOLD
 		else:
 			_msg = tr("UI_SHOP_UNAVAILABLE")
@@ -239,14 +244,20 @@ func refresh() -> void:
 			continue
 		var entry = list[idx]
 		# ── 制书行：没有装备图标，画个「书」字占位 —— 视觉上跟装备分得开 ──
+		# **逐件**：书名就是装备名（制书·寒月剑），不是档次
 		if entry is Array:
-			var tier := int(entry[1])
-			var price := int(PlayerState.crafting().blueprint_price.get(str(tier), 0))
+			var bp_path := str(entry[1])
+			var bp_it := load(bp_path) as ItemData
 			icon.visible = false
 			var mark := CURSOR_MARK if idx == _cursor else INDENT
-			var owned := PlayerState.tier_unlocked(tier)
+			if bp_it == null:
+				lbl.text = INDENT + "?"
+				lbl.modulate = DIM
+				continue
+			var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
+			var owned := PlayerState.has_blueprint(bp_path)
 			lbl.text = "%s📖 %s　%s ×%d" % [mark,
-				I18n.t(&"UI_BP_TIER", [tr(TIER_I18N[tier])]), tr("HUD_GOLD"), price]
+				I18n.t(&"UI_BP_TIER", [tr(bp_it.name_key)]), tr("HUD_GOLD"), price]
 			lbl.modulate = DIM if owned else (GOLD if idx == _cursor else NORMAL)
 			continue
 		var it := load(str(entry)) as ItemData

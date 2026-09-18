@@ -441,16 +441,21 @@ func _t11_disassemble_craft_loop() -> void:
 	PlayerState.unequip(&"weapon")
 	PlayerState.disassemble(wear_uid)      # 收尾拆掉，别把状态带给打造段
 
-	# ── ②③ 打造与制书 ──
+	# ── ②③ 打造与制书（**逐件**：书名就是装备名）──
 	var tier := ItemData.Tier.RARE                        # 极品（最低的可打造档）
 	var cost := PlayerState.crafting().cost_for(int(tier))
-	var craftable := GameProgress.drop_pool(tier)[0]
+	var pool := GameProgress.drop_pool(tier)
+	var craftable := str(pool[0])
+	var other := str(pool[mini(1, pool.size() - 1)])       # 同档另一件（书不通用）
 	var bp_price := int(PlayerState.crafting().blueprint_price.get(str(int(tier)), 0))
-	var locked_refused := PlayerState.craft(craftable).is_empty()       # 没解锁
+	var locked_refused := PlayerState.craft(craftable).is_empty()       # 没这本书
 	PlayerState.add_gold(bp_price)
-	var bought := PlayerState.unlock_tier(tier) and PlayerState.gold == 0 \
-		and PlayerState.tier_unlocked(tier)
-	var repurchase_refused: bool = not PlayerState.unlock_tier(tier)   # 重复买拒绝
+	var bought := PlayerState.unlock_blueprint(craftable) \
+		and PlayerState.gold == 0 and PlayerState.has_blueprint(craftable)
+	var repurchase_refused: bool = not PlayerState.unlock_blueprint(craftable)
+	# **书不通用**：有寒月剑的书 ≠ 能造同档别的件 —— 逐件制书的核心
+	var book_not_shared := PlayerState.craft(other).is_empty() \
+		and not PlayerState.has_blueprint(other)
 	# 材料不够：一分不动（原子），造不出
 	var before := PlayerState.material_count(&"mat_refined_iron")
 	var still_locked := PlayerState.craft(craftable).is_empty() \
@@ -475,10 +480,10 @@ func _t11_disassemble_craft_loop() -> void:
 				table_ok = false
 
 	var ok := gone and iron_ok and black_ok and worn_refused \
-		and locked_refused and bought and repurchase_refused and still_locked \
-		and crafted_ok and table_ok
-	_check("11", "回收闭环：分解到账（穿的不收）；打造要解锁+付料（原子）；制书重复买拒绝；分解<打造",
+		and locked_refused and bought and repurchase_refused and book_not_shared \
+		and still_locked and crafted_ok and table_ok
+	_check("11", "回收闭环：分解到账（穿的不收）；打造要**这一件**的制书+付料（原子、书不通用）；重复买拒绝；分解<打造",
 		ok,
-		"优秀档拆 %d 精铁+%d 玄铁　极品解锁 %d 元宝、打造新 uid=%s、料扣清=%s　铁律=%s" % [
+		"优秀档拆 %d 精铁+%d 玄铁　极品解锁 %d 元宝、打造新 uid=%s、料扣减=%s、书不通用=%s　铁律=%s" % [
 			iron_gain, black_gain, bp_price, str(not new_uid.is_empty()),
-			str(crafted_ok), str(table_ok)])
+			str(crafted_ok), str(book_not_shared), str(table_ok)])

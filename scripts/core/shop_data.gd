@@ -18,11 +18,10 @@ extends Resource
 
 ## 出售折价率。0.5 = 半价回收（造梦西游观感）
 @export_range(0.0, 1.0, 0.05) var sell_ratio: float = 0.5
-
-## 制书上架：tier(int，字符串 key) → 元宝价。价格真相在 CraftingData.blueprint_price，
-## 这里存的是「上架了哪几档」+ 面板直接标价用的快照 —— 两边由 apply_economy.py 同源生成。
-## **养成材料不上架**（原则 5.1：精铁↔元宝互不兑换），上架的只有制书这种「解锁」类商品
-@export var blueprint_tiers: Dictionary = {}
+##
+## 制书**不在这里**：它不是档位商品 —— 神裁定（2026-09-18）制书逐件走，
+## 66 本列表由 ShopPanel 从 `GameProgress.drop_pool`（可打造档的装备索引）现拼，
+## 价格按档从 CraftingData.blueprint_price 取。商店数据里只留装备货架。
 
 
 func has_stock(path: String) -> bool:

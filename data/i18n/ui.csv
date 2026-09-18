@@ -32,7 +32,7 @@ UI_CRAFT_STATUS,"选一件装备打造（🔒 = 先买制书）","Pick a piece t
 UI_CRAFT_HINT,"↑↓ 选择　·　J 打造 / 买制书　·　Tab 强化　·　Esc 离开","↑↓ select　·　J craft / buy blueprint　·　Tab upgrade　·　Esc leave"
 UI_CRAFT_OK,"打造完成：%s","Crafted: %s"
 UI_CRAFT_POOR,"材料不够：%s","Missing materials: %s"
-UI_CRAFT_BP_BOUGHT,"已解锁 %s 的打造（%d 元宝）","Unlocked crafting for %s (%d gold)"
+UI_CRAFT_BP_BOUGHT,"已买下 %s 的制作书（%d 元宝）","Bought %s's blueprint (%d gold)"
 UI_CRAFT_BP_POOR,"元宝不够（需要 %d）","Not enough gold (need %d)"
 UI_CRAFT_BP_LOCKED,"制书 · %d 元宝","Blueprint · %d gold"
 HUD_SHARD,"精铁","Ore"
@@ -335,14 +335,11 @@ ITEM_WP_U6756_4_U6731U96C0U6756,"朱雀杖","Vermilion Bird Staff"
 ITEM_WP_U6756_4_U7384U51A5U6756,"玄冥杖","Dark Water Staff"
 ITEM_WP_U6756_5_U592AU6781U6756,"太极杖","Taiji Staff"
 ITEM_WP_U6756_5_U6DF7U6C8CU6756,"混沌杖","Chaos Staff"
+UI_BP_TIER,制书·%s,%s Blueprint
+UI_SHOP_BP_OK,"已买下 %s 的制作书！去铁匠铺打造（Tab 切到打造页）","Bought %s's blueprint! Craft it at the forge (Tab to switch)"
+UI_SHOP_BP_OWNED,"这本书已经买过了","Blueprint already owned"
 MAT_REFINED_IRON,精铁,精铁
 MAT_BLACK_IRON,玄铁,玄铁
 MAT_SKY_CRYSTAL,天晶,天晶
 MAT_DRAGON_SOUL,龙魂,龙魂
 MAT_TAICHU,太乙精金,太乙精金
-UI_TIER_3,极品,Exceptional
-UI_TIER_4,传说,Legendary
-UI_TIER_5,至尊,Supreme
-UI_BP_TIER,制书·%s,%s Blueprint
-UI_SHOP_BP_OK,"解锁成功！去铁匠铺打造（Tab 切到打造页）","Unlocked! Craft it at the forge (Tab to switch)"
-UI_SHOP_BP_OWNED,"这本已经解锁过了","Already unlocked"

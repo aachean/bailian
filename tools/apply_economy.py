@@ -100,6 +100,10 @@ def main() -> int:
     bp_price = {str(tier_index(k)): int(v) for k, v in prices["blueprint_buy"].items()}
     mat_value = {str(m["id"]): int(prices["material_value_ref"][m["name"]]) for m in mats}
 
+    # 制书是**逐件**的（神裁定 2026-09-18）：66 本，名字就是装备名 ——
+    # 不需要单独的数据文件：书 = 装备路径，价格按档走 blueprint_price。
+    # 商店列表由 ShopPanel 从装备索引现拼，shop.tres 里不再存制书字段
+
     # ── 铁律 1：分解产量 < 打造成本（逐料，逐档）────────────────
     print("铁律 1：分解产量 < 同档打造成本（逐料）")
     for t in sorted(cost_by_tier, key=int):
@@ -131,12 +135,11 @@ def main() -> int:
     ui_new = "\n".join(keep + mat_lines) + "\n"
     print(f"i18n：材料名 {len(mat_lines)} 行（旧 {sum(1 for l in lines if l.startswith(MAT_KEY))} 行）")
 
-    # ── 商店上架制书 ───────────────────────────────────────────
+    # ── 商店上架制书（改为：shop.tres 里**不再存制书**）──────────
+    # 逐件制书（神裁定 2026-09-18）：66 本 = 可打造装备本身，列表由 ShopPanel
+    # 从 `GameProgress.drop_pool` 现拼、价格按档取 crafting.tres。
+    # 这里只负责把**残留的旧档位字段**从 shop.tres 清掉（幂等）
     shop = read_text(SHOP_TRES)
-    bp_field = "blueprint_tiers = " + gd_dict({k: v for k, v in bp_price.items()})
-
-    print("\n商店：制书上架 " + bp_field)
-
     if dry:
         print("\n（dry-run，未写文件）")
         return 0
@@ -177,16 +180,10 @@ yields = {{{yield_items}}}
     (ECON_DIR / "disassemble.tres").write_text(dis, encoding="utf-8", newline="\n")
     print(f"✅ 写入 {ECON_DIR.relative_to(REPO)}/crafting.tres、disassemble.tres")
 
-    # 商店：blueprint_tiers 字段（ShopData 侧读它上架制书）
-    if "blueprint_tiers" in shop:
-        shop = re.sub(r"^blueprint_tiers = .*$", bp_field, shop, count=1, flags=re.M)
-    else:
-        m = re.search(r"^sell_ratio = .*$", shop, re.M)
-        if m is None:
-            raise SystemExit("❌ shop.tres 里找不到插入点 sell_ratio")
-        shop = shop[: m.end()] + "\n" + bp_field + shop[m.end():]
+    # 清掉 shop.tres 里残留的档位制书字段（逐件化之前写的；没有就跳过）
+    shop = re.sub(r"^blueprint_tiers = .*\n?", "", shop, count=1, flags=re.M)
     SHOP_TRES.write_text(shop, encoding="utf-8", newline="\n")
-    print(f"✅ 写入 {SHOP_TRES.relative_to(REPO)}（制书 {len(bp_price)} 档上架）")
+    print(f"✅ 刷新 {SHOP_TRES.relative_to(REPO)}（档位制书字段已清，逐件列表由面板现拼）")
 
     UI_CSV.write_text(ui_new, encoding="utf-8", newline="\n")
     print(f"✅ 写入 {UI_CSV.relative_to(REPO)}")

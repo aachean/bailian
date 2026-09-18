@@ -190,7 +190,7 @@ func _disassemble_at_cursor() -> void:
 	refresh()
 
 
-## 打造光标那件（打造页 J）。档没解锁时 J 是**买制书** ——
+## 打造光标那件（打造页 J）。**这一件**的制书没有时 J 是买书 ——
 ## 解锁与打造在一个键里闭环，不用再回商店跑一趟（商店也上架，同价）
 func _craft_at_cursor() -> void:
 	var path := selected_craft_path()
@@ -200,9 +200,9 @@ func _craft_at_cursor() -> void:
 	if it == null:
 		return
 	var tier := int(it.tier)
-	if not PlayerState.tier_unlocked(tier):
+	if not PlayerState.has_blueprint(path):
 		var price := int(PlayerState.crafting().blueprint_price.get(str(tier), 0))
-		if PlayerState.unlock_tier(tier):
+		if PlayerState.unlock_blueprint(path):
 			_msg = I18n.t(&"UI_CRAFT_BP_BOUGHT", [tr(it.name_key), price])
 			_msg_color = GOLD
 		else:
@@ -376,7 +376,7 @@ func _refresh_craft() -> void:
 			lbl.modulate = DIM
 			continue
 		var mark := CURSOR_MARK if idx == _cursor else INDENT
-		if not PlayerState.tier_unlocked(int(it.tier)):
+		if not PlayerState.has_blueprint(path):
 			var bp := int(PlayerState.crafting().blueprint_price.get(str(int(it.tier)), 0))
 			lbl.text = "%s%s　🔒 %s" % [mark, tr(it.name_key),
 				I18n.t(&"UI_CRAFT_BP_LOCKED", [bp])]
