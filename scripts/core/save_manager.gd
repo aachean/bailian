@@ -11,25 +11,27 @@ extends Node
 const SECTION := "progress"
 ## 存档格式版本。
 ##
+## 11（2026-09-18）：**装备 v2 重做**（[ADR-0021](../docs/adr/0021-gear-v2-rework.md)）。
+##   槽位 4→8、品质 3→6、词条从百分比换成平铺点数、**132 件装备全部换了新资源 id**。
+##   旧档里的装备路径**一条都读不出来**，所以这一版**不作任何迁移、不做兜底**：
+##   `STRUCTURE_VERSION` 一起抬到 11，低于它的档在菜单里标「旧版本 · 不可继续」、
+##   点了不进（给出理由，不静默）。**想继续玩就开新档。**
 ## 10（2026-09-15）：第二个角色上线（M4）。存档多了 character_id（选了谁）。
-##   **10 不作废进度**：纯增量字段，旧档读不到 = 没选过，回退默认角色。
-## 9（2026-09-15）：经济上线（M3 第 3 步）。存档多了 gold（元宝）一个字段，
-##   买 / 卖 / 怪掉的元宝都进它。**9 不作废进度**：纯增量字段，
-##   旧档读不到就是 0（元宝本来也是从 0 开始攒）。
+## 9（2026-09-15）：经济上线（M3 第 3 步）。存档多了 gold（元宝）一个字段。
 ## 8（2026-09-14）：装备从「型号（资源路径）」换成「实例 uid」，强化改成逐件 + 按品质封顶。
 ##   存档多了 forge（uid → 强化等级）与 next_uid 两张表，upgrade（全局强化等级）作废。
-##   **8 不作废进度**：等级 / 装备 / 精铁 / 打到哪全都能读回来，
-##   旧档里的 upgrade 会搬到当时装备的那把武器上（PlayerState._migrate_legacy_upgrade）。
 ## 7：副本粒度重定（副本 = 一条 3~4 屏的路），存档只剩「哪些副本通关了」这一张表。
-const VERSION := 10
+const VERSION := 11
 
-## 低于这个版本的档，「打到哪」那套记录作废（只带回成长）。
-## 7 之前的档记的是**线性三关**的进度，套不进「地图 → 副本 → 屏」的结构 ——
-## 见 main_menu 的旧档分支。**判定要用它，不是 VERSION**：
-## 拿 VERSION 判的话，每次加一层同格式的新字段都会误伤一批能用的档
-const STRUCTURE_VERSION := 7
+## 低于这个版本的档**一律不可继续**（v2 起）。
+##
+## 它的原意是「低于此版本的档，只作废『打到哪』、保留成长」—— 那是「装备模型还能读、
+## 只是关卡结构变了」的年代。v2 之后**模型本身换了**，读一半的档比读不了更坏
+## （装备会变成空槽、强化表指向不存在的 uid），所以现在它等于「可读性下限」。
+## 见 [ADR-0021](../docs/adr/0021-gear-v2-rework.md) §2.5：「删旧件、新 id、不写迁移」。
+const STRUCTURE_VERSION := 11
 ## 存档槽数量（2026-09-15 黑盒反馈：3 不够，扩到 15，菜单每页 5 个翻 3 页）。
-## 槽位文件名不变（save_N.cfg），老档天然在原位
+## 槽位文件名不变（save_N.cfg）
 const SLOT_COUNT := 15
 const LAST_SLOT_PATH := "user://last_slot.cfg"
 
@@ -192,6 +194,16 @@ func slot_version(slot: int) -> int:
 	return int(cfg.get_value(SECTION, "version", 0))
 
 
+## 这一槽能不能继续玩。**低于 STRUCTURE_VERSION 的一律不可继续**。
+##
+## 为什么是「拒收」而不是「迁移」：v2 换掉了装备模型（槽位/品质/词条/资源 id 全变），
+## 读到一半的档比读不了更坏 —— 装备会变成空槽、强化表指向不存在的 uid，
+## 而且**全是静默的**。与其写一张映射表去猜「玩家那把剑现在该是哪把」，
+## 不如明确告诉他这档玩不了。见 [ADR-0021](../docs/adr/0021-gear-v2-rework.md) §2.5
+func slot_usable(slot: int) -> bool:
+	return slot_exists(slot) and slot_version(slot) >= STRUCTURE_VERSION
+
+
 ## 读当前槽的关卡路径。空串 = 没档 / 坏档，调用方走「新游戏」分支。
 func read_progress(slot: int = -1) -> String:
 	var s := current_slot if slot < 0 else slot
@@ -244,12 +256,3 @@ func take_pending_state() -> Dictionary:
 		return {}
 	_pending_restore = false
 	return read_state()
-
-
-## 取消「下一次进关卡要恢复快照」这个待办。
-##
-## 读**旧结构**的档时用：那份快照里记的是老关卡里的坐标（x 可能到 1800），
-## 直接套到城镇（宽 1280）上会把玩家甩到界外。那种情况要的是
-## 「带上等级装备、世界从头开始」，所以先把快照的恢复请求撤掉
-func drop_pending_restore() -> void:
-	_pending_restore = false

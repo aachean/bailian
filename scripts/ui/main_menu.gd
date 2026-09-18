@@ -219,14 +219,9 @@ func _slot_text(slot: int, index: int) -> String:
 	var level := int(player.get("level", 1))
 	var level_file := str(info.get("level", "")).get_file().get_basename()
 	var place := tr("UI_LEVEL_" + level_file.to_upper())
-	# 旧结构的档（三层结构之前存的）：等级 / 装备 / 精铁都在，但「打到第几关」
-	# 那套记录已经作废。**不能静默** —— 玩家点进去会发现自己站在城镇、
-	# 进度从头开始，得先在这里说清楚。
-	#
-	# 判定用 STRUCTURE_VERSION 而不是 VERSION：后者每次加字段都会涨，
-	# 拿它判会把「能读的档」误报成「进度要重来」
-	var stale := SaveManager.slot_version(slot) < SaveManager.STRUCTURE_VERSION
-	var tail := tr("UI_SLOT_OLD") if stale else place
+	# 低于 STRUCTURE_VERSION 的档**不可继续**（v2 换了装备模型，读一半比读不了更坏）。
+	# **不能静默** —— 列表上必须先说清楚是「玩不了」而不是「空档」
+	var tail := tr("UI_SLOT_OLD") if not SaveManager.slot_usable(slot) else place
 	# 这档玩的是谁（2026-09-15 黑盒反馈：读档列表看不出哪档是弓手）
 	var cid := str(player.get("character_id", ""))
 	var who := ""
@@ -416,26 +411,22 @@ func _begin_new_game(slot: int) -> void:
 
 func _on_continue() -> void:
 	var last := SaveManager.last_slot()
-	if last > 0 and SaveManager.slot_exists(last):
+	if last > 0 and SaveManager.slot_usable(last):
 		_enter_slot(last)
 
 
-## 从槽位进入：场景 + 快照 + 玩家数据，三样都从档里来
+## 从槽位进入：场景 + 快照 + 玩家数据，三样都从档里来。
+##
+## **不可继续的档到这里直接拒收**（v2 起）：旧档里的装备路径一条都读不出来，
+## 硬读的结果是「装备栏空了几格、强化表飞了」而且**全都不报错**。
+## 不做迁移、不做兜底 —— 把理由写在槽位列表的标题上，让玩家自己决定开新档还是删档
 func _enter_slot(slot: int) -> void:
+	if not SaveManager.slot_usable(slot):
+		# 不静默：这类档点了必须有回应，否则玩家只会觉得「点了没反应」
+		_slots_title.text = tr("UI_SLOT_OLD_BLOCK")
+		return
 	SaveManager.load_game(slot)
 	var st := SaveManager.read_state(slot)
-	# 旧结构的档（三层结构之前存的）：等级 / 装备 / 精铁照旧带回，
-	# 但「打到第几关」那套记录已经作废 —— 把玩家送回城镇，解锁进度重新初始化。
-	# **保留成长、只重来关卡进度**：直接作废整份档等于让玩家白玩，太粗暴
-	if SaveManager.slot_version(slot) < SaveManager.STRUCTURE_VERSION:
-		if st.has("player"):
-			PlayerState.load_from(st.player)
-		# 那份快照里的坐标是老关卡的（x 可能到 1800），套不进城镇。
-		# 撤掉恢复请求 = 只带成长数据、世界从头开始
-		SaveManager.drop_pending_restore()
-		GameProgress.reset_progress()
-		get_tree().change_scene_to_file(LEVEL_PATH)
-		return
 	var level := SaveManager.read_progress(slot)
 	if level.is_empty() or not ResourceLoader.exists(level):
 		SaveManager.erase_slot(slot)

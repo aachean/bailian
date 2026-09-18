@@ -283,24 +283,31 @@ func _t6_cooldowns_are_per_slot() -> void:
 			slot1_cd, int(_cooldowns()[1]), str(second_cast)])
 
 
-## 铁壁：出招期间减伤大幅提高，动作结束恢复
+## 铁壁：出招期间减伤大幅提高，动作结束恢复。
+## v2 起装备的防御是**平铺点数**，走 `Health.armor_reduction()` 的护甲曲线；
+## 技能给的那一份是**比例**（`guard_reduction`），两者由 Health 取 max 后再统一卡 0.6。
+## 所以这里读 `effective_reduction()`（真正生效的那个数），而不是某个原始字段 ——
+## 铁壁写的是 0.8，被天花板压到 0.6，这条断言顺带把天花板也钉住了
 func _t7_ironwall_guards() -> void:
 	await _place(320.0)
 	# 技能槽按顺序是 [旋风斩, 突刺斩, 铁壁, 调息, 剑气斩]（由自动补位填的）
 	PlayerState.set_skill_slot(2, IRONWALL)
 	await _pframes(2)
 	var h := _player.get_node("Health") as Health
-	var before: float = h.damage_reduction
+	var before: float = h.effective_reduction()
 	await _tap_skill(3)
 	await _pframes(6)                        # 进到铁壁的持续段
-	var during: float = h.damage_reduction
+	var during: float = h.effective_reduction()
+	var raw_guard: float = h.guard_reduction
 	await _pframes(50)                       # 等动作彻底结束
-	var after: float = h.damage_reduction
+	var after: float = h.effective_reduction()
 	var wall := load(IRONWALL) as SkillData
-	_check("7", "铁壁：出招期间减伤提到 80%，动作结束回到原来的值",
-		is_equal_approx(before, 0.0) and is_equal_approx(during, wall.guard_reduction) \
-			and is_equal_approx(after, before),
-		"开打前 %.2f → 铁壁期间 %.2f → 结束后 %.2f" % [before, during, after])
+	var want := minf(wall.guard_reduction, Health.MAX_DAMAGE_REDUCTION)
+	_check("7", "铁壁：出招期间减伤提到技能表里的值（卡 0.6 上限），动作结束回到原来的值",
+		is_equal_approx(before, 0.0) and is_equal_approx(raw_guard, wall.guard_reduction) \
+			and is_equal_approx(during, want) and is_equal_approx(after, before),
+		"开打前 %.2f → 铁壁期间 %.2f（技能表 %.2f，卡上限到 %.2f）→ 结束后 %.2f" % [
+			before, during, wall.guard_reduction, want, after])
 
 
 ## 调息：真的把血回上去

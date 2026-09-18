@@ -20,10 +20,12 @@ extends Node
 const SaveGuard := preload("res://tests/save_guard.gd")
 
 const TOWN_PATH := "res://scenes/stages/town.tscn"
-## 三档品质各一件，拿来验「强化上限按品质递增」的台阶
-const ITEM_COMMON := "res://data/items/leather_cap.tres"     # 普通｜上限 3
-const ITEM_FINE := "res://data/items/iron_sword.tres"        # 精良｜上限 5
-const ITEM_RARE := "res://data/items/flame_blade.tres"       # 稀有｜上限 8
+## 三档品质各一把**剑**，拿来验「强化上限按品质递增」的台阶。
+## v2 六档（封顶 3/4/5/6/7/8），这里取前三档；
+## **特意都选武器**：下面有条断言验「穿在武器的槽里」，拿防具会静默跑错槽
+const ITEM_COMMON := "res://data/items/wp_u5251_0_u94c1u5251.tres"        # 普通｜上限 3
+const ITEM_FINE := "res://data/items/wp_u5251_1_u7cbeu94a2u5251.tres"     # 精良｜上限 4
+const ITEM_SUPER := "res://data/items/wp_u5251_2_u7384u94c1u5251.tres"    # 优秀｜上限 5
 
 var _pass := 0
 var _fail := 0
@@ -52,11 +54,11 @@ func _ready() -> void:
 	await _t10_cost_rises_with_level()
 	await _t11_gain_falls_off_with_level()
 	await _t12_forge_survives_save()
-	await _t13_legacy_upgrade_migrates()
+	await _t13_old_save_is_refused()
 	await _t14_forge_atk_joins_damage_pool()
-	await _t15_soft_cap_is_lossless_below_knee()
+	await _t15_flat_attack_skips_soft_cap()
 	await _t16_soft_cap_diminishes_above_knee()
-	await _t17_ratio_has_hard_cap()
+	await _t17_armor_curve_has_hard_cap()
 	await _t18_growth_per_level_diminishes()
 	await _t19_cap_power_is_bounded()
 
@@ -185,19 +187,19 @@ func _t7_items_are_instances() -> void:
 			str(distinct), lv_a, lv_b])
 
 
-## 品质档位绑定强化上限（设计原则 5.2）：白 < 精良 < 稀有，
+## 品质档位绑定强化上限（设计原则 5.2）：普通 < 精良 < 优秀，
 ## 而且**每一档的上限都是它自己的**，不是「全部共用一个上限」
 func _t8_forge_cap_by_tier() -> void:
 	PlayerState.reset_for_new_game()
 	var a: String = PlayerState.add_item(ITEM_COMMON)
 	var b: String = PlayerState.add_item(ITEM_FINE)
-	var c: String = PlayerState.add_item(ITEM_RARE)
+	var c: String = PlayerState.add_item(ITEM_SUPER)
 	var ca := PlayerState.forge_max(a)
 	var cb := PlayerState.forge_max(b)
 	var cc := PlayerState.forge_max(c)
-	_check("8", "品质档位绑定强化上限：普通 < 精良 < 稀有",
+	_check("8", "品质档位绑定强化上限：普通 < 精良 < 优秀",
 		ca > 0 and ca < cb and cb < cc,
-		"普通 %d ／ 精良 %d ／ 稀有 %d" % [ca, cb, cc])
+		"普通 %d ／ 精良 %d ／ 优秀 %d" % [ca, cb, cc])
 
 
 ## 练到顶之后：不能再练，而且**不能白扣精铁**。
@@ -225,7 +227,7 @@ func _t9_maxed_cannot_forge() -> void:
 func _t10_cost_rises_with_level() -> void:
 	PlayerState.reset_for_new_game()
 	PlayerState.shards = 9999
-	var uid: String = PlayerState.add_item(ITEM_RARE)
+	var uid: String = PlayerState.add_item(ITEM_SUPER)
 	var c0 := PlayerState.forge_cost(uid)
 	PlayerState.forge_once(uid)
 	var c1 := PlayerState.forge_cost(uid)
@@ -272,76 +274,71 @@ func _t12_forge_survives_save() -> void:
 			lv, str(worn == uid), fresh, uid])
 
 
-## 旧档迁移：老存档里 equipped / bag 是**纯路径**（没有 # 后缀），
-## 强化是**玩家身上的一个全局数字**。读进来之后要变成
-## 「路径即 uid」+「那个数字搬到当时装备的武器上」，而不是把玩家的强化吞掉
-func _t13_legacy_upgrade_migrates() -> void:
-	PlayerState.reset_for_new_game()
-	var old := {
-		"shards": 5,
-		"level": 9,
-		"exp": 0,
-		"equipped": {"weapon": ITEM_FINE},      # 纯路径 = 老格式
-		"bag": [],
-		"upgrade": 4,                           # 老格式的全局强化等级
-	}
-	PlayerState.load_from(old)
-	var lv := PlayerState.forge_level(ITEM_FINE)
-	var worn := PlayerState.item_at(&"weapon")
-	var lv_ok: bool = lv == 4 and worn != null and worn.id == &"iron_sword"
+## 旧版本存档：**拒收**（v2 起）。
+##
+## 老档里 equipped / bag 存的是 v1 的装备路径、词条是百分比、强化是玩家身上一个全局数字。
+## v2 换了装备模型（槽位 4→8、品质 3→6、132 件资源全换 id），那些路径**一条都读不出来**。
+## 我们**不做迁移、不做兜底** —— 硬读的结果是「装备栏空了几格、强化表指向不存在的 uid」，
+## 而且全都不报错。所以判据落在 `SaveManager.slot_usable`：低于 STRUCTURE_VERSION 的档
+## 在菜单里标「旧版本 · 不可继续」，点了给出理由（不静默）。
+##
+## 这条断言守的是**那条拒收开关本身**：它一旦被谁改回「能读」，静默数据损坏就回来了
+func _t13_old_save_is_refused() -> void:
+	var cfg := ConfigFile.new()
+	# 手写一份「v10 时代的档」：版本号就是唯一的判据
+	cfg.set_value(SaveManager.SECTION, "version", 10)
+	cfg.set_value(SaveManager.SECTION, "level", TOWN_PATH)
+	cfg.save(SaveManager.slot_path(1))
+	var old_refused := not SaveManager.slot_usable(1)
 
-	# 全局等级高于品质上限时要夹住 —— 精良武器上限 5，给个 9 只能是 5。
-	# 注意必须挂在**武器**槽上：旧档那个 upgrade 的语义就是「武器强化」
-	# （铁砧的提示牌上写的就是这四个字），搬到别的部位上是无中生有
-	PlayerState.reset_for_new_game()
-	PlayerState.load_from({"equipped": {"weapon": ITEM_FINE}, "upgrade": 9})
-	var clamped := PlayerState.forge_level(ITEM_FINE)
+	# 同一槽写成当前版本 → 立刻变成可用
+	SaveManager.start_new_game(1, TOWN_PATH)
+	var fresh_ok := SaveManager.slot_usable(1)
 
-	# 旧档里有强化、但当时没装备武器：那份强化无处可去，丢掉 ——
-	# 关键是【不能崩】、也不能因此把精铁弄脏
-	PlayerState.reset_for_new_game()
-	PlayerState.load_from({"equipped": {}, "bag": [], "upgrade": 6})
-	var dropped: bool = PlayerState.forge.is_empty()
-
-	_check("13", "旧档的全局强化等级搬到武器上并按品质上限夹住；没武器就丢掉",
-		lv_ok and clamped == PlayerState.forge_max(ITEM_FINE) and dropped,
-		"upgrade=4 → 精良武器 +%d（期望 4）　upgrade=9 → +%d（上限 %d）　"
-		% [lv, clamped, PlayerState.forge_max(ITEM_FINE)]
-		+ "没武器时强化表为空=%s" % str(dropped))
+	_check("13", "旧版本存档被拒收：不可继续、也不做迁移（版本号是唯一判据）",
+		old_refused and fresh_ok,
+		"v10 的档 slot_usable=%s（期望 false）　写成 v11 后 slot_usable=%s（期望 true）" % [
+			str(old_refused), str(fresh_ok)])
 
 
 ## 强化加成必须真的进了伤害乘区 —— 面板写 +38% 而打出的数字没变，
-## 就是设计原则 4.1 要防的那种「游戏在骗玩家」
+## 就是设计原则 4.1 要防的那种「游戏在骗玩家」。
+## v2 起强化是**百分比**那一半（`atk_pct`），装备自己的攻击走 `atk_flat` 点数
 func _t14_forge_atk_joins_damage_pool() -> void:
 	PlayerState.reset_for_new_game()
 	PlayerState.shards = 100
 	var uid: String = PlayerState.add_item(ITEM_FINE)
 	PlayerState.equip(uid)
-	var before: float = PlayerState.bonus_total().get("atk", 0.0)
+	var before: float = PlayerState.bonus_total().get("atk_pct", 0.0)
 	PlayerState.forge_once(uid)
-	var after: float = PlayerState.bonus_total().get("atk", 0.0)
+	var after: float = PlayerState.bonus_total().get("atk_pct", 0.0)
 	var gained := after - before
 	var expect := PlayerState.forge_atk_at(1)
-	_check("14", "强化加成进了伤害乘区（词条聚合里算上了）",
+	_check("14", "强化加成进了伤害乘区（百分比那一半算上了）",
 		is_equal_approx(gained, expect),
-		"攻击加成 %.3f → %.3f（+%.3f，期望 +%.3f）" % [before, after, gained, expect])
+		"强化%% %.3f → %.3f（+%.3f，期望 +%.3f）" % [before, after, gained, expect])
 
 
 # ── 3.4 软上限 / 4.2 硬上限 ────────────────────────────────────
 
-## 软上限不能误伤「正常装备量级」：几件装备的词条加起来还在 knee 以内时，
-## 生效值必须**一分不少**。这条守的是 4.1（面板 +15% 就得真 +15%）——
-## 一条一上来就递减的曲线会让单件装备当场对不上账
-func _t15_soft_cap_is_lossless_below_knee() -> void:
+## **平铺攻击不进软上限**（ADR-0021 §2.6）。
+##
+## 为什么这条必须钉住：软上限的 knee/cap 是按**百分比**定的（1.0/1.0），
+## 把它套到平铺点数上，一把 48 点的至尊武器会被压成 `1 + 47/48 ≈ 1.98` ——
+## 九成伤害静默蒸发、不报错、只表现为「打不动」。所以平铺那一半原样进聚合，
+## 而它不需要软上限：8 个槽各 1 件、每件上限由档位封死，压根没有「无限堆叠」这回事
+func _t15_flat_attack_skips_soft_cap() -> void:
 	PlayerState.reset_for_new_game()
-	var uid: String = PlayerState.add_item(ITEM_FINE)       # 攻 +15%
+	var uid: String = PlayerState.add_item(ITEM_FINE)
 	PlayerState.equip(uid)
-	var bonus: float = PlayerState.bonus_total().get("atk", 0.0)
-	var raw := (load(ITEM_FINE) as ItemData).atk_bonus       # 0.15，远在 knee(1.0) 以内
-	_check("15", "软上限在 knee 以内无损：单件装备的词条原样生效",
-		is_equal_approx(bonus, raw),
-		"装备词条 +%.3f → 生效 +%.3f（knee=%.1f，一分没少）" % [
-			raw, bonus, PlayerState.progression.soft_knee_atk])
+	var bonus := PlayerState.bonus_total()
+	var rolled := int(PlayerState.stat_of(uid).get("atk", 0))
+	_check("15", "平铺攻击原样进聚合（没被软上限压）",
+		int(bonus.get("atk_flat", -1)) == rolled and rolled > 0 \
+			and is_zero_approx(float(bonus.get("atk_pct", -1.0))),
+		"这一件 roll 到 %d 点 → 聚合 atk_flat %d（knee=%.1f 只盯百分比那一半）" % [
+			rolled, int(bonus.get("atk_flat", -1)),
+			PlayerState.progression.soft_knee_atk])
 
 
 ## 超出 knee 之后才开始递减：边际收益一次比一次少，而且**永远到不了** knee+cap。
@@ -359,16 +356,27 @@ func _t16_soft_cap_diminishes_above_knee() -> void:
 			g1, g2, far, k + c])
 
 
-## 比例类属性必须有硬上限（4.2）。减伤现在的天花板是 0.6 ——
-## 「堆防御到无敌」不能成为解，这条是那个天花板的守门人。
-## 未知的比例属性也得被夹住，否则以后加暴击忘了设上限就会漏出去
-func _t17_ratio_has_hard_cap() -> void:
-	var cap := PlayerState.clamp_ratio(&"def", 5.0)
+## 比例类属性必须有硬上限（4.2）。**v2 起防御不再是比例属性** ——
+## 它变成平铺点数，上限改由 `Health.armor_reduction()` 的护甲曲线自己卡：
+## `def/(100+def)`，def=100 → 50%、def=150 → 60%、再往上也不动。
+## 这条同时守 4.5（不做减法）：曲线连续、有渐近线，不会出现「差一点就无敌」的砖墙。
+## 另外未登记的比例属性仍要被夹在 [0,1]，否则以后加暴击忘了设上限就会漏出去
+func _t17_armor_curve_has_hard_cap() -> void:
+	var h := Health.new()
+	h.defense = 100
+	var at100 := h.armor_reduction()
+	h.defense = 150
+	var at150 := h.armor_reduction()
+	h.defense = 100000
+	var huge := h.effective_reduction()
+	h.free()
 	var unknown := PlayerState.clamp_ratio(&"crit", 3.7)
-	_check("17", "比例属性走硬上限：减伤夹在 0.6，未登记的比例属性夹在 [0,1]",
-		is_equal_approx(cap, Health.MAX_DAMAGE_REDUCTION) and is_equal_approx(unknown, 1.0),
-		"减伤 5.0 → %.2f（上限 %.2f）　未登记的 crit 3.7 → %.2f" % [
-			cap, Health.MAX_DAMAGE_REDUCTION, unknown])
+	_check("17", "护甲曲线有硬上限：def=100→50%、def→∞ 也只到 60%（不是减法、不可免伤）",
+		is_equal_approx(at100, 0.5) and is_equal_approx(at150, Health.MAX_DAMAGE_REDUCTION) \
+			and is_equal_approx(huge, Health.MAX_DAMAGE_REDUCTION) \
+			and is_equal_approx(unknown, 1.0),
+		"def=100 → %.2f　def=150 → %.2f　def=∞ → %.2f（上限 %.2f）　未登记的 crit 3.7 → %.2f" % [
+			at100, at150, huge, Health.MAX_DAMAGE_REDUCTION, unknown])
 
 
 # ── 100 级那件事：等级是钥匙，不是战力轴（设计原则 3.2）────────────

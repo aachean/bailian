@@ -20,9 +20,39 @@ extends Node
 const TOWN := preload("res://scenes/stages/town.tscn")
 const PICKUP := preload("res://scenes/components/pickup.tscn")
 const SHOP_STAND := preload("res://scenes/core/shop_stand.tscn")
-const SWORD := "res://data/items/iron_sword.tres"          # 精良，定价 40
-const FLAME := "res://data/items/flame_blade.tres"         # 稀有，不在货架
-const CAP := "res://data/items/leather_cap.tres"           # 普通，定价 16（货架第一件）
+## 测哪一件**从货架数据里挑**，不写死路径。
+## v2 换过全部装备资源、也换过货架内容（现在 11 件「普通」档）——
+## 写死路径的测试在数据一改时就变成「元件不存在 → 一路静默失败」，
+## 而失败信息看起来像经济算错了，查起来最费时间
+func _stock_items() -> Array[ItemData]:
+	var out: Array[ItemData] = []
+	if PlayerState.shop() == null:
+		return out
+	for p in PlayerState.shop().stock:
+		var it := load(str(p)) as ItemData
+		if it != null:
+			out.append(it)
+	return out
+
+
+## 货架里**当前角色穿得上**的最便宜武器（#2/#3/#7 要穿上）。
+## ⚠️ 必须过 `can_equip`：v2 货架里有四种武器（剑/刀/弓/杖），
+## 挑到一把刀 `equip()` 会静默失败 —— 后面的账目断言会变成「穿上时就把装备卖了」
+## 这种看起来像经济算错的假红（实测踩过一次）
+func _stock_weapon() -> ItemData:
+	var best: ItemData = null
+	for it in _stock_items():
+		if it.slot != ItemData.Slot.WEAPON or not PlayerState.can_equip(it):
+			continue
+		if best == null or it.gold_price < best.gold_price:
+			best = it
+	return best
+
+
+## 货架第一行（商店面板按 J 买的就是它）
+func _stock_first() -> ItemData:
+	var items := _stock_items()
+	return null if items.is_empty() else items[0]
 
 var _pass := 0
 var _fail := 0
@@ -115,54 +145,70 @@ func _t1_gold_basics() -> void:
 ## 买卖闭环：货架内买得到、买来是新实例、卖价 = 定价 × 折价率（半价）
 func _t2_buy_sell_loop() -> void:
 	_fresh_state()
+	var w := _stock_weapon()
+	var price := 0 if w == null else w.gold_price
+	var half := int(floor(float(price) * PlayerState.shop().sell_ratio))
 	PlayerState.add_gold(100)
-	var uid := PlayerState.buy_item(SWORD)
-	var bought := not uid.is_empty() and PlayerState.bag.has(uid) \
-		and PlayerState.gold == 60 and PlayerState.item_of(uid) != null
+	var uid := PlayerState.buy_item(w.resource_path) if w != null else ""
+	var bought := w != null and not uid.is_empty() and PlayerState.bag.has(uid) \
+		and PlayerState.gold == 100 - price and PlayerState.item_of(uid) != null
 	# 新实例：uid 带序号，不是资源路径本身（型号 ≠ 实例）
 	var is_instance: bool = uid.contains(PlayerState.UID_SEP)
 	var gain := PlayerState.sell_item(uid)
-	var sold := gain == 20 and PlayerState.gold == 80 and not PlayerState.bag.has(uid)
-	_check("2", "买卖闭环：40 买进 → 半价 20 卖出；实例 uid；账目吻合",
+	var sold := gain == half and PlayerState.gold == 100 - price + half \
+		and not PlayerState.bag.has(uid)
+	_check("2", "买卖闭环：按定价买进 → 半价卖出；实例 uid；账目吻合",
 		bought and is_instance and sold,
-		"元宝 100 → 60（买剑）→ 80（卖剑，floor(40×0.5)=20）")
+		"这一件定价 %d　元宝 100 → %d（买）→ %d（卖，floor(%d×%.1f)=%d）" % [
+			price, 100 - price, PlayerState.gold, price,
+			PlayerState.shop().sell_ratio, half])
 
 
 ## 卖的三条规矩：货架外的不卖（那是「买」的反向）；穿在身上的不收；没这东西不收
 func _t3_sell_rules() -> void:
 	_fresh_state()
+	var w := _stock_weapon()
+	var price := 0 if w == null else w.gold_price
+	var half := int(floor(float(price) * PlayerState.shop().sell_ratio))
 	PlayerState.add_gold(100)
-	var not_in_bag := PlayerState.sell_item(SWORD) == 0        # 路径 ≠ 背包里的实例
-	var uid := PlayerState.buy_item(SWORD)
+	var not_in_bag := PlayerState.sell_item(w.resource_path) == 0   # 路径 ≠ 背包里的实例
+	var uid := PlayerState.buy_item(w.resource_path)
 	PlayerState.equip(uid)                                     # 穿上（离开背包）
 	var worn := PlayerState.sell_item(uid) == 0 \
 		and PlayerState.equipped_uid(&"weapon") == uid \
-		and PlayerState.gold == 60
+		and PlayerState.gold == 100 - price
+	var gold_worn := PlayerState.gold
 	var unequipped := PlayerState.unequip(&"weapon")
 	var back_gain := PlayerState.sell_item(unequipped)
-	var sold_after_unequip: bool = back_gain == 20 and PlayerState.gold == 80
+	var sold_after_unequip: bool = back_gain == half \
+		and PlayerState.gold == 100 - price + half
 	_check("3", "出售规矩：身上穿的卖不掉；卸下后才能卖；没进过背包的路径不收",
 		not_in_bag and worn and sold_after_unequip,
-		"穿上时 sell=0，卸下后 sell=20；卖东西不产生第二份元宝")
+		"没进过包的不收=%s　穿上时 sell=0 且元宝 %d（期望 %d）　卸下后 sell=%d（期望 %d）元宝 %d（期望 %d）" % [
+			str(not_in_bag), gold_worn, 100 - price, back_gain, half,
+			PlayerState.gold, 100 - price + half])
 
 
 ## 商店面板（真实按键）：J 买货架第一件、买不起有话、Esc 关门
 func _t4_shop_panel_buys() -> void:
 	_fresh_state()
 	PlayerState.add_gold(50)
+	var first := _stock_first()
+	var price := 0 if first == null else first.gold_price
 	var panel := _player.get_node("ShopPanel")
 	panel.call("open")
 	await _pframes(2)
 	var opened: bool = bool(panel.call("is_open")) and get_tree().paused
-	_tap_key(KEY_J)                       # 货架第一件 = leather_cap（16 元宝）
+	_tap_key(KEY_J)                       # 货架第一件
 	await _pframes(2)
-	var bought: bool = PlayerState.gold == 34 and PlayerState.bag.size() == 1
+	var bought: bool = PlayerState.gold == 50 - price and PlayerState.bag.size() == 1
 	_tap_key(KEY_ESCAPE)
 	await _pframes(2)
 	var closed: bool = not bool(panel.call("is_open")) and not get_tree().paused
-	_check("4", "商店面板：开 → J 买下 16 元宝的帽子 → Esc 关（暂停随面板走）",
+	_check("4", "商店面板：开 → J 买下货架第一件 → Esc 关（暂停随面板走）",
 		opened and bought and closed,
-		"元宝 50 → 34；背包 +1；Esc 后不暂停")
+		"第一件「%s」定价 %d　元宝 50 → %d；背包 +1；Esc 后不暂停" % [
+			("—" if first == null else str(first.display_name)), price, PlayerState.gold])
 
 
 ## 商店台的门：首通砺场才开张（计划 §3.7）。通关表动了要原样还回去
@@ -247,16 +293,21 @@ func _t6_potion_gate() -> void:
 ## 老货币一分不许动：强化仍然只走精铁；卖装备不产精铁（两条管道互不兑换）
 func _t7_forge_still_uses_shards() -> void:
 	_fresh_state()
+	var w := _stock_weapon()
+	var price := 0 if w == null else w.gold_price
+	var half := int(floor(float(price) * PlayerState.shop().sell_ratio))
 	PlayerState.add_gold(500)
 	PlayerState.shards = 10
-	var uid := PlayerState.buy_item(SWORD)
+	var uid := PlayerState.buy_item(w.resource_path)
 	var forged := PlayerState.forge_once(uid)
 	var ok: bool = forged and PlayerState.forge_level(uid) == 1 \
-		and PlayerState.shards < 10 and PlayerState.gold == 460
+		and PlayerState.shards < 10 and PlayerState.gold == 500 - price
 	var gain := PlayerState.sell_item(uid)
 	_check("7", "两条管道：强化扣精铁不动元宝；出售进元宝不动精铁",
-		ok and gain == 20 and PlayerState.shards >= 0 and PlayerState.gold == 480,
-		"精铁 10 → 少（强化），元宝 500 → 460 → 480（卖）")
+		ok and gain == half and PlayerState.shards >= 0 \
+			and PlayerState.gold == 500 - price + half,
+		"精铁 10 → %d（强化），元宝 500 → %d → %d（卖）" % [
+			PlayerState.shards, 500 - price, PlayerState.gold])
 
 
 ## 存档：gold 随档走；旧档没有这字段 → 安静从 0 起
@@ -274,7 +325,9 @@ func _t8_save_roundtrip() -> void:
 		"save_to 带 gold=77；load_from({level:3}) → gold=0")
 
 
-## 数据一致性：价格都填了、货架都指向真装备、怪的掉落账能对上
+## 数据一致性：**每一件装备**都填了定价、货架都指向真装备、怪的掉落账能对上。
+## v2 起装备从 9 件变成 132 件，所以这里扫目录而不是点名几件 ——
+## 漏填定价的装备会变成「商店里标 0 元宝」这种没人发现的漏洞
 func _t9_data_consistency() -> void:
 	var shop := PlayerState.shop()
 	var stock_ok := shop != null and not shop.stock.is_empty()
@@ -282,10 +335,20 @@ func _t9_data_consistency() -> void:
 		var it := load(str(p)) as ItemData
 		if it == null or it.gold_price <= 0:
 			stock_ok = false
-	var flame_ok: bool = true
-	var flame_it := load(FLAME) as ItemData
-	if flame_it == null or flame_it.gold_price != 150:
-		flame_ok = false
+	# 全部装备都有定价（含不在货架上的）
+	var dir := "res://data/items"
+	var files := ResDir.files(dir)
+	var priced := 0
+	var unpriced: Array[String] = []
+	for f in files:
+		var it := load("%s/%s" % [dir, f]) as ItemData
+		if it == null:
+			continue
+		if it.gold_price > 0:
+			priced += 1
+		else:
+			unpriced.append(str(it.id))
+	var all_priced: bool = files.size() >= 132 and unpriced.is_empty()
 	var boss2 := load("res://data/enemies/boss2.tres") as EnemyData
 	var walker := load("res://data/enemies/walker.tres") as EnemyData
 	var luhou := load("res://data/enemies/boss_luhou.tres") as EnemyData
@@ -293,6 +356,7 @@ func _t9_data_consistency() -> void:
 		and walker != null and walker.drop_gold == 2 \
 		and luhou != null and luhou.drop_gold == 0     # 炉喉收尾不打架，不掉钱
 	var sell_ok: bool = shop != null and shop.sell_price(40) == 20
-	_check("9", "数据：8 件装备都有定价；货架指到真装备；怪掉落账目；炉喉不掉钱",
-		stock_ok and flame_ok and drops_ok and sell_ok,
-		"卖价公式只在 ShopData 一处：floor(40×0.5)=20")
+	_check("9", "数据：每件装备都有定价；货架指到真装备；怪掉落账目；炉喉不掉钱",
+		stock_ok and all_priced and drops_ok and sell_ok,
+		"装备 %d 件有定价／%d 件（没定价的：%s）　卖价公式只在 ShopData 一处：floor(40×0.5)=20" % [
+			priced, files.size(), "无" if unpriced.is_empty() else ", ".join(unpriced.slice(0, 5))])

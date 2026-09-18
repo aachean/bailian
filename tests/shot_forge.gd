@@ -14,10 +14,11 @@ extends Node
 
 const TOWN := preload("res://scenes/stages/town.tscn")
 
-const IRON_SWORD := "res://data/items/iron_sword.tres"
-const FLAME_BLADE := "res://data/items/flame_blade.tres"
-const IRON_HELM := "res://data/items/iron_helm.tres"
-const LEATHER_CAP := "res://data/items/leather_cap.tres"
+## v2：装备全部换新 id，这里换成对应的四件（普通剑 / 优秀剑 / 精良盔 / 普通盔）
+const IRON_SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"
+const FLAME_BLADE := "res://data/items/wp_u5251_2_u7384u94c1u5251.tres"
+const IRON_HELM := "res://data/items/eq_u5934u76d4_1_u7cbeu94a2u76d4.tres"
+const LEATHER_CAP := "res://data/items/eq_u5934u76d4_0_u76aeu76d4.tres"
 
 
 func _ready() -> void:

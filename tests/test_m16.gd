@@ -206,14 +206,24 @@ func _count_projectiles(room: Node) -> int:
 	return n
 
 
-## 武器类型是唯一的装备门：弓手穿铁剑被拒（可卖不可挥），剑客反之；
-## 本命武器畅通。**拒绝必须能在界面上说出来**（背包提示行），不许静默
+## 武器类型是唯一的装备门：弓手穿剑被拒（可卖不可挥），剑客反之；本命武器畅通。
+## **拒绝必须能在界面上说出来**（背包提示行），不许静默。
+##
+## v2 起武器有**四种**（剑 / 刀 / 弓 / 杖），所以这里除了「别人的本命武器拿不了」，
+## 还盯一条新的：**刀与杖现在谁都不能穿**（刀手 / 法师还没做，是批 7）。
+## 不盯的话，一把刀会变成「谁都能挥的剑」，而职业门静默失效
 func _t7_weapon_type_gate() -> void:
+	const SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"      # 剑
+	const BOW := "res://data/items/wp_u5f13_0_u730eu5f13.tres"        # 弓
+	const BLADE := "res://data/items/wp_u5200_0_u73afu9996u5200.tres"  # 刀（无职业）
+	const STAFF := "res://data/items/wp_u6756_0_u6843u6728u6756.tres"  # 杖（无职业）
 	PlayerState.character_id = "archer"
 	PlayerState.reset_for_new_game()
 	PlayerState.character_id = "archer"
-	var sword_uid := PlayerState.add_item("res://data/items/iron_sword.tres")
-	var bow_uid := PlayerState.add_item("res://data/items/wind_bow.tres")
+	var sword_uid := PlayerState.add_item(SWORD)
+	var bow_uid := PlayerState.add_item(BOW)
+	var blade_uid := PlayerState.add_item(BLADE)
+	var staff_uid := PlayerState.add_item(STAFF)
 	var sword_refused: bool = PlayerState.equip(sword_uid) == "" \
 		and PlayerState.bag.has(sword_uid) \
 		and PlayerState.equipped_uid(&"weapon") == ""
@@ -227,8 +237,16 @@ func _t7_weapon_type_gate() -> void:
 	PlayerState._character_loaded_for = ""
 	var bow_on_sword: bool = not PlayerState.can_equip(PlayerState.item_of(bow_uid))
 	var sword_on_sword: bool = PlayerState.can_equip(PlayerState.item_of(sword_uid))
+	# 刀 / 杖：两个角色都不该能穿（对应的职业还没做）
+	var blade_locked: bool = not PlayerState.can_equip(PlayerState.item_of(blade_uid))
+	PlayerState.character_id = "archer"
+	PlayerState._character = null
+	PlayerState._character_loaded_for = ""
+	var staff_locked: bool = not PlayerState.can_equip(PlayerState.item_of(staff_uid))
 	PlayerState.reset_for_new_game()
-	_check("7", "装备门：弓手穿不了铁剑（留在包里可卖）、本命弓畅通；剑客反之",
-		sword_refused and bow_ok and bow_on_sword and sword_on_sword,
-		"弓手+铁剑拒=%s　弓手+逐风弓=%s　剑客+逐风弓拒=%s　剑客+铁剑=%s" % [
-			str(sword_refused), str(bow_ok), str(bow_on_sword), str(sword_on_sword)])
+	_check("7", "装备门：弓手穿不了剑（留在包里可卖）、本命弓畅通；剑客反之；刀/杖无职业穿不了",
+		sword_refused and bow_ok and bow_on_sword and sword_on_sword \
+			and blade_locked and staff_locked,
+		"弓手+剑拒=%s　弓手+本命弓=%s　剑客+弓拒=%s　剑客+剑=%s　刀（无职业，剑客）=拒%s　杖（无职业，弓手）=拒%s" % [
+			str(sword_refused), str(bow_ok), str(bow_on_sword), str(sword_on_sword),
+			str(blade_locked), str(staff_locked)])

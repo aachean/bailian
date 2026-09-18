@@ -387,8 +387,11 @@ func _t6_clear_last_clears_dungeon() -> void:
 func _t7_progress_survives_save() -> void:
 	SaveManager.write_progress("res://scenes/stages/lichang.tscn",
 		{"player": {"hp": 60, "shards": 7, "upgrade": 2}, "enemies": []})
-	SaveManager.load_game(1)
-	SaveManager.drop_pending_restore()     # 本用例只验进度，不恢复世界
+	# 这里**故意不调 `load_game()`**：它的作用是「下次进关卡要恢复快照」，
+	# 本用例只验进度读写，不需要那件事 —— 调了反而要给引擎留一个
+	# 「取消恢复」的接口（v2 把 `drop_pending_restore` 删掉了，因为它的唯一
+	# 调用方是「旧档只保留成长」那条已经作废的分支）。
+	# `current_slot` 在 _ready 里已经设成 1，读档判定用的是它
 	var cleared := SaveManager.is_cleared(&"lichang")
 	var other := SaveManager.is_cleared(&"duancuiqu")
 	# 第一个副本天生就开，不需要任何前提

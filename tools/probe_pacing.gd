@@ -16,7 +16,7 @@ extends Node
 
 const ROOM := preload("res://scenes/stages/test_room.tscn")
 const LICHANG := preload("res://scenes/stages/lichang.tscn")
-const IRON_SWORD := "res://data/items/iron_sword.tres"
+const IRON_SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"   # v2 的「铁剑」（普通）
 const DUMMY_X := 590.0
 const ATTACK_X := 540.0
 ## 量多久（帧）。10 秒够长到把连招衔接的波动抹平

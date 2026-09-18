@@ -195,12 +195,14 @@ func _t5_close_and_reward() -> void:
 	var closed: bool = not bool(_box.call("is_open"))
 	var resumed: bool = not get_tree().paused
 	var root_hidden: bool = not (_box.get_node("Root") as Control).visible
-	var got: bool = _in_bag("res://data/items/iron_sword.tres")
+	# 老铁匠给的是哪一把**从对话数据读**（v2 换过全部装备路径，写死就会漏改）
+	var gift := str((load("res://data/dialogue/smith_intro.tres") as DialogueData).give_item)
+	var got: bool = _in_bag(gift)
 	var flagged: bool = PlayerState.has_flag(&"met_smith")
 	_check("5", "说完最后一句按 J：对话关闭、世界恢复，并获得铁匠给的一把剑",
 		fourth and closed and resumed and root_hidden and got and flagged,
-		"第 4 句=%s　关闭=%s　恢复=%s　剑进背包=%s　进度标记=%s" % [
-			str(fourth), str(closed), str(resumed), str(got), str(flagged)])
+		"第 4 句=%s　关闭=%s　恢复=%s　剑进背包=%s（%s）　进度标记=%s" % [
+			str(fourth), str(closed), str(resumed), str(got), gift.get_file(), str(flagged)])
 
 
 ## 再聊一次：换了台词，且不再重复给东西

@@ -12,10 +12,13 @@ const ROOM := preload("res://scenes/stages/test_room.tscn")
 const PICKUP := preload("res://scenes/components/pickup.tscn")
 const BOSS := preload("res://scenes/enemies/boss.tscn")
 
-const IRON_SWORD := "res://data/items/iron_sword.tres"      # 武器｜攻 +15%
-const FLAME_BLADE := "res://data/items/flame_blade.tres"    # 武器｜攻 +30%
-const IRON_HELM := "res://data/items/iron_helm.tres"        # 头盔｜血 +45
-const IRON_ARMOR := "res://data/items/iron_armor.tres"      # 护甲｜防 +25%
+## v2（2026-09-18）装备全部换新 id、词条改平铺 —— 这四条常量跟着换。
+## 括号里是**区间**，实例取到的具体值由 uid 哈希决定（PlayerState.stat_of），
+## 所以断言一律读 `PlayerState.stat_of(uid)`，不写死数字
+const IRON_SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"        # 武器·普通｜攻 1-3
+const FLAME_BLADE := "res://data/items/wp_u5251_2_u7384u94c1u5251.tres"  # 武器·优秀｜攻 8-13
+const IRON_HELM := "res://data/items/eq_u5934u76d4_1_u7cbeu94a2u76d4.tres"  # 头盔·精良｜血 8-13 防 3-5
+const IRON_ARMOR := "res://data/items/eq_u80f8u7532_1_u94c1u7532.tres"   # 胸甲·精良｜血 12-19 防 6-9
 
 var _pass := 0
 var _fail := 0
@@ -133,6 +136,25 @@ func _scale() -> float:
 	return float(_player.get_node("Hitbox").damage_scale)
 
 
+## 装备贡献的**平铺攻击点数**（v2 起攻击分两半：点数在 attack_flat、百分比在 damage_scale）
+func _flat() -> int:
+	return int(_player.get_node("Hitbox").attack_flat)
+
+
+## 装备贡献的**平铺防御点数**（走 Health 的护甲曲线换成减伤）
+func _defense() -> int:
+	return int((_player.get_node("Health") as Health).defense)
+
+
+## 图标指着哪一件 —— 比**资源路径**而不是 id：v2 换掉了全部装备 id，
+## 断言里写死 id 会逼着每次重做装备都改测试，而漏改就是静默假绿。
+## 路径是「这一件是什么」在测试里唯一稳定的说法
+func _icon_path(icon: ItemIcon) -> String:
+	if icon == null or icon.item() == null:
+		return ""
+	return icon.item().resource_path
+
+
 func _max_hp() -> int:
 	return int((_player.get_node("Health") as Health).max_hp)
 
@@ -198,83 +220,97 @@ func _t2_walk_over_pickup() -> void:
 			before, PlayerState.bag.size(), gained, on_ground])
 
 
-## 穿上武器：攻击倍率当场 +15%
+## 穿上武器：平铺攻击加上去，**倍率不动**（v2 起装备攻击是点数，不是百分比）
 func _t3_equip_raises_attack() -> void:
 	await _place(320.0)
-	# 前面打 Boss 给了 60 经验，等级已经变了 —— 倍率断言要先把成长值钉回基线
+	# 前面打 Boss 给了 60 经验，等级已经变了 —— 断言要先把成长值钉回基线
 	_reset_stats()
-	var before := _scale()
-	_wear(IRON_SWORD)
+	var flat_before := _flat()
+	var scale_before := _scale()
+	var uid := _wear(IRON_SWORD)
 	await _pframes(2)
-	var after := _scale()
-	_check("3", "穿上铁剑：攻击倍率 +15%（装备词条进了伤害管线）",
-		is_equal_approx(round((after - before) * 100.0) / 100.0, 0.15) and after > before,
-		"倍率 %.2f → %.2f（+%.0f%%，期望 +15%%）" % [before, after, (after - before) * 100.0])
+	var flat_after := _flat()
+	var gained := int(PlayerState.stat_of(uid).get("atk", 0))
+	_check("3", "穿上铁剑：平铺攻击 += 这一件 roll 到的点数，倍率不变",
+		flat_after - flat_before == gained and flat_before == 0 and gained > 0 \
+			and is_equal_approx(_scale(), scale_before),
+		"平铺攻击 %d → %d（+%d）　倍率 %.2f（应不变）" % [
+			flat_before, flat_after, gained, _scale()])
 
 
-## 同部位再穿一件：旧的自动回背包，不丢东西
+## 同部位再穿一件：旧的自动回背包，不丢东西，点数换成新件的
 func _t4_same_slot_replaces() -> void:
 	var bag_before: int = PlayerState.bag.size()
-	_wear(FLAME_BLADE)
+	var uid := _wear(FLAME_BLADE)
 	await _pframes(2)
 	var wearing := PlayerState.item_at(&"weapon")
 	var back_in_bag := _in_bag(IRON_SWORD)
-	var scale_now := _scale()
-	_check("4", "换同部位装备：旧的自动回背包，新件生效（+30%）",
-		wearing != null and wearing.id == &"flame_blade" and back_in_bag \
-			and is_equal_approx(round(scale_now * 100.0) / 100.0, 1.30),
-		"槽里=%s　铁剑回背包=%s　倍率 %.2f（期望 1.30）　背包 %d 件" % [
-			str(wearing.id if wearing != null else &"空"), str(back_in_bag),
-			scale_now, PlayerState.bag.size() - bag_before])
+	var flat_now := _flat()
+	var want := int(PlayerState.stat_of(uid).get("atk", 0))
+	_check("4", "换同部位装备：旧的自动回背包，新件的点数生效",
+		wearing != null and wearing.resource_path == FLAME_BLADE and back_in_bag \
+			and flat_now == want and want >= 8 and want <= 13,
+		"槽里=%s　铁剑回背包=%s　平铺攻击 %d（期望 %d，优秀档 8-13）　背包 %+d 件" % [
+			(FLAME_BLADE if wearing == null else wearing.resource_path), str(back_in_bag),
+			flat_now, want, PlayerState.bag.size() - bag_before])
 
 
-## 卸下：装备回背包，倍率回落
+## 卸下：装备回背包，点数回落到 0
 func _t5_unequip_returns_to_bag() -> void:
-	var before := _scale()
+	var before := _flat()
 	PlayerState.unequip(&"weapon")
 	await _pframes(2)
-	var after := _scale()
+	var after := _flat()
 	var slot_empty := PlayerState.item_at(&"weapon") == null
 	var back := _in_bag(FLAME_BLADE)
-	_check("5", "卸下武器：回背包、倍率回落到没穿装备的水平",
-		slot_empty and back and is_equal_approx(round(after * 100.0) / 100.0, 1.0),
-		"槽空=%s　烈焰刃回背包=%s　倍率 %.2f → %.2f（期望 1.00）" % [
+	_check("5", "卸下武器：回背包、平铺攻击回落到 0",
+		slot_empty and back and after == 0,
+		"槽空=%s　玄铁剑回背包=%s　平铺攻击 %d → %d（期望 0）" % [
 			str(slot_empty), str(back), before, after])
 
 
-## 头盔的生命词条：血上限 +45，且当前血跟着补上那 45（不是掉一截）
+## 头盔的生命词条：血上限加多少、当前血就补多少（不是掉一截）
 func _t6_hp_bonus_raises_max_hp() -> void:
 	(_player.get_node("Health") as Health).heal_full()
 	await _pframes(1)
 	var hp_before := _max_hp()
 	var cur_before := int((_player.get_node("Health") as Health).hp)
-	_wear(IRON_HELM)
+	var uid := _wear(IRON_HELM)
 	await _pframes(2)
 	var hp_after := _max_hp()
 	var cur_after := int((_player.get_node("Health") as Health).hp)
-	_check("6", "穿上铁盔：血上限 +45，当前血跟着补上那 45",
-		hp_after - hp_before == 45 and cur_after - cur_before == 45,
-		"血上限 %d → %d　当前血 %d → %d" % [hp_before, hp_after, cur_before, cur_after])
+	var gain := int(PlayerState.stat_of(uid).get("hp", 0))
+	_check("6", "穿上精钢盔：血上限与当前血一起加上这一件 roll 到的血量",
+		gain > 0 and hp_after - hp_before == gain and cur_after - cur_before == gain,
+		"血上限 %d → %d　当前血 %d → %d（该件血 +%d）" % [
+			hp_before, hp_after, cur_before, cur_after, gain])
 
 
-## 护甲的防御词条：挨同样一下，掉的血更少（25% 减伤）
+## 胸甲的防御词条：走护甲曲线 def/(100+def)，挨同样一下掉血更少。
+## **期望值在测试里手算**（不读 Health 的函数）—— 拿被测函数算期望等于没测
 func _t7_def_bonus_reduces_damage() -> void:
 	await _place(320.0)
+	# **先清干净**：上一条断言装的精钢盔还戴在头上，它的防御会混进「无甲」这一档
+	# （实测第一次跑就是这样：无甲掉 19 而不是 20，差值来自头盔的 4 点防）
+	_reset_stats()
 	var h := _player.get_node("Health") as Health
 	h.heal_full()
 	var no_armor: int = h.take_damage(20, Vector2.ZERO, false, 0)
 	h.heal_full()
-	_wear(IRON_ARMOR)
+	var uid := _wear(IRON_ARMOR)
 	await _pframes(2)
-	var reduction: float = h.damage_reduction
+	var defense := _defense()
+	var want_def := int(PlayerState.stat_of(uid).get("def", 0))
 	h.heal_full()
 	var with_armor: int = h.take_damage(20, Vector2.ZERO, false, 0)
 	h.heal_full()
-	# 20 点攻击、25% 减伤 → 15 点
-	_check("7", "穿上铁甲：同样一下打 20 点，掉血变成 15（25% 减伤）",
-		no_armor == 20 and with_armor == 15 and is_equal_approx(reduction, 0.25),
-		"无甲掉 %d　有甲掉 %d（期望 15）　减伤 %.0f%%" % [
-			no_armor, with_armor, reduction * 100.0])
+	# 手算：减伤 = def/(100+def)，再取 1 点保底
+	var expect := maxi(1, int(round(20.0 * 100.0 / (100.0 + float(defense)))))
+	_check("7", "穿上铁甲：防御变成平铺点数，同样一下 20 点按护甲曲线减伤",
+		no_armor == 20 and defense == want_def and want_def > 0 and with_armor == expect,
+		"无甲掉 %d　有甲掉 %d（期望 %d）　防御 %d（def/(100+def)=%.1f%%）" % [
+			no_armor, with_armor, expect, defense,
+			100.0 * float(defense) / (100.0 + float(defense))])
 
 
 ## 装备栏与背包进快照，读档原样回来
@@ -354,18 +390,18 @@ func _t10_cursor_and_equip_by_key() -> void:
 
 	_check("10", "背包里上下移动光标，按 J 把选中的装备穿上",
 		c1 == ItemData.SLOT_IDS.size() and equipped_now != null \
-			and equipped_now.id == &"flame_blade" and bag_now == 0,
+			and equipped_now.resource_path == FLAME_BLADE and bag_now == 0,
 		"光标 %d → %d（期望 %d=背包第一行）　穿上的=%s　背包剩 %d 件" % [
 			c0, c1, ItemData.SLOT_IDS.size(),
-			str(equipped_now.id if equipped_now != null else &"无"), bag_now])
+			("无" if equipped_now == null else equipped_now.resource_path), bag_now])
 
 
 ## 面板上真的写出了装备名和词条 —— 防「静默空白 / 显示 key 本身」
 func _t11_panel_shows_names_and_stats() -> void:
 	var hud := _player.get_node("HUD")
 	PlayerState.set_equipment({}, [])
-	_wear(IRON_HELM)
-	_wear(FLAME_BLADE)
+	var helm_uid := _wear(IRON_HELM)
+	var blade_uid := _wear(FLAME_BLADE)
 	await _pframes(2)
 	_press("bag")
 	await _pframes(3)
@@ -381,8 +417,9 @@ func _t11_panel_shows_names_and_stats() -> void:
 	_release("bag")
 	await _pframes(2)
 
-	var has_weapon_name := equip_text.contains(tr("ITEM_FLAME_BLADE"))
-	var has_helm_name := equip_text.contains(tr("ITEM_IRON_HELM"))
+	# 名字直接从**这一件自己的 name_key** 取（v2 换过全部装备 key，写死就会漏改）
+	var has_weapon_name := equip_text.contains(tr(String(PlayerState.item_of(blade_uid).name_key)))
+	var has_helm_name := equip_text.contains(tr(String(PlayerState.item_of(helm_uid).name_key)))
 	var has_stat := equip_text.contains(tr("STAT_ATK")) or equip_text.contains(tr("STAT_HP"))
 	var no_key_leak: bool = not equip_text.contains("ITEM_") and not title.contains("UI_") \
 		and not hint.contains("UI_")
@@ -480,15 +517,14 @@ func _t14_item_icons() -> void:
 	var weapon_icon := equip_box.get_child(0).get_child(0) as ItemIcon
 	var empty_bag_icon := rows_box.get_child(0).get_child(0) as ItemIcon
 
-	var helm_ok: bool = helm_icon != null and helm_icon.item() != null \
-		and helm_icon.item().id == &"iron_helm" and helm_icon.visible
+	var helm_ok: bool = _icon_path(helm_icon) == IRON_HELM and helm_icon.visible
 	var empty_slot_ok: bool = weapon_icon != null and weapon_icon.item() == null and weapon_icon.visible
 	var empty_row_ok: bool = empty_bag_icon != null and not empty_bag_icon.visible
 
 	# 换一把武器：图标要跟着换（不是画完就定死）
 	_wear(FLAME_BLADE)
 	await _pframes(2)
-	var switched: bool = weapon_icon.item() != null and weapon_icon.item().id == &"flame_blade"
+	var switched: bool = _icon_path(weapon_icon) == FLAME_BLADE
 
 	# 角色面板（C）的装备行也用同一套图标
 	hud.get_node("CharPanel").visible = true
@@ -497,10 +533,8 @@ func _t14_item_icons() -> void:
 	var char_box := hud.get_node("CharPanel/EquipRows") as VBoxContainer
 	var char_weapon_icon := char_box.get_child(0).get_child(0) as ItemIcon
 	var char_helm_icon := char_box.get_child(1).get_child(0) as ItemIcon
-	var char_ok: bool = char_weapon_icon != null and char_weapon_icon.item() != null \
-		and char_weapon_icon.item().id == &"flame_blade" \
-		and char_helm_icon != null and char_helm_icon.item() != null \
-		and char_helm_icon.item().id == &"iron_helm"
+	var char_ok: bool = _icon_path(char_weapon_icon) == FLAME_BLADE \
+		and _icon_path(char_helm_icon) == IRON_HELM
 	var char_ids := "%s / %s" % [_id_of(char_weapon_icon), _id_of(char_helm_icon)]
 	hud.get_node("CharPanel").visible = false
 
@@ -516,8 +550,7 @@ func _t14_item_icons() -> void:
 	drop.global_position = Vector2(120.0, 288.0)      # 离玩家远点，免得当场被吸走
 	await _pframes(3)
 	var drop_icon := drop.get_node_or_null("Visual") as ItemIcon
-	var drop_ok: bool = drop_icon != null and drop_icon.item() != null \
-		and drop_icon.item().id == &"iron_sword"
+	var drop_ok: bool = _icon_path(drop_icon) == IRON_SWORD
 	# 先取值再释放：queue_free 之后碰 drop_icon 会拿到已释放对象
 	var drop_id := _id_of(drop_icon)
 	var drop_size := Vector2.ZERO if drop_icon == null else drop_icon.size
@@ -551,7 +584,7 @@ func _t15_blade_takes_weapon_color() -> void:
 	_check("15", "装备武器后手里的光刃换成武器品质色，刃也更长",
 		not plain.is_equal_approx(armed) and armed.is_equal_approx(expect) \
 			and armed_reach > plain_reach,
-		"无武器 %s（长 %.0f） → 烈焰刃 %s（长 %.0f，期望色 %s）" % [
+		"无武器 %s（长 %.0f） → 玄铁剑 %s（长 %.0f，期望色 %s）" % [
 			str(plain), plain_reach, str(armed), armed_reach, str(expect)])
 
 

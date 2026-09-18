@@ -10,19 +10,19 @@ extends Node
 ## 「属于玩家而不是属于关卡」的数据一律放 autoload，这是第三次因此改架构。
 ##
 ## ── 装备是【实例】，不是【型号】（2026-09-14 改）────────────────
-## 一开始存的是资源路径（"res://data/items/iron_sword.tres"）——
+## 一开始存的是资源路径（`res://data/items/xxx.tres` 这种）——
 ## 那等于「铁剑」这个**型号**，于是两把铁剑在系统眼里是同一件东西。
 ## 强化一旦做成逐件（设计原则 5.2：品质档位绑定强化上限），这个模型就塌了：
 ## 练过的剑卖掉、再捡一把同型号的，它居然也是练过的。
 ##
 ## 现在每个**实例**有一个 uid：`资源路径#序号`，例如
-## `res://data/items/iron_sword.tres#7`。背包和装备栏存 uid，
+## `res://data/items/wp_u5251_0_u94c1u5251.tres#7`。背包和装备栏存 uid，
 ## 强化等级挂在 uid 上（`forge` 表），一件装备练到几级只跟它自己有关。
+## **逐件随机的平铺词条也从 uid 推**（`stat_of`：uid 哈希当种子）——
+## 于是「同一个实例的数值固定」不需要额外的存档结构。
 ##
-## **旧档天然兼容**：老存档里的纯路径就是一个「没有 # 后缀的 uid」，
-## path_of() 原样返回，forge 表里查不到就是 0 级。不需要迁移代码。
-##
-## 代价：重命名资源文件仍会让老档失效（开发期可接受，写在这里备案）。
+## 代价：重命名资源文件仍会让存档失效（写在这里备案）。v2 就是这样一批重命名，
+## 所以旧档整份不可继续（见 SaveManager.STRUCTURE_VERSION=11）。
 
 ## 升级时发。玩家听了加血上限 / 蓝上限并回满
 signal level_up(new_level: int)
@@ -154,7 +154,6 @@ func load_from(d: Dictionary) -> void:
 	bag = (d.get("bag", []) as Array).duplicate()
 	forge = (d.get("forge", {}) as Dictionary).duplicate()
 	next_uid = int(d.get("next_uid", 0))
-	_migrate_legacy_upgrade(int(d.get("upgrade", 0)))
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
@@ -182,21 +181,17 @@ func save_to() -> Dictionary:
 	}
 
 
-## 老档的「全局强化等级」搬到当前武器上（clamp 到该品质的上限）。
-## 旧档里 upgrade 是玩家身上的一个数字，与装备无关 —— 新模型里没有它的位置了。
-## 找不到武器就丢掉（无法归属），这一点写在 ADR 里
-func _migrate_legacy_upgrade(legacy: int) -> void:
-	if legacy <= 0:
-		return
-	var w := equipped_uid(&"weapon")
-	if w.is_empty():
-		return
-	forge[w] = mini(legacy, forge_max(w))
+## 老档的「全局强化等级」搬到当前武器上 —— **v2 起删掉了**。
+##
+## 它存在的意义是让「全局 upgrade 一个数字」那个年代（v8 之前）的存档能读回来。
+## v2 换了装备模型（槽位 4→8、品质 3→6、132 件资源全换 id），旧档**整份不可继续**
+## （见 SaveManager.slot_usable），所以这段迁移已经是死代码，留着只会误导下一个人。
+## 见 docs/adr/0021-gear-v2-rework.md §2.5「删旧件、新 id、不写迁移」
 
 
 ## 把 next_uid 推到「所有已存在 uid 的最大序号 + 1」之后。
-## 存档里没带 next_uid（旧档 / 手改档）时靠这一步兜底，
-## 否则新捡的装备会撞上档案里已有的 uid
+## 兜的是**存档里漏了 next_uid**（手改档、以后增字段时的兼容空白）——
+## 不兜的话新捡的装备会和档案里已有的 uid 撞号，两件东西从此共享强化等级
 func _ensure_uid_counter() -> void:
 	var max_seen := 0
 	var all: Array = bag.duplicate()
@@ -225,7 +220,9 @@ func make_uid(path: String) -> String:
 	return uid
 
 
-## uid → 资源路径。**没有 # 的串原样返回** —— 老存档里的纯路径就是这种情况
+## uid → 资源路径。**没有 # 的串原样返回** ——
+## 存档里的 uid 一定是 `路径#序号` 的形状（make_uid 生成），
+## 这里不特殊处理「纯路径」，那只是同一个字符串函数的自然结果
 func path_of(uid: String) -> String:
 	var i := uid.find(UID_SEP)
 	return uid if i < 0 else uid.substr(0, i)

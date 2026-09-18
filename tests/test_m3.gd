@@ -11,7 +11,7 @@ extends Node
 const TOWN := preload("res://scenes/stages/town.tscn")
 const LICHANG := preload("res://scenes/stages/lichang.tscn")
 
-const IRON_SWORD := "res://data/items/iron_sword.tres"   # 精良武器｜攻 +15%，强化上限 5
+const IRON_SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"  # 普通剑｜平铺攻 1-3，强化上限 3
 
 var _pass := 0
 var _fail := 0
@@ -392,6 +392,8 @@ func _t9_forge_at_anvil() -> void:
 	await _pframes(6)
 	var scale0: float = (player.get_node("Hitbox") as Hitbox).damage_scale
 
+	var flat0: int = (player.get_node("Hitbox") as Hitbox).attack_flat
+
 	var cost: int = PlayerState.forge_cost(uid)      # 成本从数据取，不写死
 	_press("attack")                 # 站上铁砧按 J → 开铁匠铺
 	await _pframes(4)
@@ -408,22 +410,27 @@ func _t9_forge_at_anvil() -> void:
 	var lv := PlayerState.forge_level(uid)
 	var shards: int = PlayerState.shards
 	var scale1: float = (player.get_node("Hitbox") as Hitbox).damage_scale
+	var flat1: int = (player.get_node("Hitbox") as Hitbox).attack_flat
 
 	_tap_key(KEY_ESCAPE)             # Esc 关掉
 	await _pframes(4)
 	var closed: bool = not bool(panel.call("is_open")) and not get_tree().paused
 
+	# v2：强化走**百分比**那一半，装备自己的攻击是平铺点数（不受强化影响）
 	var expect: float = 1.0 + PlayerState.progression.atk_bonus_at(PlayerState.level) \
-		+ (load(IRON_SWORD) as ItemData).atk_bonus + PlayerState.forge_atk(uid)
+		+ PlayerState.forge_atk(uid)
+	var rolled := int(PlayerState.stat_of(uid).get("atk", 0))
 	town.queue_free()
 	await _pframes(2)
 
 	_check("9", "铁匠铺：站上铁砧按 J 开面板 → 选中那件按 J 强化（倍率涨、按成本扣精铁）",
 		opened and picked == uid and lv == 1 and shards == 10 - cost \
-			and is_equal_approx(scale1, expect) and closed,
+			and is_equal_approx(scale1, expect) and closed \
+			and flat1 == rolled and flat1 == flat0,
 		"开面板=%s（当时暂停=%s）　光标选中=穿着的武器=%s　强化 +%d　精铁 10→%d（成本 %d）　"
 		% [str(opened), str(paused_when_open), str(picked == uid), lv, shards, cost]
-		+ "倍率 %.3f → %.3f（期望 %.3f）　Esc 关掉=%s" % [scale0, scale1, expect, str(closed)])
+		+ "倍率 %.3f → %.3f（期望 %.3f）　平铺攻击 %d（不受强化影响）　Esc 关掉=%s" % [
+			scale0, scale1, expect, flat1, str(closed)])
 
 
 ## 强化与碎片进快照 —— 「继续游戏」不能把练好的武器吐回去
@@ -509,15 +516,19 @@ func _t12_hud_shows_player_state() -> void:
 	await _pframes(2)
 	var bag: String = (hud.get_node("Bag/Count") as Label).text
 	var lv: String = (hud.get_node("Status/Level") as Label).text
-	# 开角色面板：武器强化等级现在住在面板里（HUD 等级位显示角色等级）
+	# 开角色面板：武器强化等级现在住在面板里（HUD 等级位显示角色等级）。
+	# ⚠️ v2 起属性表**拆成两栏**（左生存 / 右战力），精铁那一行在**右栏**里 ——
+	# 只看左边那个 Label 会得到「面板里没有精铁」这种假红
 	hud.call("_unhandled_input", _make_action("panel"))
 	await _pframes(2)
 	var panel_text: String = (hud.get_node("CharPanel/Text") as Label).text
+	var panel_text2: String = (hud.get_node("CharPanel/Text2") as Label).text
+	var panel_all := panel_text + "\n" + panel_text2
 	hud.call("_unhandled_input", _make_action("panel"))
 	await _pframes(2)
 	town.queue_free()
 	await _pframes(2)
 
 	_check("12", "左上状态栏 / 右上背包 / 角色面板各显其职",
-		bag.contains("4") and lv.begins_with("Lv.") and panel_text.contains("精铁"),
-		"背包「%s」　状态「%s」　面板含精铁行=%s" % [bag, lv, str(panel_text.contains("精铁"))])
+		bag.contains("4") and lv.begins_with("Lv.") and panel_all.contains("精铁"),
+		"背包「%s」　状态「%s」　面板含精铁行=%s" % [bag, lv, str(panel_all.contains("精铁"))])
