@@ -4,5 +4,5 @@
 
 [resource]
 script = ExtResource("1_shop")
-stock = Array[String](["res://data/items/leather_cap.tres", "res://data/items/cloth_robe.tres", "res://data/items/wood_charm.tres", "res://data/items/iron_sword.tres", "res://data/items/iron_helm.tres", "res://data/items/iron_armor.tres", "res://data/items/jade_talisman.tres"])
+stock = Array[String](["res://data/items/eq_u5934u76d4_0_u76aeu76d4.tres", "res://data/items/eq_u6212u6307_0_u94c1u6212.tres", "res://data/items/eq_u624bu956f_0_u6728u956f.tres", "res://data/items/eq_u62a4u817f_0_u76aeu62a4u817f.tres", "res://data/items/eq_u80f8u7532_0_u5e03u8863.tres", "res://data/items/eq_u9774u5b50_0_u5e03u978b.tres", "res://data/items/eq_u9879u94fe_0_u9aa8u5760.tres", "res://data/items/wp_u5200_0_u73afu9996u5200.tres", "res://data/items/wp_u5251_0_u5236u5f0fu5251.tres", "res://data/items/wp_u5f13_0_u6728u5f13.tres", "res://data/items/wp_u6756_0_u5b66u5f92u6756.tres"])
 sell_ratio = 0.5

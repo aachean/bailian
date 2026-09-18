@@ -18,8 +18,15 @@ signal hit_landed(target: Node2D, damage: int, point: Vector2, heavy: bool)
 ## 打谁（碰撞层位掩码）。玩家的判定框打 enemy 层 = 2
 @export_flags_2d_physics var target_mask: int = 2
 ## 伤害倍率。装备强化加成走这里：持有者改它，判定结算时生效。
-## 放在 Hitbox 而不是改技能表 —— 强化改的是「这个人」，不是「这一招」
+## 放在 Hitbox 而不是改技能表 —— 强化改的是「这个人」，不是「这一招」。
+## **v2 起这个乘区只剩百分比（等级% + 强化%）**，装备攻击不再进这里（见下）
 @export var damage_scale: float = 1.0
+## 平铺攻击（点数）。装备的「攻击」词条走这里 —— **加算在技能基础伤害上，不是乘**。
+## 伤害合成（docs/adr/0018 方案 A）：
+##   `(技能基础伤害 + attack_flat) × damage_scale × 目标护甲曲线`
+## 为什么要点数加算而不是并进乘区：装备变强要能被玩家直接读出来（+12 就是多打 12），
+## 而百分比乘在技能基础伤害一动就全变，调参也难。见 design-principles 4.1
+@export var attack_flat: int = 0
 ## 是否画出判定框。调手感时开，正常关
 @export var debug_draw: bool = false
 
@@ -103,7 +110,9 @@ func _offset() -> Vector2:
 func _resolve(body: Node2D) -> void:
 	var h := body.get_node_or_null("Health") as Health
 	var point := body.global_position + Vector2(0.0, -12.0)
-	var dmg := int(round(float(_skill.roll_damage(_rng)) * damage_scale))
+	# 先加平铺攻击再乘百分比 —— 顺序不能反（乘完再加等于让强化放大装备点数）
+	var raw := float(_skill.roll_damage(_rng)) + float(attack_flat)
+	var dmg := int(round(raw * damage_scale))
 
 	# 被击退的方向：从攻击方指向目标
 	var dir := 1

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u62a4u817f_4_u5929u9f99u62a4u817f"
+name_key = &"ITEM_EQ_U62A4U817F_4_U5929U9F99U62A4U817F"
+display_name = "天龙护腿"
+slot = 3
+tier = 4
+min_level = 60
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 43
+hp_max = 66
+def_min = 17
+def_max = 25
+gold_price = 540

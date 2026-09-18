@@ -6,5 +6,5 @@
 script = ExtResource("1_data")
 speaker_key = &"NPC_SMITH"
 lines = Array[String](["DLG_SMITH_1", "DLG_SMITH_2", "DLG_SMITH_3", "DLG_SMITH_4"])
-give_item = "res://data/items/iron_sword.tres"
+give_item = "res://data/items/wp_u5251_0_u94c1u5251.tres"
 flag = &"met_smith"

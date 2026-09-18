@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"wp_u5200_5_u5f00u5929u5200"
+name_key = &"ITEM_WP_U5200_5_U5F00U5929U5200"
+display_name = "开天刀"
+slot = 0
+weapon_type = &"blade"
+tier = 5
+min_level = 75
+source = &"craft"
+atk_min = 33
+atk_max = 48
+hp_min = 0
+hp_max = 0
+def_min = 0
+def_max = 0
+gold_price = 1200

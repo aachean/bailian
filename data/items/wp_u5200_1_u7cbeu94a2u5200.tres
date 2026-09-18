@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"wp_u5200_1_u7cbeu94a2u5200"
+name_key = &"ITEM_WP_U5200_1_U7CBEU94A2U5200"
+display_name = "精钢刀"
+slot = 0
+weapon_type = &"blade"
+tier = 1
+min_level = 15
+source = &"drop"
+atk_min = 4
+atk_max = 7
+hp_min = 0
+hp_max = 0
+def_min = 0
+def_max = 0
+gold_price = 70

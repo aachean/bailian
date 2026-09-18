@@ -134,9 +134,11 @@ var _reviving := false
 var _hurt_flash: float = 0.0
 ## 升级金光的标记（与受击红光共用衰减通道）
 var _level_flash := false
-## 装备给的减伤基线。铁壁这类技能出招期间会临时改用更大的减伤，
-## 动作结束要恢复到这条基线（不然格挡一次，全身减伤永久变了）
-var _base_reduction: float = 0.0
+## 装备给的平铺防御基线（点数）。格挡类技能出招期间会临时给一个减伤%，
+## 动作结束要把那份临时减伤收回去 —— 不然格挡一次，全身减伤永久变了。
+## ⚠️ v2 起这是**点数**不是比例（改名自 _base_reduction），
+## 基线本身不需要「恢复」，要恢复的是技能那份临时 guard（见 _health.guard_reduction）
+var _base_defense: int = 0
 ## 本次出招的投射物有没有发过（判定窗口跨 4 帧，只该发一道剑气）
 var _projectile_fired := false
 
@@ -562,16 +564,20 @@ const BLADE_BASE_REACH := 42.0
 func _apply_upgrade() -> void:
 	var bonus := PlayerState.bonus_total()
 	var prog := PlayerState.progression
-	# 攻击倍率只有一个乘区（设计原则 4.1）：等级 + 装备词条 + 逐件强化。
-	# 后两样都已经在 bonus 里（_recalc_bonus 把强化加成也算进去了），这里只补等级那一份
-	_hitbox.damage_scale = 1.0 + prog.atk_bonus_at(level) + float(bonus.get("atk", 0.0))
+	# 攻击在 v2 拆成两半（docs/adr/0018 方案 A）：
+	#   平铺点数 → hitbox.attack_flat，**加算**在技能基础伤害上
+	#   百分比   → damage_scale，仍只有一个乘区（4.1）：等级% + 强化%
+	# 面板显示的也就是这两个数，玩家能一眼对上打出来的伤害
+	_hitbox.attack_flat = int(bonus.get("atk_flat", 0))
+	_hitbox.damage_scale = 1.0 + prog.atk_bonus_at(level) + float(bonus.get("atk_pct", 0.0))
 	_set_max_hp(prog.hp_at(level) + int(bonus.get("hp", 0)))
 	# 蓝上限也归这条管线（2026-09-14 补）。它以前在 _ready / apply_saved /
 	# _on_level_up 三处各写一遍 —— 于是「等级变了但没走那三条路」的地方
 	# （测试里直接改等级、以后可能的天赋加成）蓝上限会静默停在旧值
 	_set_max_mp(prog.mp_at(level))
-	_base_reduction = float(bonus.get("def", 0.0))
-	_health.damage_reduction = _base_reduction
+	# 防御也是平铺点数了：喂给 Health，由它的护甲曲线算减伤（4.5 不做减法）
+	_base_defense = int(bonus.get("def_flat", 0))
+	_health.defense = _base_defense
 	_refresh_blade()
 	_refresh_hud()
 
@@ -1008,10 +1014,11 @@ func _attack_process(delta: float) -> void:
 	var sk := _current
 
 	_health.invincible = sk.is_invincible_at(t)
-	# 铁壁这类技能在出招期间额外减伤。与装备减伤【取较大值】，不是相加 ——
-	# 叠加很容易堆成免伤，那挨打就没有代价了（同 Health 的 60% 上限精神）
+	# 铁壁这类技能在出招期间额外减伤。**交给 Health 与护甲曲线取 max**，
+	# 不是相加 —— 叠加很容易堆成免伤，那挨打就没有代价了
+	# （v2 起装备那半边是平铺防御，写成 ratio 会变成单位错误，所以由 Health 统一取）
 	if sk.guard_reduction > 0.0:
-		_health.damage_reduction = maxf(_base_reduction, sk.guard_reduction)
+		_health.guard_reduction = sk.guard_reduction
 	velocity.x = sk.lunge_speed * sk.lunge_factor(t) * float(_facing)
 
 	if sk.is_active_at(t):
@@ -1062,8 +1069,9 @@ func _is_skill(sk: SkillData) -> bool:
 	return sk != null and skills.has(sk)
 
 
-## 甩出投射物（剑气）。伤害沿用技能自己的 damage，倍率带上装备与强化 ——
-## 与近战判定同一条管线（Hitbox.damage_scale），不另算一套
+## 甩出投射物（剑气）。伤害沿用技能自己的 damage，**平铺攻击与百分比倍率两条都带上** ——
+## 与近战判定同一条管线（Hitbox.attack_flat / damage_scale），不另算一套。
+## ⚠️ 加了 attack_flat 就别忘了同步这里：漏一个，远程角色的装备攻击就是白穿的
 func _fire_projectile(sk: SkillData) -> void:
 	if sk.projectile_scene == null:
 		return
@@ -1073,6 +1081,7 @@ func _fire_projectile(sk: SkillData) -> void:
 	var node := sk.projectile_scene.instantiate() as Node2D
 	if node == null:
 		return
+	node.set("attack_flat", _hitbox.attack_flat)
 	node.set("damage_scale", _hitbox.damage_scale)
 	node.set("target_mask", 2)          # 打敌人层
 	# 命中反馈三件套从招式表抄给箭 —— 投射物命中不经过 _on_hit_landed，
@@ -1149,7 +1158,9 @@ func _end_action() -> void:
 	_whirl_fx.visible = false
 	_whirl_fx.modulate.a = 0.0
 	_health.invincible = false
-	_health.damage_reduction = _base_reduction   # 格挡类技能的临时减伤在这里收回去
+	# 格挡类技能的临时减伤在这里收回去。装备那份平铺防御不归这管 ——
+	# 它就是 Health.defense，从头到尾没被改过，所以「收回」只要清 guard
+	_health.guard_reduction = 0.0
 	_projectile_fired = false
 	_current = null
 	state = State.FREE

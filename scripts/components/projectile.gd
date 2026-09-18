@@ -17,8 +17,12 @@ var source: Node2D = null        # 投掷者（命中判定时排除它自己）
 ## 打谁（碰撞层位掩码）。敌方投射物（掷矛）打 player=1，玩家的剑气打 enemy=2
 var target_mask: int = 1
 ## 伤害倍率。玩家发射的剑气用它带上装备加成 —— 与 Hitbox.damage_scale 同一个意思：
-## 加成属于「这个人」，不属于「这一招」
+## 加成属于「这个人」，不属于「这一招」。
+## **v2 起这个乘区只剩百分比**（等级% + 强化%），平铺攻击走 attack_flat（见下）
 var damage_scale: float = 1.0
+## 平铺攻击（点数）。与 Hitbox.attack_flat 同一个意思，理由也同一条：
+## 加算在技能基础伤害上，不是并进乘区（docs/adr/0018 方案 A）
+var attack_flat: int = 0
 ## 命中反馈三件套（M4 打击感）：顿帧、火花、屏震。
 ## 由发射方从 SkillData 抄进来 —— 敌方的矛不设（默认 0），命中只有掉血，
 ## 玩家听到的受击声与红色火花由玩家自己的 _on_damaged 负责，两头不重样
@@ -68,7 +72,7 @@ func _physics_process(delta: float) -> void:
 			continue
 		var point := global_position
 		var dir := 1 if velocity.x >= 0.0 else -1
-		var dmg := int(round(float(damage) * damage_scale))
+		var dmg := int(round((float(damage) + float(attack_flat)) * damage_scale))
 		# 命中反馈：声、火花、双方顿帧、屏震 —— 与近战 _on_hit_landed 同一套语言。
 		# 弓箭打人不该是哑的（这正是远程角色要复用的管线）
 		Audio.play(&"hit")

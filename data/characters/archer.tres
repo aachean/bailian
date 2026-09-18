@@ -13,6 +13,6 @@ sprite_frame_h = 29.0
 sprite_foot_y = 25.0
 body_color = Color(0.25, 0.62, 0.5, 1)
 weapon_type = &"bow"
-starting_weapon = "res://data/items/wind_bow.tres"
+starting_weapon = "res://data/items/wp_u5f13_0_u6728u5f13.tres"
 combo = Array[String](["res://data/skills/bow_1.tres", "res://data/skills/bow_2.tres", "res://data/skills/bow_3.tres"])
 skills = Array[String](["res://data/skills/quick_shot.tres", "res://data/skills/heavy_bolt.tres", "res://data/skills/sky_pierce.tres"])

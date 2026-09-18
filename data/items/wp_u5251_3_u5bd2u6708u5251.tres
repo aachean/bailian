@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"wp_u5251_3_u5bd2u6708u5251"
+name_key = &"ITEM_WP_U5251_3_U5BD2U6708U5251"
+display_name = "寒月剑"
+slot = 0
+weapon_type = &"sword"
+tier = 3
+min_level = 45
+source = &"craft"
+atk_min = 14
+atk_max = 21
+hp_min = 0
+hp_max = 0
+def_min = 0
+def_max = 0
+gold_price = 220

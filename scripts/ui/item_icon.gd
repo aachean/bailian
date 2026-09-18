@@ -8,7 +8,7 @@ extends Control
 ## 三处共用同一套图标：背包面板、地上掉落物、以后要加的铁砧 / 商店。
 ##
 ## ── 形状 = 部位，颜色 = 品质 ──────────────────────────────────
-## 剑 / 盔 / 甲 / 坠四种轮廓，一眼分得出是什么；
+## 八种轮廓：剑/刀/弓/杖 + 盔/胸甲/护腿/靴 + 戒/项链/镯，一眼分得出是什么；
 ## 颜色直接取 ItemData.tier_color()，和地上掉落物、面板文字是同一个色源 ——
 ## 一件紫装在三个地方必须是同一个紫。
 
@@ -78,20 +78,36 @@ func _draw() -> void:
 	var base := _item.tier_color()
 	var hi := base.lightened(0.4)
 	var dark := base.darkened(0.55)
+	# 形状 = 部位（v2 八槽），颜色 = 品质（六档）。
+	# **八种轮廓必须两两可辨** —— 认不出形状时，「这件穿哪儿」就只能读文字，
+	# 而装备栏的一行本来就只有 16px 宽的位置放图标
 	match _item.slot:
 		ItemData.Slot.HELM:
 			_draw_helm(k, base, hi, dark)
-		ItemData.Slot.ARMOR:
-			_draw_armor(k, base, hi, dark)
-		ItemData.Slot.TRINKET:
-			_draw_trinket(k, base, hi, dark)
+		ItemData.Slot.CHEST:
+			_draw_chest(k, base, hi, dark)
+		ItemData.Slot.LEGS:
+			_draw_legs(k, base, hi, dark)
+		ItemData.Slot.BOOTS:
+			_draw_boots(k, base, hi, dark)
+		ItemData.Slot.RING:
+			_draw_ring(k, base, hi)
+		ItemData.Slot.NECKLACE:
+			_draw_necklace(k, base, hi)
+		ItemData.Slot.BRACELET:
+			_draw_bracelet(k, base, hi)
 		_:
-			# 武器分家（M4 第二角色）：弓画弓，其余画剑 ——
+			# 武器按类型分家（v2 四种）：弓画弓、刀画单刃、杖画杆加宝珠，其余画剑 ——
 			# 背包里铁剑和逐风弓得一眼分得出，不然装备门提示都像在说谎
-			if _item.weapon_type == &"bow":
-				_draw_bow(k, base, hi)
-			else:
-				_draw_sword(k, base, hi, dark)
+			match _item.weapon_type:
+				&"bow":
+					_draw_bow(k, base, hi)
+				&"blade":
+					_draw_blade(k, base, hi, dark)
+				&"staff":
+					_draw_staff(k, base, hi, dark)
+				_:
+					_draw_sword(k, base, hi, dark)
 
 
 ## 弓：一段弧 + 弦 + 搭着的箭杆
@@ -177,8 +193,8 @@ func _draw_helm(k: float, base: Color, hi: Color, dark: Color) -> void:
 	draw_rect(_rect(2.5, 14, 13.5, 15.5, k), hi)    # 底沿
 
 
-## 护甲：盾形胸甲 + 中脊
-func _draw_armor(k: float, base: Color, hi: Color, dark: Color) -> void:
+## 胸甲：盾形躯干 + 中脊（原 _draw_armor，v2 槽位改名）
+func _draw_chest(k: float, base: Color, hi: Color, dark: Color) -> void:
 	draw_colored_polygon(_poly([
 		Vector2(2.5, 2.5), Vector2(13.5, 2.5), Vector2(13.5, 9),
 		Vector2(8, 15), Vector2(2.5, 9),
@@ -191,17 +207,94 @@ func _draw_armor(k: float, base: Color, hi: Color, dark: Color) -> void:
 	], k), hi)
 
 
-## 饰品：菱形宝石 + 内芯
-func _draw_trinket(k: float, base: Color, hi: Color, dark: Color) -> void:
+## 护腿：腰带 + 两条收窄的腿甲（宽度收在中间，与胸甲的整块轮廓分得开）
+func _draw_legs(k: float, base: Color, hi: Color, dark: Color) -> void:
+	draw_rect(_rect(3.0, 1.6, 13.0, 3.6, k), dark)                    # 腰带
 	draw_colored_polygon(_poly([
-		Vector2(8, 0.5), Vector2(15, 8), Vector2(8, 15.5), Vector2(1, 8),
+		Vector2(3.4, 3.6), Vector2(7.2, 3.6), Vector2(6.6, 14.6), Vector2(4.0, 14.6),
 	], k), base)
 	draw_colored_polygon(_poly([
-		Vector2(8, 4), Vector2(12, 8), Vector2(8, 12), Vector2(4, 8),
-	], k), hi)
+		Vector2(8.8, 3.6), Vector2(12.6, 3.6), Vector2(12.0, 14.6), Vector2(9.4, 14.6),
+	], k), base)
+	draw_rect(_rect(3.4, 3.6, 7.2, 4.8, k), hi)
+	draw_rect(_rect(8.8, 3.6, 12.6, 4.8, k), hi)
+
+
+## 靴子：两只 L 形靴（靴筒 + 外翻的靴头）+ 鞋底
+func _draw_boots(k: float, base: Color, hi: Color, dark: Color) -> void:
 	draw_colored_polygon(_poly([
-		Vector2(8, 6.5), Vector2(9.5, 8), Vector2(8, 9.5), Vector2(6.5, 8),
-	], k), dark)
+		Vector2(1.6, 3.6), Vector2(6.0, 3.6), Vector2(6.0, 12.4), Vector2(1.6, 12.4),
+	], k), base)
+	draw_colored_polygon(_poly([
+		Vector2(1.6, 12.4), Vector2(6.0, 12.4), Vector2(6.0, 14.4), Vector2(0.8, 14.4),
+	], k), base)
+	draw_rect(_rect(1.6, 3.6, 6.0, 4.8, k), hi)
+	draw_colored_polygon(_poly([
+		Vector2(10.0, 3.6), Vector2(14.4, 3.6), Vector2(14.4, 12.4), Vector2(10.0, 12.4),
+	], k), base)
+	draw_colored_polygon(_poly([
+		Vector2(10.0, 12.4), Vector2(14.4, 12.4), Vector2(15.2, 14.4), Vector2(10.0, 14.4),
+	], k), base)
+	draw_rect(_rect(10.0, 3.6, 14.4, 4.8, k), hi)
+	draw_rect(_rect(0.8, 14.2, 15.2, 15.5, k), dark)                  # 鞋底
+
+
+## 戒指：细环 + 顶上一颗宝石（环细、宝石小，与手镯的粗开口环分得开）
+func _draw_ring(k: float, base: Color, hi: Color) -> void:
+	draw_polyline(_circle(8.0, 10.0, 4.8, 14, k), base, maxf(1.6, 1.6 * k))
+	draw_colored_polygon(_poly([
+		Vector2(8, 0.8), Vector2(11.2, 4.4), Vector2(8, 7.6), Vector2(4.8, 4.4),
+	], k), hi)
+
+
+## 项链：V 形细链 + 一个坠子
+func _draw_necklace(k: float, base: Color, hi: Color) -> void:
+	draw_polyline(_poly([
+		Vector2(1.0, 2.0), Vector2(4.4, 6.4), Vector2(8.0, 8.6),
+		Vector2(11.6, 6.4), Vector2(15.0, 2.0),
+	], k), base, maxf(1.3, 1.3 * k))
+	draw_colored_polygon(_poly([
+		Vector2(8, 8.6), Vector2(11.0, 11.6), Vector2(8, 15.2), Vector2(5.0, 11.6),
+	], k), hi)
+
+
+## 手镯：粗的开口环（两端各一段端头，一眼区别于戒指的细闭环）
+func _draw_bracelet(k: float, base: Color, hi: Color) -> void:
+	draw_polyline(_circle(8.0, 8.6, 5.4, 16, k), base, maxf(2.0, 2.0 * k))
+	draw_rect(_rect(1.8, 3.4, 4.8, 5.4, k), hi)
+	draw_rect(_rect(11.2, 3.4, 14.2, 5.4, k), hi)
+
+
+## 刀：单刃、刀背带弧（与剑的直身双刃一眼分得出）
+func _draw_blade(k: float, base: Color, hi: Color, dark: Color) -> void:
+	draw_colored_polygon(_poly([
+		Vector2(6.0, 1.0), Vector2(9.0, 0.5), Vector2(11.6, 10.8), Vector2(7.6, 10.8),
+	], k), base)
+	draw_colored_polygon(_poly([
+		Vector2(9.0, 0.5), Vector2(11.6, 10.8), Vector2(12.5, 10.4),
+	], k), hi)
+	draw_rect(_rect(4.6, 10.8, 13.4, 12.2, k), dark)                  # 护手
+	draw_rect(_rect(7.2, 12.2, 10.0, 15.6, k), dark)                  # 柄
+
+
+## 法杖：长杆 + 顶端宝珠
+func _draw_staff(k: float, base: Color, hi: Color, dark: Color) -> void:
+	draw_rect(_rect(7.1, 4.2, 8.9, 15.6, k), dark)                    # 杆
+	draw_colored_polygon(_poly([
+		Vector2(8, 0.4), Vector2(11.6, 3.6), Vector2(8, 6.8), Vector2(4.4, 3.6),
+	], k), base)
+	draw_colored_polygon(_poly([
+		Vector2(8, 2.0), Vector2(10.2, 3.6), Vector2(8, 5.2), Vector2(5.8, 3.6),
+	], k), hi)
+
+
+## 圆（n 边形近似），直接乘好 k —— 给 draw_polyline 用的折线
+func _circle(cx: float, cy: float, r: float, n: int, k: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in n + 1:
+		var a := TAU * float(i) / float(n)
+		out.append(Vector2(cx + r * cos(a), cy + r * sin(a)) * k)
+	return out
 
 
 func _poly(pts: Array, k: float) -> PackedVector2Array:

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"wp_u6756_1_u7cbeu94a2u6cd5u6756"
+name_key = &"ITEM_WP_U6756_1_U7CBEU94A2U6CD5U6756"
+display_name = "精钢法杖"
+slot = 0
+weapon_type = &"staff"
+tier = 1
+min_level = 15
+source = &"drop"
+atk_min = 4
+atk_max = 7
+hp_min = 0
+hp_max = 0
+def_min = 0
+def_max = 0
+gold_price = 70

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u80f8u7532_1_u94c1u7532"
+name_key = &"ITEM_EQ_U80F8U7532_1_U94C1U7532"
+display_name = "铁甲"
+slot = 2
+tier = 1
+min_level = 15
+source = &"drop"
+atk_min = 0
+atk_max = 0
+hp_min = 13
+hp_max = 22
+def_min = 4
+def_max = 7
+gold_price = 70

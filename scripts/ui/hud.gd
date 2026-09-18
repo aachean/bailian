@@ -18,7 +18,9 @@ const CURSOR_MARK := "▶ "
 const INDENT := "   "
 const ROW_HEIGHT := 20.0         # 背包面板一行的高度：图标 16 + 上下各留 2
 const ICON_SIZE := 16.0
-const CHAR_ROW_HEIGHT := 18.0    # 角色面板一行（更挤：上面还有八行属性）
+const CHAR_ROW_HEIGHT := 17.0    # 角色面板一行。**8 槽之后不能再是 18** ——
+                                 # 8×18=144 会把面板顶出屏幕下沿（360 高），
+                                 # 收到的 17 让「8 行文字 + 8 行装备」正好落在 72..338
 
 var _bag_open := false
 ## 背包面板的提示消息（穿不上武器之类）—— 带过期时刻，2.4 秒后回常规提示
@@ -580,32 +582,45 @@ func _scroll_top(count: int) -> int:
 	return clampi(top, 0, maxi(count - BAG_ROWS, 0))
 
 
-## 装备名（稀有件加星）—— 名字用文字体现品质，颜色留给列表状态
+## 装备名（高档加星）—— 名字用文字体现品质，颜色留给列表状态。
+## v2 六档：极品 ★ / 传说 ★★ / 至尊 ★★★（前三档不加，白绿蓝本来就是过渡件）
 func _item_name(it: ItemData) -> String:
 	if it == null:
 		return "?"
 	var n := tr(it.name_key)
-	return n + " ★" if it.tier == ItemData.Tier.RARE else n
+	match it.tier:
+		ItemData.Tier.LEGENDARY:
+			return n + " ★★★"
+		ItemData.Tier.EPIC:
+			return n + " ★★"
+		ItemData.Tier.RARE:
+			return n + " ★"
+		_:
+			return n
 
 
-## 一件装备的词条文本：「+2　攻+38%　血+20」。
-## **攻击那一项算的是「基础词条 + 强化」的合计** —— 设计原则 4.1 要求面板上的
-## 加成必须等于实际打出的倍率；强化既然在打怪时生效，就必须在面板上出现，
-## 开头的 `+N` 是它的来源标注。什么都没给时是「—」，不显示空白
+## 一件装备的词条文本：「+2　攻+12　血+38　防+5　强化+36%」。
+## **数值取【实例已 roll 的值】而不是型号区间** —— 设计原则 4.1 要求面板上的加成
+## 必须等于这一件实际打出来的贡献，拿 min/max 显示就是骗人。
+## 开头的 `+N` 是强化等级、末尾的百分比是强化给的那一份（它仍然是百分比）。
+## 什么都没给时是「—」，不显示空白
 func _stat_text(uid: String, it: ItemData) -> String:
 	if it == null:
 		return ""
 	var parts: Array[String] = []
 	var lv := PlayerState.forge_level(uid)
-	var atk := it.atk_bonus + PlayerState.forge_atk(uid)
+	var st := PlayerState.stat_of(uid)
+	var forge_pct := PlayerState.forge_atk(uid)
 	if lv > 0:
 		parts.append("+%d" % lv)
-	if not is_zero_approx(atk):
-		parts.append("%s+%d%%" % [tr("STAT_ATK"), int(round(atk * 100.0))])
-	if it.hp_bonus != 0:
-		parts.append("%s+%d" % [tr("STAT_HP"), it.hp_bonus])
-	if not is_zero_approx(it.def_bonus):
-		parts.append("%s+%d%%" % [tr("STAT_DEF"), int(round(it.def_bonus * 100.0))])
+	if int(st.get("atk", 0)) > 0:
+		parts.append("%s+%d" % [tr("STAT_ATK"), int(st.get("atk", 0))])
+	if int(st.get("hp", 0)) > 0:
+		parts.append("%s+%d" % [tr("STAT_HP"), int(st.get("hp", 0))])
+	if int(st.get("def", 0)) > 0:
+		parts.append("%s+%d" % [tr("STAT_DEF"), int(st.get("def", 0))])
+	if forge_pct > 0.0:
+		parts.append("%s+%d%%" % [tr("STAT_FORGE"), int(round(forge_pct * 100.0))])
 	return "—" if parts.is_empty() else "　".join(parts)
 
 
@@ -697,14 +712,19 @@ func refresh_char_panel(h: Health) -> void:
 	var hp := 0 if h == null else h.hp
 	var max_hp := 0 if h == null else h.max_hp
 	var dmg: float = _player.get_node("Hitbox").damage_scale
-	var red: float = 0.0 if h == null else h.damage_reduction
+	var flat: int = int(_player.get_node("Hitbox").attack_flat)
+	var def: int = 0 if h == null else h.defense
+	var red: float = 0.0 if h == null else h.effective_reduction()
 	var lines: Array[String] = [
 		"%s %d / %d" % [tr("PANEL_LEVEL"), level, PlayerState.level_cap],
 		_exp_line(level, exp_pts),
 		"%s %d / %d" % [tr("PANEL_HP"), hp, max_hp],
 		"%s %d / %d" % [tr("PANEL_MP"), mp, max_mp],
-		"%s +%d%%" % [tr("PANEL_ATK"), int(round((dmg - 1.0) * 100.0))],
-		"%s -%d%%" % [tr("PANEL_DEF"), int(round(red * 100.0))],
+		# 攻击在 v2 是两个数（4.1 要求两个都看得见）：平铺点数 + 乘区倍率。
+		# 实际伤害 = (技能基础 + 平铺) × 倍率 × 目标护甲 —— 面板把前两项如实摆出来
+		"%s +%d ×%.2f" % [tr("PANEL_ATK"), flat, dmg],
+		# 防御同理：平铺点数 + 它换来的减伤比例（由 Health 的护甲曲线算，不重复实现）
+		"%s %d（-%d%%）" % [tr("PANEL_DEF"), def, int(round(red * 100.0))],
 		# 这里曾经写成 tr("PANEL_SHARD") —— csv 里没有这个 key，于是界面上
 		# 直接显示 "PANEL_SHARD" 四个字，而且**不报任何错**。
 		# 漏翻 / 拼错 key 一律静默，只能靠截图或断言抓（截图抓到了）

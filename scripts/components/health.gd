@@ -17,10 +17,16 @@ signal hp_changed(hp: int, max_hp: int)
 @export var max_hp: int = 120
 ## 挨打之后的无敌时长（秒）。要略大于一次挥砍的判定持续帧数
 @export var post_hit_invincible: float = 0.10
-## 减伤比例（0.25 = 挨打少掉 25% 的血）。装备的「防御」词条写这里，敌人默认 0
-@export var damage_reduction: float = 0.0
+## 平铺防御（点数）。**不是减伤百分比** —— 内部走护甲曲线 `def/(100+def)`。
+## 装备的「防御」词条写这里；敌人没填就是 0（挨打全额）
+## （2026-09-18 从按比例的 damage_reduction 换成平铺点数，见 docs/adr/0018）
+@export var defense: int = 0
+## 技能格挡的临时减伤（比例）。与护甲曲线**取 max，不是相加** ——
+## 相加会让「格挡 + 满装」叠出设计上没有的减伤档。技能结束由持有者清零
+@export var guard_reduction: float = 0.0
 
-## 减伤上限。留住这道天花板是为了「堆防御到无敌」不会成为解 —— 见 docs/adr/0005
+## 减伤上限。留住这道天花板是为了「堆防御到无敌」不会成为解 —— 见 docs/adr/0005。
+## 护甲曲线在 def=150 时正好到 0.6，之后一刀切平（ADR-0019 的 def≤150 封顶）
 const MAX_DAMAGE_REDUCTION := 0.6
 
 var hp: int = 0
@@ -51,8 +57,9 @@ func can_be_hit() -> bool:
 
 ## 扣血。返回实际造成的伤害；0 表示这次没打中（无敌 / 已死 / 已在受击无敌里）。
 ## 攻击方靠这个返回值决定「算不算命中」，所以要严格区分 0 和「打出了 0 点伤害」。
-## 护甲（damage_reduction）在这一层生效：攻击方算出的伤害先去减伤，再落到血上。
+## 护甲在这一层生效：攻击方算出的伤害先去减伤，再落到血上。
 ## 放在 Health 而不是攻击方，是因为「挨打的人有多硬」属于挨打的人。
+## **玩家与敌人共用这一套**（敌人填 def 就自动生效，见 docs/adr/0020）
 func take_damage(amount: int, point: Vector2 = Vector2.ZERO, heavy: bool = false, dir: int = 0) -> int:
 	if not can_be_hit() or amount <= 0:
 		return 0
@@ -68,10 +75,23 @@ func take_damage(amount: int, point: Vector2 = Vector2.ZERO, heavy: bool = false
 	return dealt
 
 
+## 护甲曲线：减伤比例 = def/(100+def)，卡 0.6。
+## **这不是「攻击 − 防御」减法**（design-principles 4.5 明令禁止）：曲线连续、单调、
+## 有渐近线，不会出现「差一点就无敌 / 差一点就白给」的砖墙。
+## 例：def=20 → 16.7%，def=40 → 28.6%，def=150 → 60%（到顶）
+func armor_reduction() -> float:
+	return minf(float(defense) / (100.0 + float(defense)), MAX_DAMAGE_REDUCTION)
+
+
+## 实际生效的减伤：护甲曲线与技能格挡取 max。两条都过同一道封顶
+func effective_reduction() -> float:
+	return clampf(maxf(armor_reduction(), guard_reduction), 0.0, MAX_DAMAGE_REDUCTION)
+
+
 ## 减伤计算。至少留 1 点 —— 「全身神装站着不掉血」会让挨打彻底失去代价，
 ## 而保底 1 点守住了这条底线（掉出世界的 9999 点照样秒杀，减伤不吃掉它）
 func _reduced(amount: int) -> int:
-	var r := clampf(damage_reduction, 0.0, MAX_DAMAGE_REDUCTION)
+	var r := effective_reduction()
 	if r <= 0.0:
 		return amount
 	return maxi(1, int(round(float(amount) * (1.0 - r))))

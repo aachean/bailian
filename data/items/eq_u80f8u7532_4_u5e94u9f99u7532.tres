@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u80f8u7532_4_u5e94u9f99u7532"
+name_key = &"ITEM_EQ_U80F8U7532_4_U5E94U9F99U7532"
+display_name = "应龙甲"
+slot = 2
+tier = 4
+min_level = 60
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 69
+hp_max = 110
+def_min = 22
+def_max = 32
+gold_price = 540

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u9879u94fe_5_u9e3fu8499u73e0"
+name_key = &"ITEM_EQ_U9879U94FE_5_U9E3FU8499U73E0"
+display_name = "鸿蒙珠"
+slot = 6
+tier = 5
+min_level = 75
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 75
+hp_max = 112
+def_min = 0
+def_max = 0
+gold_price = 1200

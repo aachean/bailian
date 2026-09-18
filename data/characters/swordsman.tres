@@ -13,6 +13,6 @@ sprite_dir = "res://assets/characters/swordsman"
 sprite_scale = 1.5
 sprite_frame_h = 84.0
 sprite_foot_y = 62.0
-starting_weapon = "res://data/items/iron_sword.tres"
+starting_weapon = "res://data/items/wp_u5251_0_u94c1u5251.tres"
 combo = Array[String](["res://data/skills/attack_1.tres", "res://data/skills/attack_2.tres", "res://data/skills/attack_3.tres"])
 skills = Array[String](["res://data/skills/whirl.tres", "res://data/skills/thrust.tres", "res://data/skills/ironwall.tres", "res://data/skills/sword_wave.tres", "res://data/skills/quake.tres", "res://data/skills/breathe.tres", "res://data/skills/upcut.tres"])

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u5934u76d4_3_u8d64u94dcu76d4"
+name_key = &"ITEM_EQ_U5934U76D4_3_U8D64U94DCU76D4"
+display_name = "赤铜盔"
+slot = 1
+tier = 3
+min_level = 45
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 23
+hp_max = 36
+def_min = 11
+def_max = 16
+gold_price = 220

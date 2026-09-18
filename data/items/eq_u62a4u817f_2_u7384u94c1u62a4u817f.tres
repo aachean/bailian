@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u62a4u817f_2_u7384u94c1u62a4u817f"
+name_key = &"ITEM_EQ_U62A4U817F_2_U7384U94C1U62A4U817F"
+display_name = "玄铁护腿"
+slot = 3
+tier = 2
+min_level = 30
+source = &"drop"
+atk_min = 0
+atk_max = 0
+hp_min = 15
+hp_max = 25
+def_min = 6
+def_max = 10
+gold_price = 140

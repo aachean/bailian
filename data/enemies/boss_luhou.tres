@@ -21,7 +21,7 @@ attack_skill = ExtResource("2_skill")
 drop_shards = 24
 exp_reward = 200
 drop_item_chance = 1.0
-drop_items = Array[String](["res://data/items/flame_blade.tres", "res://data/items/jade_talisman.tres", "res://data/items/iron_armor.tres"])
+drop_items = Array[String](["res://data/items/eq_u5934u76d4_1_u7cbeu94a2u76d4.tres", "res://data/items/eq_u5934u76d4_1_u94feu7532u76d4.tres", "res://data/items/eq_u6212u6307_1_u7389u77f3u6212.tres", "res://data/items/eq_u6212u6307_1_u7cbeu94a2u6212.tres", "res://data/items/eq_u624bu956f_1_u7cbeu94a2u956f.tres", "res://data/items/eq_u624bu956f_1_u94f6u956f.tres", "res://data/items/eq_u62a4u817f_1_u7cbeu94a2u62a4u817f.tres", "res://data/items/eq_u62a4u817f_1_u94feu7532u62a4u817f.tres", "res://data/items/eq_u80f8u7532_1_u94c1u7532.tres", "res://data/items/eq_u80f8u7532_1_u9501u5b50u7532.tres", "res://data/items/eq_u9774u5b50_1_u7cbeu94a2u9774.tres", "res://data/items/eq_u9774u5b50_1_u94c1u9774.tres", "res://data/items/eq_u9879u94fe_1_u7389u4f69.tres", "res://data/items/eq_u9879u94fe_1_u94f6u94fe.tres", "res://data/items/wp_u5200_1_u7cbeu94a2u5200.tres", "res://data/items/wp_u5200_1_u96c1u7fceu5200.tres", "res://data/items/wp_u5251_1_u767eu70bcu5251.tres", "res://data/items/wp_u5251_1_u7cbeu94a2u5251.tres", "res://data/items/wp_u5f13_1_u89d2u5f13.tres", "res://data/items/wp_u5f13_1_u94c1u80ceu5f13.tres", "res://data/items/wp_u6756_1_u767du8721u6756.tres", "res://data/items/wp_u6756_1_u7cbeu94a2u6cd5u6756.tres"])
 
 drop_gold = 0
 drop_heal_chance = 0.0

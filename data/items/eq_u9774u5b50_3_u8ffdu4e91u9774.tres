@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u9774u5b50_3_u8ffdu4e91u9774"
+name_key = &"ITEM_EQ_U9774U5B50_3_U8FFDU4E91U9774"
+display_name = "追云靴"
+slot = 4
+tier = 3
+min_level = 45
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 20
+hp_max = 32
+def_min = 7
+def_max = 11
+gold_price = 220

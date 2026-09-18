@@ -18,8 +18,10 @@ extends Resource
 ## 便宜得多，因为**它一开始就不需要压**。
 
 ## 各品质的强化上限，下标 = ItemData.Tier 的枚举序号。
-## 顺序必须与 ItemData.Tier 一致：COMMON / FINE / RARE
-@export var tier_max: Array[int] = [3, 5, 8]
+## 顺序必须与 ItemData.Tier 一致：普通 / 精良 / 优秀 / 极品 / 传说 / 至尊（6 档，2026-09-18 扩）
+## ⚠️ 这个数组是**按下标取值**的（max_for_tier 用 clampi）—— Tier 枚举一动，
+## 这里必须同改，否则越界静默夹到最后一项，等于所有品质共用一个上限（违反 5.2）
+@export var tier_max: Array[int] = [3, 4, 5, 6, 7, 8]
 
 @export_group("成本（从第 n 级升到 n+1 级 = base_cost × cost_growth^n）")
 @export var base_cost: int = 3

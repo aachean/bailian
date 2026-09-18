@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u5934u76d4_5_u5e1du80c4"
+name_key = &"ITEM_EQ_U5934U76D4_5_U5E1DU80C4"
+display_name = "帝胄"
+slot = 1
+tier = 5
+min_level = 75
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 57
+hp_max = 86
+def_min = 26
+def_max = 38
+gold_price = 1200

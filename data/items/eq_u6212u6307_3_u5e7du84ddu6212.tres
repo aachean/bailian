@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u6212u6307_3_u5e7du84ddu6212"
+name_key = &"ITEM_EQ_U6212U6307_3_U5E7DU84DDU6212"
+display_name = "幽蓝戒"
+slot = 5
+tier = 3
+min_level = 45
+source = &"craft"
+atk_min = 11
+atk_max = 16
+hp_min = 0
+hp_max = 0
+def_min = 0
+def_max = 0
+gold_price = 220

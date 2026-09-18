@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u5934u76d4_0_u76aeu76d4"
+name_key = &"ITEM_EQ_U5934U76D4_0_U76AEU76D4"
+display_name = "皮盔"
+slot = 1
+tier = 0
+min_level = 1
+source = &"drop"
+atk_min = 0
+atk_max = 0
+hp_min = 5
+hp_max = 7
+def_min = 1
+def_max = 2
+gold_price = 30

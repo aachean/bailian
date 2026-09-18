@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"wp_u5f13_2_u7a7fu4e91u5f13"
+name_key = &"ITEM_WP_U5F13_2_U7A7FU4E91U5F13"
+display_name = "穿云弓"
+slot = 0
+weapon_type = &"bow"
+tier = 2
+min_level = 30
+source = &"drop"
+atk_min = 8
+atk_max = 13
+hp_min = 0
+hp_max = 0
+def_min = 0
+def_max = 0
+gold_price = 140

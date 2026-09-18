@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"eq_u624bu956f_3_u8d64u91d1u956f"
+name_key = &"ITEM_EQ_U624BU956F_3_U8D64U91D1U956F"
+display_name = "赤金镯"
+slot = 7
+tier = 3
+min_level = 45
+source = &"craft"
+atk_min = 0
+atk_max = 0
+hp_min = 0
+hp_max = 0
+def_min = 11
+def_max = 16
+gold_price = 220

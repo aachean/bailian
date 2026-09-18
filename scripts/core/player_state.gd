@@ -39,8 +39,10 @@ signal exp_changed(new_exp: int)
 ## 场景里的玩家节点也听它 —— 换装与强化要立刻改变攻击倍率 / 生命上限 / 减伤。
 signal equipment_changed
 
-## 槽位 id，顺序与 ItemData.Slot 枚举一致
-const SLOT_IDS: Array[StringName] = [&"weapon", &"helm", &"armor", &"trinket"]
+## 槽位 id **不再在这里重复定义** —— 唯一来源是 `ItemData.SLOT_IDS`。
+## 2026-09-18 删掉这份副本：v1 时它和 ItemData 各有一份（4 项硬编码），
+## 扩到 8 槽时两处都要改，漏一处就是「装备栏少几个槽」这种静默错位。
+## 单一定义 = `ItemData.SLOT_IDS`（顺序与 ItemData.Slot 枚举一致）
 
 ## 实例 id 的分隔符
 const UID_SEP := "#"
@@ -111,8 +113,17 @@ var skill_slots: Array = ["", "", "", "", ""]
 ## 携带的技能变了（装上 / 卸下 / 自动补位）—— 玩家节点听了重建技能表
 signal skills_changed
 
-## 词条聚合缓存。装备一变就重算，免得 HUD 每帧去 load 一遍所有装备资源
-var _bonus: Dictionary = {"atk": 0.0, "hp": 0, "def": 0.0}
+## 词条聚合缓存。装备一变就重算，免得 HUD 每帧去 load 一遍所有装备资源。
+## v2 的形状（2026-09-18 从 {"atk": 百分比, "hp": 点, "def": 百分比} 拆开）：
+##   atk_flat – 装备平铺攻击合计（点数，**加算**进伤害）
+##   atk_pct  – 百分比攻击合计（**只剩强化**；装备攻击不再进这里）
+##   hp       – 装备平铺生命合计（点数）
+##   def_flat – 装备平铺防御合计（点数，走护甲曲线，不是减伤百分比）
+var _bonus: Dictionary = {"atk_flat": 0, "atk_pct": 0.0, "hp": 0, "def_flat": 0}
+
+## 实例词条缓存：uid → {"atk","hp","def"} 已 roll 定的值。
+## 不缓存的话，HUD 每帧刷新、每次 take_damage 都要重新 roll 一遍
+var _stat_cache: Dictionary = {}
 
 
 func reset_for_new_game() -> void:
@@ -189,7 +200,7 @@ func _migrate_legacy_upgrade(legacy: int) -> void:
 func _ensure_uid_counter() -> void:
 	var max_seen := 0
 	var all: Array = bag.duplicate()
-	for s in SLOT_IDS:
+	for s in ItemData.SLOT_IDS:
 		all.append(equipped_uid(s))
 	for u in all:
 		var i := str(u).find(UID_SEP)
@@ -288,7 +299,7 @@ func set_uid_counter(n: int) -> void:
 ## 铁匠铺的列表就用它 —— 顺序稳定，光标不会跳
 func forgeable_uids() -> Array:
 	var out: Array = []
-	for s in SLOT_IDS:
+	for s in ItemData.SLOT_IDS:
 		var uid := equipped_uid(s)
 		if not uid.is_empty():
 			out.append(uid)
@@ -463,7 +474,7 @@ func item_at(slot: StringName) -> ItemData:
 ## 按槽位顺序取「当前穿着的全部装备」，空槽是 null（界面按顺序画四行）
 func equipped_list() -> Array:
 	var out: Array = []
-	for s in SLOT_IDS:
+	for s in ItemData.SLOT_IDS:
 		out.append(item_at(s))
 	return out
 
@@ -522,9 +533,33 @@ func _remove_from_bag(uid: String) -> void:
 		bag.remove_at(idx)
 
 
-## 全部装备的词条总和（含各件的强化加成）：{"atk": 倍率, "hp": 点, "def": 减伤比例}
+## 全部装备的词条总和（含各件的强化加成）。形状见 `_bonus` 的声明处
 func bonus_total() -> Dictionary:
 	return _bonus
+
+
+## 这件装备**实例**的平铺词条（已定的值）：{"atk": 点, "hp": 点, "def": 点}
+##
+## ── 为什么结果不进存档 ────────────────────────────────────────
+## 用 uid 的哈希当随机种子 —— **同一个实例每次算出来完全一样**。
+## 于是「逐件随机」（ADR-0017）既不需要新的存档结构、也不会因为读档或换场景而变；
+## 断言也能直接对账（与 audio.gd 用哈希生成噪声同一个理由：可复现才拿得住）。
+## 区间是 0/0 的装备（防具只有防御那种）取到 0，不影响别的轨道
+func stat_of(uid: String) -> Dictionary:
+	if uid.is_empty():
+		return {"atk": 0, "hp": 0, "def": 0}
+	if _stat_cache.has(uid):
+		return _stat_cache[uid]
+	var it := item_of(uid)
+	var out: Dictionary
+	if it == null:
+		out = {"atk": 0, "hp": 0, "def": 0}
+	else:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(uid)
+		out = it.roll(rng)
+	_stat_cache[uid] = out
+	return out
 
 
 ## 直接摆入装备栏、背包与强化表（读档用）。摆完重算词条并发信号让玩家节点跟上
@@ -540,33 +575,44 @@ func set_equipment(e: Dictionary, b: Array, f: Dictionary = {}) -> void:
 ## 比例类属性的硬上限（设计原则 4.2）。**所有比例属性都必须从这儿过一道** ——
 ## 将来加暴击 / 闪避 / 穿透时，把上限加进这个 match，别在各自的计算里各写一份。
 ## 未知的比例属性一律夹到 [0, 1]：宁可保守，也不要一个没设上限的百分比流出去
+##
+## ⚠️ 2026-09-18（v2）：**防御已经不是比例属性了**。它现在是平铺点数，
+## 上限改由 `Health.armor_reduction()` 的护甲曲线自己卡（def=150 → 0.6）。
+## 所以这里删掉了 `&"def"` 分支 —— **别再往这儿送 def**，那会变成「夹 0.6 但单位是点」
+## 这种静默的错。（4.2「比例属性要有天花板」这条本身没变，只是天花板搬了家）
 func clamp_ratio(key: StringName, value: float) -> float:
 	match key:
-		&"def":
-			return clampf(value, 0.0, Health.MAX_DAMAGE_REDUCTION)
 		_:
 			return clampf(value, 0.0, 1.0)
 
 
 func _recalc_bonus() -> void:
-	var atk := 0.0
+	var atk_flat := 0
+	var atk_pct := 0.0
 	var hp := 0
-	var def := 0.0
-	for s in SLOT_IDS:
+	var def_flat := 0
+	for s in ItemData.SLOT_IDS:
 		var uid := equipped_uid(s)
-		var it := item_of(uid)
-		if it == null:
+		if uid.is_empty():
 			continue
-		atk += it.atk_bonus + forge_atk(uid)     # 强化加成叠进同一个乘区（设计原则 4.1）
-		hp += it.hp_bonus
-		def += it.def_bonus
-	# 加总类属性走软上限（3.4）：堆过头之后每点越不值钱
+		var st := stat_of(uid)
+		atk_flat += int(st.get("atk", 0))
+		hp += int(st.get("hp", 0))
+		def_flat += int(st.get("def", 0))
+		atk_pct += forge_atk(uid)                 # 强化加成叠进同一个乘区（4.1）
 	var prog := progression
 	_bonus = {
-		"atk": prog.soften(atk, prog.soft_knee_atk, prog.soft_cap_atk),
-		"hp": int(round(prog.soften(float(hp), float(prog.soft_knee_hp), float(prog.soft_cap_hp)))),
-		# 比例类属性走硬上限（4.2）：界面上写 -60% 就必须真的一分不多
-		"def": clamp_ratio(&"def", def),
+		# 平铺攻击**不进软上限**：能穿的件数是固定的（8 槽各 1 件），每件的上限由档位封死
+		# —— 压根不存在「无限堆叠」这件事（ADR-0021 §2.6）
+		"atk_flat": atk_flat,
+		# 强化% 仍然要压：单件练到顶是 +72.8%，8 件叠起来 +582%。
+		# knee/cap 沿用 1.0/1.0（量级没变，还是百分比）。
+		# ⚠️ **别把这条曲线套到平铺攻击上** —— 48 点攻击走 soften(x,1,1) 会变成 1.98
+		"atk_pct": prog.soften(atk_pct, prog.soft_knee_atk, prog.soft_cap_atk),
+		# 平铺生命同理不进软上限：8 件是固定件数，档位也封了每件的上限
+		"hp": hp,
+		# 平铺防御不进这里 —— 它走 Health 的护甲曲线，在那里卡 0.6（4.2 的上限仍只有一处）
+		"def_flat": def_flat,
 	}
 
 
