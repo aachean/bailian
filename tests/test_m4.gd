@@ -184,22 +184,22 @@ func _t5_mp_regen() -> void:
 		"10 → %d（80 帧内）" % mp)
 
 
-## C 键开关角色面板
+## B 键开关背包面板（角色属性已并入，C 键废除 —— 2026-09-18）
 func _t6_panel_toggles() -> void:
 	var hud := _player.get_node_or_null("HUD")
 	if hud == null:
-		_check("6", "C 键开关角色面板", false, "找不到 HUD")
+		_check("6", "B 键开关背包面板", false, "找不到 HUD")
 		return
-	var was: bool = hud.get_node("CharPanel").visible
-	_press("panel")
+	var was: bool = hud.get_node("BagPanel").visible
+	_press("bag")
 	await _pframes(4)
-	_release("panel")
-	var opened: bool = hud.get_node("CharPanel").visible
-	_press("panel")
+	_release("bag")
+	var opened: bool = hud.get_node("BagPanel").visible
+	_press("bag")
 	await _pframes(4)
-	_release("panel")
-	var closed: bool = not hud.get_node("CharPanel").visible
-	_check("6", "C 键开关角色面板（属性总览）",
+	_release("bag")
+	var closed: bool = not hud.get_node("BagPanel").visible
+	_check("6", "B 键开关背包面板（属性+装备+背包一体）",
 		(not was) and opened and closed,
 		"初始关=%s　按后开=%s　再按关=%s" % [str(not was), str(opened), str(closed)])
 

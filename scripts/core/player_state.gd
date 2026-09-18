@@ -133,9 +133,6 @@ func reset_for_new_game() -> void:
 	blueprints.clear()
 	revive_tokens = 0
 	revive_bought.clear()
-	shop_offers.clear()
-	shop_bp_offers.clear()
-	shop_refreshed_at = 0.0
 	character_id = ""
 	level = 1
 	exp = 0
@@ -165,9 +162,6 @@ func load_from(d: Dictionary) -> void:
 	blueprints = (d.get("blueprints", []) as Array).duplicate()
 	revive_tokens = int(d.get("revive_tokens", 0))
 	revive_bought = (d.get("revive_bought", {}) as Dictionary).duplicate()
-	shop_offers = (d.get("shop_offers", []) as Array).duplicate()
-	shop_bp_offers = (d.get("shop_bp_offers", []) as Array).duplicate()
-	shop_refreshed_at = float(d.get("shop_refreshed_at", 0.0))
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
@@ -187,9 +181,6 @@ func save_to() -> Dictionary:
 		"blueprints": blueprints.duplicate(),
 		"revive_tokens": revive_tokens,
 		"revive_bought": revive_bought.duplicate(),
-		"shop_offers": shop_offers.duplicate(),
-		"shop_bp_offers": shop_bp_offers.duplicate(),
-		"shop_refreshed_at": shop_refreshed_at,
 		"character_id": character_id,
 		"level": level,
 		"exp": exp,
@@ -520,37 +511,67 @@ func has_blueprint(path: String) -> bool:
 	return blueprints.has(path)
 
 
-# ── 商店货架刷新（每 4 现实小时换一批装备；制书常驻）──────────
+# ── 商店货架刷新（每 4 现实小时换一批装备；制书也随机）──────────
+#
+# ── 刷新状态住**全局文件**，不进存档槽（2026-09-18 神圈注）────────
+# 「每 4 现实小时」意味着时钟属于**现实世界**，不属于某个存档：
+# 放进存档槽的话，退出时机不对（商店状态没赶上下一次保存）重进就会
+# 回到 4:00:00。user://shop_refresh.cfg 是唯一真相：所有存档槽共享
+# 同一家店的同一批货、同一个钟 —— 商店是「世界的店」，不随读档回滚。
+
+const SHOP_STATE_PATH := "user://shop_refresh.cfg"
 
 ## 当前货架（随机抽的装备路径数组）。**不是 ShopData.stock** ——
 ## stock 是「这家店卖什么档次」的底线清单，offers 是这一批实际摆出来的货
 var shop_offers: Array = []
 
-## 本期的**随机制书货架**（装备路径数组）。制书不再常驻 66 本 ——
-## 每期独立 roll：10% 极品 / 5% 传说 / 1% 至尊（2026-09-18 神定的概率与定价），
+## 本期的**随机制书货架**（装备路径数组）。每期独立 roll：
+## 10% 极品 / 5% 传说 / 1% 至尊（2026-09-18 神定的概率与定价），
 ## 出了就随机该档的一件装备。**本期限购 1 本**：买走即从货架上撤下，
 ## 再想要只能等下次刷新
 var shop_bp_offers: Array = []
 
-## 上次刷新的时刻（Unix 秒）。存档 —— 关游戏时间也在走
+## 上次刷新的时刻（Unix 秒，现实时间）
 var shop_refreshed_at: float = 0.0
+
+
+## 从全局文件恢复货架状态（ensure_shop_fresh 开头调 —— 打开商店看一眼）
+func _load_shop_state() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SHOP_STATE_PATH) != OK:
+		return
+	shop_offers = cfg.get_value("shop", "offers", [])
+	shop_bp_offers = cfg.get_value("shop", "bp_offers", [])
+	shop_refreshed_at = float(cfg.get_value("shop", "refreshed_at", 0.0))
+
+
+## 货架状态写回全局文件。抽新货 / 买走撤下时都要调 ——
+## 状态只在内存里的话，退出游戏就丢，时钟又回 4 小时
+func save_shop_state() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("shop", "offers", shop_offers)
+	cfg.set_value("shop", "bp_offers", shop_bp_offers)
+	cfg.set_value("shop", "refreshed_at", shop_refreshed_at)
+	cfg.save(SHOP_STATE_PATH)
 
 
 ## 货架过期了就重抽。**进商店面板前调**（打开时看一眼，不靠时钟轮询）。
 ## 装备：从已建档的掉落档次（普通/精良/优秀）里不重复抽 7 件 ——
 ## 极品+永远不进货（途径隔离，ADR-0016）。
 ## 制书：8 个书位独立 roll（10/5/1%），出书才占位。
-## 首次（没档/刚 reset）：立刻抽一批并把时刻设为现在
+## 首次（没有任何记录）：立刻抽一批并把时刻设为现在
 func ensure_shop_fresh() -> void:
 	var hours := 4.0
 	var sd := shop()
 	if sd != null:
 		hours = float(sd.refresh_hours)
+	_load_shop_state()
 	var now := Time.get_unix_time_from_system()
 	if shop_offers.is_empty() or now - shop_refreshed_at >= hours * 3600.0:
 		shop_offers = _roll_shop_offers(7)   # 7 件 + 尾部一条还魂丹 = 左栏 8 行正好
 		shop_bp_offers = _roll_bp_offers(8)
 		shop_refreshed_at = now
+		save_shop_state()
 
 
 ## 抽一批装备货架：三档混合（普通偏多）。不重复 —— 同一件摆两份没有意义

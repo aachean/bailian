@@ -471,8 +471,6 @@ func _t12_empty_bag_state() -> void:
 ## （写这条时立刻抓到一处：角色面板的 PANEL_SHARD 是个不存在的 key）
 func _t13_no_translation_key_leak() -> void:
 	var hud := _player.get_node("HUD")
-	hud.get_node("CharPanel").visible = true
-	hud.call("refresh")
 	_press("bag")
 	await _pframes(3)
 	_release("bag")
@@ -492,7 +490,6 @@ func _t13_no_translation_key_leak() -> void:
 	await _pframes(3)
 	_release("bag")
 	await _pframes(2)
-	hud.get_node("CharPanel").visible = false
 
 	_check("13", "两个面板上都不出现翻译 key 本身（漏翻是静默失败，只能这么抓）",
 		leaks.is_empty(),
@@ -528,18 +525,15 @@ func _t14_item_icons() -> void:
 	await _pframes(2)
 	var switched: bool = _icon_path(weapon_icon) == FLAME_BLADE
 
-	# 角色面板（C）的装备行也用同一套图标
-	hud.get_node("CharPanel").visible = true
-	hud.call("refresh")
+	# 背包面板的装备行也用同一套图标（角色面板已并入背包 —— C 键废除）
+	hud.call("refresh_bag")
 	await _pframes(2)
-	var char_box := hud.get_node("CharPanel/EquipRows") as VBoxContainer
+	var char_box := hud.get_node("BagPanel/EquipRows") as VBoxContainer
 	var char_weapon_icon := char_box.get_child(0).get_child(0) as ItemIcon
 	var char_helm_icon := char_box.get_child(1).get_child(0) as ItemIcon
 	var char_ok: bool = _icon_path(char_weapon_icon) == FLAME_BLADE \
 		and _icon_path(char_helm_icon) == IRON_HELM
 	var char_ids := "%s / %s" % [_id_of(char_weapon_icon), _id_of(char_helm_icon)]
-	hud.get_node("CharPanel").visible = false
-
 	_press("bag")
 	await _pframes(3)
 	_release("bag")

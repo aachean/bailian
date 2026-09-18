@@ -525,24 +525,20 @@ func _t12_hud_shows_player_state() -> void:
 	var mat_row: String = (hud.get_node("BagPanel/MatRow") as Label).text
 	hud.call("_unhandled_input", _make_action("bag"))
 	await _pframes(2)
-	# 开角色面板：武器强化等级现在住在面板里（HUD 等级位显示角色等级）。
-	# ⚠️ v2 起属性表**拆成两栏**（左生存 / 右战力），精铁那一行在**右栏**里 ——
-	# 只看左边那个 Label 会得到「面板里没有精铁」这种假红
-	hud.call("_unhandled_input", _make_action("panel"))
+	# 属性块并入 B 面板（C 键废除）：StatsLabel 顶部该有「等级」属性行
+	hud.call("_unhandled_input", _make_action("bag"))
 	await _pframes(2)
-	var panel_text: String = (hud.get_node("CharPanel/Text") as Label).text
-	var panel_text2: String = (hud.get_node("CharPanel/Text2") as Label).text
-	var panel_all := panel_text + "\n" + panel_text2
-	hud.call("_unhandled_input", _make_action("panel"))
+	var panel_all: String = (hud.get_node("BagPanel/StatsL") as Label).text
+	hud.call("_unhandled_input", _make_action("bag"))
 	await _pframes(2)
 	town.queue_free()
 	await _pframes(2)
 
-	_check("12", "左上状态栏 / 右上元宝 / 材料行与角色面板各显其职",
+	_check("12", "左上状态栏 / 右上元宝 / 材料行与角色属性块各显其职",
 		bag.contains("7") and not bag.contains("精铁") and lv.begins_with("Lv.") \
-			and mat_row.contains("精铁4") and panel_all.contains("精铁"),
-		"右上「%s」　材料行含精铁4=%s　状态「%s」　面板含精铁行=%s" % [
-			bag, str(mat_row.contains("精铁4")), lv, str(panel_all.contains("精铁"))])
+			and mat_row.contains("精铁4") and panel_all.contains("等级"),
+		"右上「%s」　材料行含精铁4=%s　状态「%s」　属性块含等级行=%s" % [
+			bag, str(mat_row.contains("精铁4")), lv, str(panel_all.contains("等级"))])
 
 
 ## 锻造台（2026-09-18 神要求补上）：打造藏在铁砧面板的 Tab 页里玩家没找到 ——

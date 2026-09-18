@@ -34,7 +34,6 @@ var _cursor := 0                 # 全面板共用一个光标：0..7 是装备�
 var _equip_rows: Array[HBoxContainer] = []
 ## 背包格子（2×6）：每格 = 底板（选中高亮）+ 图标。底板颜色就是选中态
 var _bag_cells: Array[Panel] = []
-var _char_equip_rows: Array[HBoxContainer] = []
 ## 技能栏的 5 个格子（代码建的 Panel，里面是图标 / 冷却遮罩 / 键位角标）
 var _skill_cells: Array = []
 
@@ -61,12 +60,10 @@ var _has_player := false
 ## 「砺场 · 第 2 段 / 共 3 段」。一屏一屏推进时玩家要随时知道自己推进到哪了 ——
 ## 这是三层结构带来的新信息，HUD 上不写就只能靠舆图反复确认
 @onready var _stage_label: Label = $Stage
-@onready var _panel: Panel = $CharPanel
-@onready var _panel_text: Label = $CharPanel/Text
-## 属性表的右栏。**八行属性竖着排会跟下面八行装备抢位置**（360 高的屏幕塞不下），
-## 所以拆两栏：左边生存（等级/经验/生命/魔力），右边战力（攻击/防御/元宝/强化）
-@onready var _panel_text2: Label = $CharPanel/Text2
-@onready var _char_equip_box: VBoxContainer = $CharPanel/EquipRows
+## 角色属性块（B 面板左栏顶部）。**C 键面板已并入这里**（2026-09-18 神裁定：
+## 不需要按 C，按 B 一键看全部）—— 一个面板一个键，信息不再拆两处
+@onready var _stats_l: Label = $BagPanel/StatsL
+@onready var _stats_r: Label = $BagPanel/StatsR
 @onready var _skill_bar: HBoxContainer = $SkillBar
 @onready var _bag_panel: Panel = $BagPanel
 @onready var _bag_title: Label = $BagPanel/Title
@@ -86,7 +83,6 @@ var _has_player := false
 
 func _ready() -> void:
 	_has_player = _player != null and _player.is_in_group("player")
-	_panel.visible = false
 	_bag_panel.visible = false
 	_skill_panel.visible = false
 	_build_rows()
@@ -114,10 +110,6 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("panel"):
-		_panel.visible = not _panel.visible
-		refresh()
-		return
 	if event.is_action_pressed("bag"):
 		toggle_bag()
 		return
@@ -146,8 +138,6 @@ func _build_rows() -> void:
 		_equip_rows.append(_make_row(_equip_box))
 	for _i in BAG_COLS * BAG_GRID_ROWS:
 		_bag_cells.append(_make_bag_cell())
-	for _i in ItemData.SLOT_IDS.size():
-		_char_equip_rows.append(_make_row(_char_equip_box, CHAR_ROW_HEIGHT))
 
 
 ## 造一个背包格子：底板（颜色 = 选中态）+ 居中图标。
@@ -567,6 +557,8 @@ func close_all_panels() -> void:
 func refresh_bag() -> void:
 	if not _bag_open:
 		return
+	# 角色属性块（原 C 面板的属性表）每次开背包都跟着刷 —— 一键看全部
+	_refresh_stats_block(_player.get_node("Health") as Health)
 	_bag_title.text = tr("UI_BAG_TITLE")
 	# 提示行两级：出错消息（2.4s）> 常规键位+余额。消息必须说出来，不许静默
 	if not _bag_msg.is_empty() and Time.get_ticks_msec() < _bag_msg_until:
@@ -772,8 +764,6 @@ func refresh() -> void:
 	refresh_skill_bar()
 	refresh_stage_label()
 
-	if _panel.visible:
-		refresh_char_panel(h)
 	if _bag_open:
 		refresh_bag()
 	if _skill_open:
@@ -822,9 +812,10 @@ func _exp_line(level: int, exp_pts: int) -> String:
 	return "%s %d / %d" % [tr("PANEL_EXP"), exp_pts, PlayerState.exp_needed(level)]
 
 
-## 角色面板：造梦西游式属性表，一行一项。数值全部来自「当前生效值」，
-## 不是来自某一个来源 —— 玩家在这儿看到的攻击加成必须等于实际打到怪身上的倍率
-func refresh_char_panel(h: Health) -> void:
+## 角色属性块（B 面板左栏顶部，8 行紧凑）。数值全部来自「当前生效值」，
+## 不是来自某一个来源 —— 玩家在这儿看到的攻击加成必须等于实际打到怪身上的倍率。
+## 原 C 键面板的属性表（2026-09-18 并入背包，一键看全部）
+func _refresh_stats_block(h: Health) -> void:
 	var level := int(_player.get("level"))
 	var exp_pts := int(_player.get("exp_pts"))
 	var mp := int(_player.get("mp"))
@@ -845,19 +836,12 @@ func refresh_char_panel(h: Health) -> void:
 		"%s +%d ×%.2f" % [tr("PANEL_ATK"), flat, dmg],
 		# 防御同理：平铺点数 + 它换来的减伤比例（由 Health 的护甲曲线算，不重复实现）
 		"%s %d（-%d%%）" % [tr("PANEL_DEF"), def, int(round(red * 100.0))],
-		# 这里曾经写成 tr("PANEL_SHARD") —— csv 里没有这个 key，于是界面上
-		# 直接显示 "PANEL_SHARD" 四个字，而且**不报任何错**。
-		# 漏翻 / 拼错 key 一律静默，只能靠截图或断言抓（截图抓到了）
-		"%s ×%d" % [tr("HUD_SHARD"), shards_of()],
 		_weapon_forge_line(),
 	]
-	# 两栏：左 = 生存（等级/经验/生命/魔力），右 = 战力（攻击/防御/元宝/强化）。
-	# **每栏 4 行是有原因的**：8 行竖排会顶掉下面的 8 行装备（360 高塞不下）
-	_panel_text.text = "\n".join(lines.slice(0, 4))
-	_panel_text2.text = "\n".join(lines.slice(4, 8))
-	# 装备八行带图标 —— 与背包面板同一个填法、同一套图标、同一个品质色
-	for i in ItemData.SLOT_IDS.size():
-		_fill_equip_row(_char_equip_rows[i], i, PlayerState.equipped_uid(ItemData.SLOT_IDS[i]), "")
+	# 左右两栏（生存 / 战力）—— 单栏 7 行在这个字体的行高下塞不下，
+	# 两栏各 4 行是 CharPanel 时代验证过不叠字的摆法
+	_stats_l.text = "\n".join(lines.slice(0, 4))
+	_stats_r.text = "\n".join(lines.slice(4, 7))
 
 
 ## 技能栏：5 格各显各的技能。冷却遮罩从满格缩到无（造梦西游式），

@@ -212,6 +212,7 @@ func _buy_gear(path: String) -> void:
 		refresh()
 		return
 	PlayerState.shop_offers.erase(path)
+	PlayerState.save_shop_state()      # 买走即落盘 —— 时钟与货架属于现实世界
 	_msg = I18n.t(&"UI_SHOP_BUY_OK", [PlayerState.gold])
 	_msg_color = GOLD
 	refresh()
@@ -238,6 +239,7 @@ func _buy_blueprint(bp_path: String) -> void:
 		return
 	if PlayerState.unlock_blueprint(bp_path):
 		PlayerState.shop_bp_offers.erase(bp_path)   # 本期限购 1：买走即撤，下期再随机
+		PlayerState.save_shop_state()
 		_msg = I18n.t(&"UI_SHOP_BP_OK", [tr(bp_it.name_key)])
 		_msg_color = GOLD
 	else:

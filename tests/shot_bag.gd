@@ -80,7 +80,6 @@ func _ready() -> void:
 	Input.parse_input_event(ev)
 	await _frames(4)
 	await _shot("char_panel.png")
-	player.get_node("HUD/CharPanel").visible = false   # 截图脚本直接关，不走输入去重
 	await _frames(3)
 
 	# ── 四、手里的刀：装上稀有武器挥一刀，光刃按武器品质变色 ──
