@@ -16,7 +16,7 @@ extends CanvasLayer
 ## 背包格子网格：**2 行 × 6 列 = 12 格**（2026-09-18 神圈注定形：一栏文字行太挤，
 ## 改成格子）。超出 12 件靠光标滚动翻页。
 const BAG_COLS := 6
-const BAG_GRID_ROWS := 2
+const BAG_GRID_ROWS := 5
 ## 背包格子边长（图标 16 + 内边距）。2 行 × 34 = 68，正好放进面板的格子区
 const BAG_CELL := 36.0
 const CURSOR_MARK := "▶ "

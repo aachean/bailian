@@ -182,7 +182,7 @@ text = "背包"
 offset_left = 12.0
 offset_top = 30.0
 offset_right = 104.0
-offset_bottom = 128.0
+offset_bottom = 124.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = ""
@@ -191,16 +191,16 @@ text = ""
 offset_left = 108.0
 offset_top = 30.0
 offset_right = 192.0
-offset_bottom = 128.0
+offset_bottom = 124.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = ""
 
 [node name="EquipRows" type="VBoxContainer" parent="BagPanel"]
 offset_left = 12.0
-offset_top = 136.0
+offset_top = 128.0
 offset_right = 192.0
-offset_bottom = 268.0
+offset_bottom = 264.0
 mouse_filter = 2
 theme_override_constants/separation = 0
 
@@ -243,7 +243,7 @@ color = Color(0.4, 0.35, 0.25, 1)
 offset_left = 380.0
 offset_top = 30.0
 offset_right = 620.0
-offset_bottom = 128.0
+offset_bottom = 222.0
 mouse_filter = 2
 theme_override_constants/h_separation = 3
 theme_override_constants/v_separation = 3
@@ -251,18 +251,18 @@ columns = 6
 
 [node name="MatRow" type="Label" parent="BagPanel"]
 offset_left = 380.0
-offset_top = 134.0
+offset_top = 228.0
 offset_right = 620.0
-offset_bottom = 150.0
+offset_bottom = 244.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.72, 0.7, 0.66, 1)
 text = ""
 
 [node name="BagEmpty" type="Label" parent="BagPanel"]
 offset_left = 380.0
-offset_top = 156.0
+offset_top = 250.0
 offset_right = 620.0
-offset_bottom = 174.0
+offset_bottom = 268.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.62, 0.6, 0.55, 1)
 text = ""
