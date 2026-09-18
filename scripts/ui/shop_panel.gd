@@ -1,16 +1,22 @@
 extends CanvasLayer
-## 商店：花元宝买装备。站在商店台前按 J 打开（首通砺场后才开张）。
+## 商店：**两栏** —— 左栏装备（随机货架，每 4 现实小时刷新）、右栏制书（常驻 66 本）。
+## 站在商店台前按 J 打开（首通砺场后才开张）。
 ##
-## ── 为什么卖在背包、买在这里 ──────────────────────────────────
-## 买：货架是商店自己的东西，进店才看得到 —— 界面跟着「谁的东西」走。
-## 卖：卖的是**玩家背包里**的存货，背包界面本来就在逐件展示它们，
-## 在那儿按 K 是最少操作的选择（造梦西游也是背包里按卖）。
+## ── 为什么两栏 ────────────────────────────────────────────────
+## 单栏把装备和制书混在一起，右半屏全是空的（2026-09-18 神的截图圈注）。
+## 分开后左栏是「这一批的货」（8 件，随刷新换），右栏是「打造许可」（逐件制书，
+## 永远全在）—— 两类商品的生命周期本来就不同。
+##
+## ── 刷新 ─────────────────────────────────────────────────────
+## 装备货架每 `ShopData.refresh_hours`（=4）**现实小时**换一批：从已建档的
+## 掉落档次随机抽 8 件。**进面板时查一次**（ensure_shop_fresh），不靠时钟轮询；
+## 上次刷新时刻进存档，关游戏时间也在走。右上角常驻倒计时。
 ##
 ## ── 与其它模态界面同一套约定 ──────────────────────────────────
 ## 挂在玩家节点下，`process_mode = ALWAYS` + `get_tree().paused = true`，
 ## 打开时先把 HUD 的面板让开，自己开着的时候别人不开（互查 is_open）。
 
-## 一屏显示几行（库存比这个少就照实画）
+## 每栏显示几行
 const ROWS := 8
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
@@ -24,21 +30,31 @@ const GOLD := Color(0.93, 0.84, 0.6, 1)
 const WARN := Color(0.95, 0.52, 0.45, 1)
 
 var _cursor := 0
-var _rows: Array[HBoxContainer] = []
+var _rows: Array[HBoxContainer] = []        # 左栏（装备货架）
+var _bp_rows: Array[HBoxContainer] = []     # 右栏（制书）
+## 制书区的滚动窗口顶（只滚右栏 —— 左栏货 ≤ 8 件本来就放得下）
+var _bp_top := 0
 ## 上一次操作的结果。**不静默**：按了键什么也没发生，玩家分不清是「没反应」还是「钱不够」
 var _msg := ""
 var _msg_color := DIM
+## 倒计时一秒才变一次，没必要每帧刷
+var _clock_accum := 0.0
 
 @onready var _root: Control = $Root
 @onready var _title: Label = $Root/Panel/Title
 @onready var _status: Label = $Root/Panel/Status
+@onready var _refresh_label: Label = $Root/Panel/RefreshLabel
+@onready var _gear_header: Label = $Root/Panel/GearHeader
+@onready var _bp_header: Label = $Root/Panel/BPHeader
 @onready var _list: VBoxContainer = $Root/Panel/Rows
+@onready var _bp_box: VBoxContainer = $Root/Panel/BPRows
 @onready var _hint: Label = $Root/Panel/Hint
 
 
 func _ready() -> void:
 	_root.visible = false
-	_build_rows()
+	_build_rows(_list, _rows)
+	_build_rows(_bp_box, _bp_rows)
 	if not PlayerState.gold_changed.is_connected(_on_gold_changed):
 		PlayerState.gold_changed.connect(_on_gold_changed)
 	if not PlayerState.equipment_changed.is_connected(_on_gold_changed):
@@ -59,6 +75,16 @@ func _on_language_changed(_locale: String = "") -> void:
 		refresh()
 
 
+## 倒计时是分钟级的，一秒刷一次文字足够（其它内容只在交互时重刷）
+func _process(delta: float) -> void:
+	if not _root.visible:
+		return
+	_clock_accum += delta
+	if _clock_accum >= 1.0:
+		_clock_accum = 0.0
+		_update_refresh_label()
+
+
 func is_open() -> bool:
 	return _root.visible
 
@@ -67,7 +93,10 @@ func is_open() -> bool:
 
 func open() -> void:
 	_cursor = 0
+	_bp_top = 0
 	_msg = ""
+	# 货架过期检查在这里（打开看一眼），不在 _process 里轮询
+	PlayerState.ensure_shop_fresh()
 	# 顺序照 death_menu：**先让路、再暂停**。反过来的话，让路过程中任何一句
 	# 解除暂停的代码都会把刚设的暂停抹掉（死过一次的坑，见 hud.close_all_panels）
 	var hud := _hud()
@@ -105,7 +134,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _move(dir: int) -> void:
-	var n := _entries().size()
+	var n := _gear_offers().size() + _bp_list().size()
 	if n <= 0:
 		return
 	_cursor = wrapi(_cursor + dir, 0, n)
@@ -113,58 +142,30 @@ func _move(dir: int) -> void:
 	refresh()
 
 
-## 货架条目：装备（资源路径字符串）在前，制书（["bp", 装备路径] 数组）在后 ——
-## 制书是「解锁」类商品，摆货架尾部。**逐件**：66 本（每件可打造装备一本），
-## 不是档位 —— 打造寒月剑要寒月剑的书（神的裁定，2026-09-18）。
-## 列表靠滚动（与铁匠铺打造页同一套），价格按档从 CraftingData 取
-func _entries() -> Array:
+## 左栏 = 本期随机货架（PlayerState.shop_offers，装备路径）
+func _gear_offers() -> Array:
+	return PlayerState.shop_offers
+
+
+## 右栏 = 逐件制书（66 本，装备路径）。书就是装备本身，索引用 drop_pool 现拼
+func _bp_list() -> Array:
 	var out: Array = []
-	var shop := PlayerState.shop()
-	if shop != null:
-		out.append_array(shop.stock)
 	for t in [ItemData.Tier.RARE, ItemData.Tier.EPIC, ItemData.Tier.LEGENDARY]:
-		for p in GameProgress.drop_pool(t):
-			out.append(["bp", p])
+		out.append_array(GameProgress.drop_pool(t))
 	return out
 
 
-## 买光标那件。PlayerState.buy_item 只回答成不成功，
-## 「为什么没买成」由这里区分着说 —— 钱不够与别的原因，玩家的下一步完全不同
+## 买光标那件。两个栏一个键，「为什么没买成」按条目类型区分着说
 func _buy_at_cursor() -> void:
-	var list := _entries()
-	if _cursor < 0 or _cursor >= list.size():
-		return
-	var entry = list[_cursor]
-	# ── 制书条目：买 = 拿到**这一件**的打造许可（永久），已有这本书拒绝重复付费 ──
-	if entry is Array:
-		var bp_path := str(entry[1])
-		var bp_it := load(bp_path) as ItemData
-		if bp_it == null:
-			_msg = tr("UI_SHOP_UNAVAILABLE")
-			_msg_color = WARN
-			refresh()
-			return
-		if PlayerState.has_blueprint(bp_path):
-			_msg = tr("UI_SHOP_BP_OWNED")
-			_msg_color = DIM
-			refresh()
-			return
-		var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
-		if PlayerState.gold < price:
-			_msg = I18n.t(&"UI_SHOP_POOR", [price - PlayerState.gold])
-			_msg_color = WARN
-			refresh()
-			return
-		if PlayerState.unlock_blueprint(bp_path):
-			_msg = I18n.t(&"UI_SHOP_BP_OK", [tr(bp_it.name_key)])
-			_msg_color = GOLD
-		else:
-			_msg = tr("UI_SHOP_UNAVAILABLE")
-			_msg_color = WARN
-		refresh()
-		return
-	# ── 装备条目（原样）──
-	var path := str(entry)
+	var gear_n := _gear_offers().size()
+	if _cursor < gear_n:
+		_buy_gear(str(_gear_offers()[_cursor]))
+	else:
+		_buy_blueprint(str(_bp_list()[_cursor - gear_n]))
+
+
+## 买装备（左栏）。买完从货架上撤下 —— 摆着的东西买走了还摆着，那不是商店是仓库
+func _buy_gear(path: String) -> void:
 	var it := load(path) as ItemData
 	if it != null and PlayerState.gold < it.gold_price:
 		_msg = I18n.t(&"UI_SHOP_POOR", [it.gold_price - PlayerState.gold])
@@ -177,21 +178,45 @@ func _buy_at_cursor() -> void:
 		_msg_color = WARN
 		refresh()
 		return
+	PlayerState.shop_offers.erase(path)
 	_msg = I18n.t(&"UI_SHOP_BUY_OK", [PlayerState.gold])
 	_msg_color = GOLD
 	refresh()
 
 
-func _stock() -> Array:
-	var shop := PlayerState.shop()
-	return [] if shop == null else shop.stock
+## 买制书（右栏）：拿到**这一件**的打造许可（永久）；已有这本书拒绝重复付费
+func _buy_blueprint(bp_path: String) -> void:
+	var bp_it := load(bp_path) as ItemData
+	if bp_it == null:
+		_msg = tr("UI_SHOP_UNAVAILABLE")
+		_msg_color = WARN
+		refresh()
+		return
+	if PlayerState.has_blueprint(bp_path):
+		_msg = tr("UI_SHOP_BP_OWNED")
+		_msg_color = DIM
+		refresh()
+		return
+	var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
+	if PlayerState.gold < price:
+		_msg = I18n.t(&"UI_SHOP_POOR", [price - PlayerState.gold])
+		_msg_color = WARN
+		refresh()
+		return
+	if PlayerState.unlock_blueprint(bp_path):
+		_msg = I18n.t(&"UI_SHOP_BP_OK", [tr(bp_it.name_key)])
+		_msg_color = GOLD
+	else:
+		_msg = tr("UI_SHOP_UNAVAILABLE")
+		_msg_color = WARN
+	refresh()
 
 
 # ── 绘制 ───────────────────────────────────────────────────────
 
 ## 行节点全部由代码建（与铁匠铺同一套做法）：手写 tscn 的嵌套 parent 路径
 ## 容易静默丢节点，能省的静态节点就省掉
-func _build_rows() -> void:
+func _build_rows(box: VBoxContainer, into: Array[HBoxContainer]) -> void:
 	for _i in ROWS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
@@ -212,8 +237,8 @@ func _build_rows() -> void:
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(lbl)
 
-		_list.add_child(row)
-		_rows.append(row)
+		box.add_child(row)
+		into.append(row)
 
 
 func refresh() -> void:
@@ -226,41 +251,33 @@ func refresh() -> void:
 	else:
 		_status.modulate = Color(1, 1, 1, 1)
 	_hint.text = tr("UI_SHOP_HINT")
+	_gear_header.text = tr("UI_SHOP_GEAR")
+	_bp_header.text = tr("UI_SHOP_BP")
+	_update_refresh_label()
 
-	var list := _entries()
-	if _cursor >= list.size():
-		_cursor = maxi(list.size() - 1, 0)
-	var top := _scroll_top(list.size(), ROWS)
+	var gear := _gear_offers()
+	var bps := _bp_list()
+	var total := gear.size() + bps.size()
+	if _cursor >= total:
+		_cursor = maxi(total - 1, 0)
+	var cursor_in_bp := _cursor >= gear.size()
+	if cursor_in_bp:
+		_bp_top = clampi(_cursor - gear.size() - ROWS / 2, 0, maxi(bps.size() - ROWS, 0))
+	else:
+		_bp_top = clampi(_bp_top, 0, maxi(bps.size() - ROWS, 0))
+
+	# ── 左栏：装备货架 ──
 	for r in ROWS:
-		var idx := top + r
 		var row := _rows[r]
 		var icon := row.get_child(0) as ItemIcon
 		var lbl := row.get_child(1) as Label
-		if idx >= list.size():
+		if r >= gear.size():
 			icon.visible = false
-			# 空状态要可见：整个货架空着才写一句，否则留空行
-			lbl.text = tr("UI_SHOP_EMPTY") if (list.is_empty() and r == 0) else ""
+			# 货架空要看得见（刷新批没抽出来 / 全买光了是两种状态的开头）
+			lbl.text = tr("UI_SHOP_EMPTY") if (gear.is_empty() and r == 0) else ""
 			lbl.modulate = DIM
 			continue
-		var entry = list[idx]
-		# ── 制书行：没有装备图标，画个「书」字占位 —— 视觉上跟装备分得开 ──
-		# **逐件**：书名就是装备名（制书·寒月剑），不是档次
-		if entry is Array:
-			var bp_path := str(entry[1])
-			var bp_it := load(bp_path) as ItemData
-			icon.visible = false
-			var mark := CURSOR_MARK if idx == _cursor else INDENT
-			if bp_it == null:
-				lbl.text = INDENT + "?"
-				lbl.modulate = DIM
-				continue
-			var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
-			var owned := PlayerState.has_blueprint(bp_path)
-			lbl.text = "%s📖 %s　%s ×%d" % [mark,
-				I18n.t(&"UI_BP_TIER", [tr(bp_it.name_key)]), tr("HUD_GOLD"), price]
-			lbl.modulate = DIM if owned else (GOLD if idx == _cursor else NORMAL)
-			continue
-		var it := load(str(entry)) as ItemData
+		var it := load(str(gear[r])) as ItemData
 		if it == null:
 			icon.visible = false
 			lbl.text = INDENT + "?"
@@ -269,13 +286,52 @@ func refresh() -> void:
 		icon.visible = true
 		icon.empty_frame = true
 		icon.set_item(it)
-		var mark := CURSOR_MARK if idx == _cursor else INDENT
+		var mark := CURSOR_MARK if _cursor == r else INDENT
 		var afford := PlayerState.gold >= it.gold_price
-		lbl.text = "%s%s　%s　%d" % [mark, tr(it.name_key), tr("HUD_GOLD"), it.gold_price]
-		if idx == _cursor:
+		lbl.text = "%s%s　%d" % [mark, tr(it.name_key), it.gold_price]
+		if _cursor == r:
 			lbl.modulate = GOLD if afford else WARN
 		else:
 			lbl.modulate = NORMAL if afford else Color(0.62, 0.6, 0.55, 1)
+
+	# ── 右栏：制书（逐件，滚动窗口）──
+	for r in ROWS:
+		var row := _bp_rows[r]
+		var icon := row.get_child(0) as ItemIcon
+		var lbl := row.get_child(1) as Label
+		var idx := _bp_top + r
+		if idx >= bps.size():
+			icon.visible = false
+			lbl.text = ""
+			lbl.modulate = DIM
+			continue
+		var bp_it := load(str(bps[idx])) as ItemData
+		if bp_it == null:
+			icon.visible = false
+			lbl.text = INDENT + "?"
+			lbl.modulate = DIM
+			continue
+		icon.visible = true
+		icon.empty_frame = true
+		icon.set_item(bp_it)
+		var sel := _cursor == gear.size() + idx
+		var mark := CURSOR_MARK if sel else INDENT
+		var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
+		var owned := PlayerState.has_blueprint(str(bps[idx]))
+		# 书名就是装备名（制书·寒月剑）；已有的置灰 —— 钱再多也不卖第二本
+		lbl.text = "%s📖 %s　%d" % [mark,
+			I18n.t(&"UI_BP_TIER", [tr(bp_it.name_key)]), price]
+		lbl.modulate = DIM if owned else (GOLD if sel else NORMAL)
+
+
+## 右上角倒计时：「下次刷新 2:41」（时:分）。过期显示「即将」—— 打开那一刻会换货
+func _update_refresh_label() -> void:
+	var left := PlayerState.shop_refresh_in()
+	if left <= 0.0:
+		_refresh_label.text = tr("UI_SHOP_REFRESH_SOON")
+		return
+	var total_min := int(ceil(left / 60.0))
+	_refresh_label.text = "%s %d:%02d" % [tr("UI_SHOP_REFRESH_IN"), total_min / 60, total_min % 60]
 
 
 func _scroll_top(total: int, rows: int) -> int:

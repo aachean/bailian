@@ -18,6 +18,10 @@ extends Resource
 
 ## 出售折价率。0.5 = 半价回收（造梦西游观感）
 @export_range(0.0, 1.0, 0.05) var sell_ratio: float = 0.5
+
+## 货架刷新周期（**现实小时**）。装备货架每隔这么久换一批（随机从掉落池抽），
+## 制书区常驻不刷新 —— 书是逐件的，66 本本来就全在。
+@export var refresh_hours: int = 4
 ##
 ## 制书**不在这里**：它不是档位商品 —— 神裁定（2026-09-18）制书逐件走，
 ## 66 本列表由 ShopPanel 从 `GameProgress.drop_pool`（可打造档的装备索引）现拼，

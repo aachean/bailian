@@ -446,8 +446,9 @@ func _t12_empty_bag_state() -> void:
 	await _pframes(2)
 	var cursor_after: int = int(hud.get("_cursor"))
 
-	var rows := (hud.get_node("BagPanel/Rows") as VBoxContainer)
-	var first_row: String = ((rows.get_child(0) as HBoxContainer).get_child(1) as Label).text
+	var grid := (hud.get_node("BagPanel/BagGrid") as GridContainer)
+	var first_cell_icon := (grid.get_child(0).get_child(1) as ItemIcon)
+	var detail: String = (hud.get_node("BagPanel/BagDetail") as Label).text
 	var equip_text := _hud_texts(hud)
 
 	_press("bag")
@@ -456,10 +457,11 @@ func _t12_empty_bag_state() -> void:
 	await _pframes(2)
 
 	_check("12", "背包空着时面板写明「（空）」，光标也不会越界",
-		first_row == tr("UI_BAG_EMPTY") and equip_text.contains(tr("UI_BAG_EMPTY")) \
+		not first_cell_icon.visible and detail == tr("UI_BAG_EMPTY") \
+			and equip_text.contains(tr("UI_BAG_EMPTY")) \
 			and cursor_after <= ItemData.SLOT_IDS.size() - 1,
-		"背包首行=「%s」　槽位显示含空=%s　光标 %d → %d（上限 %d）" % [
-			first_row, str(equip_text.contains(tr("UI_BAG_EMPTY"))),
+		"首格图标隐藏=%s　详情行=「%s」　光标 %d → %d（上限 %d）" % [
+			str(not first_cell_icon.visible), detail,
 			cursor_before, cursor_after, ItemData.SLOT_IDS.size() - 1])
 
 
@@ -512,10 +514,10 @@ func _t14_item_icons() -> void:
 	await _pframes(2)
 
 	var equip_box := hud.get_node("BagPanel/EquipRows") as VBoxContainer
-	var rows_box := hud.get_node("BagPanel/Rows") as VBoxContainer
+	var grid := hud.get_node("BagPanel/BagGrid") as GridContainer
 	var helm_icon := equip_box.get_child(1).get_child(0) as ItemIcon
 	var weapon_icon := equip_box.get_child(0).get_child(0) as ItemIcon
-	var empty_bag_icon := rows_box.get_child(0).get_child(0) as ItemIcon
+	var empty_bag_icon := (grid.get_child(0).get_child(1) as ItemIcon)
 
 	var helm_ok: bool = _icon_path(helm_icon) == IRON_HELM and helm_icon.visible
 	var empty_slot_ok: bool = weapon_icon != null and weapon_icon.item() == null and weapon_icon.visible

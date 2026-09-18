@@ -254,23 +254,43 @@ theme_override_constants/separation = 0
 
 [node name="Divider" type="ColorRect" parent="BagPanel"]
 offset_left = 10.0
-offset_top = 170.0
+offset_top = 168.0
 offset_right = 234.0
-offset_bottom = 172.0
+offset_bottom = 170.0
 mouse_filter = 2
 color = Color(0.4, 0.35, 0.25, 1)
 
-[node name="Rows" type="VBoxContainer" parent="BagPanel"]
+[node name="BagGrid" type="GridContainer" parent="BagPanel"]
 offset_left = 10.0
-offset_top = 176.0
+offset_top = 172.0
 offset_right = 236.0
-offset_bottom = 261.0
+offset_bottom = 236.0
 mouse_filter = 2
-theme_override_constants/separation = 0
+theme_override_constants/h_separation = 2
+theme_override_constants/v_separation = 2
+columns = 6
+
+[node name="BagDetail" type="Label" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 238.0
+offset_right = 236.0
+offset_bottom = 252.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+text = ""
+
+[node name="MatRow" type="Label" parent="BagPanel"]
+offset_left = 10.0
+offset_top = 254.0
+offset_right = 236.0
+offset_bottom = 268.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.72, 0.7, 0.66, 1)
+text = ""
 
 [node name="Hint" type="Label" parent="BagPanel"]
 offset_left = 10.0
-offset_top = 265.0
+offset_top = 268.0
 offset_right = 236.0
 offset_bottom = 281.0
 theme_override_font_sizes/font_size = 10

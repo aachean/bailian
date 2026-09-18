@@ -191,26 +191,30 @@ func _t3_sell_rules() -> void:
 			PlayerState.gold, 100 - price + half])
 
 
-## 商店面板（真实按键）：J 买货架第一件、买不起有话、Esc 关门
+## 商店面板（真实按键）：J 买光标那件、买不起有话、Esc 关门。
+## **从 offers 读第一件** —— 货架改成本期随机货后（4 小时刷新），写死 stock 第一件
+## 就会买到不存在的行；面板左栏第一件永远 = shop_offers[0]
 func _t4_shop_panel_buys() -> void:
 	_fresh_state()
-	PlayerState.add_gold(50)
-	var first := _stock_first()
-	var price := 0 if first == null else first.gold_price
+	PlayerState.add_gold(500)
 	var panel := _player.get_node("ShopPanel")
-	panel.call("open")
+	panel.call("open")                    # open 内部会 ensure_shop_fresh 抽货架
 	await _pframes(2)
 	var opened: bool = bool(panel.call("is_open")) and get_tree().paused
-	_tap_key(KEY_J)                       # 货架第一件
+	var offers: Array = panel.call("_gear_offers")
+	var first := load(str(offers[0])) as ItemData
+	var price := 0 if first == null else first.gold_price
+	_tap_key(KEY_J)                       # 光标默认在左栏第一件
 	await _pframes(2)
-	var bought: bool = PlayerState.gold == 50 - price and PlayerState.bag.size() == 1
+	var bought: bool = PlayerState.gold == 500 - price and PlayerState.bag.size() == 1
 	_tap_key(KEY_ESCAPE)
 	await _pframes(2)
 	var closed: bool = not bool(panel.call("is_open")) and not get_tree().paused
-	_check("4", "商店面板：开 → J 买下货架第一件 → Esc 关（暂停随面板走）",
-		opened and bought and closed,
-		"第一件「%s」定价 %d　元宝 50 → %d；背包 +1；Esc 后不暂停" % [
-			("—" if first == null else str(first.display_name)), price, PlayerState.gold])
+	_check("4", "商店面板：开（随机货架 ≥1 件）→ J 买下第一件 → Esc 关（暂停随面板走）",
+		opened and bought and closed and not offers.is_empty(),
+		"本期货架 %d 件，第一件「%s」定价 %d　元宝 500 → %d；背包 +1；Esc 后不暂停" % [
+			offers.size(), ("—" if first == null else str(first.display_name)), price,
+			PlayerState.gold])
 
 
 ## 商店台的门：首通砺场才开张（计划 §3.7）。通关表动了要原样还回去

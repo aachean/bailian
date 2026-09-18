@@ -13,15 +13,15 @@ extends CanvasLayer
 ## process_mode = ALWAYS 才能在暂停里收键）。这条偏离了 design-conventions 里
 ## 「面板不暂停游戏」的旧约定，已改文档并写进 docs/adr/0005。
 
-## 背包列表一屏几行，超出靠光标滚动。
-## **2026-09-18 从 6 收到 5**：八槽之后面板里要塞 8 行装备 + 背包，
-## 6 行会把面板底边压到技能栏上面（「屏幕最底边不放常驻元素」那条不能破）
-const BAG_ROWS := 5
+## 背包格子网格：**2 行 × 6 列 = 12 格**（2026-09-18 神圈注定形：一栏文字行太挤，
+## 改成格子）。超出 12 件靠光标滚动翻页。
+const BAG_COLS := 6
+const BAG_GRID_ROWS := 2
+## 背包格子边长（图标 16 + 内边距）。2 行 × 34 = 68，正好放进面板的格子区
+const BAG_CELL := 34.0
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
-## 背包面板一行的高度：图标 16 + 上下各留 0.5。
-## **2026-09-18 从 20 收到 17** —— 八槽之后面板里有 8 行装备 + 6 行背包，
-## 20 会算到 362px 高、把面板顶出 360 的屏幕下沿。17 正好落在 344。
+## 装备槽行的高度（面板上半，8 行）
 const ROW_HEIGHT := 17.0
 const ICON_SIZE := 16.0
 const CHAR_ROW_HEIGHT := 17.0    # 角色面板一行（与背包面板同高，两处行高必须一样）
@@ -30,9 +30,10 @@ var _bag_open := false
 ## 背包面板的提示消息（穿不上武器之类）—— 带过期时刻，2.4 秒后回常规提示
 var _bag_msg := ""
 var _bag_msg_until := 0
-var _cursor := 0                 # 全面板共用一个光标：0..3 是装备槽，之后是背包
+var _cursor := 0                 # 全面板共用一个光标：0..7 是装备槽，之后是背包
 var _equip_rows: Array[HBoxContainer] = []
-var _bag_rows: Array[HBoxContainer] = []
+## 背包格子（2×6）：每格 = 底板（选中高亮）+ 图标。底板颜色就是选中态
+var _bag_cells: Array[Panel] = []
 var _char_equip_rows: Array[HBoxContainer] = []
 ## 技能栏的 5 个格子（代码建的 Panel，里面是图标 / 冷却遮罩 / 键位角标）
 var _skill_cells: Array = []
@@ -70,7 +71,9 @@ var _has_player := false
 @onready var _bag_panel: Panel = $BagPanel
 @onready var _bag_title: Label = $BagPanel/Title
 @onready var _equip_box: VBoxContainer = $BagPanel/EquipRows
-@onready var _rows_box: VBoxContainer = $BagPanel/Rows
+@onready var _bag_grid: GridContainer = $BagPanel/BagGrid
+@onready var _bag_detail: Label = $BagPanel/BagDetail
+@onready var _mat_row: Label = $BagPanel/MatRow
 @onready var _bag_hint: Label = $BagPanel/Hint
 @onready var _skill_panel: Panel = $SkillPanel
 @onready var _skill_title: Label = $SkillPanel/Title
@@ -139,10 +142,31 @@ func _unhandled_input(event: InputEvent) -> void:
 func _build_rows() -> void:
 	for _i in ItemData.SLOT_IDS.size():
 		_equip_rows.append(_make_row(_equip_box))
-	for _i in BAG_ROWS:
-		_bag_rows.append(_make_row(_rows_box))
+	for _i in BAG_COLS * BAG_GRID_ROWS:
+		_bag_cells.append(_make_bag_cell())
 	for _i in ItemData.SLOT_IDS.size():
 		_char_equip_rows.append(_make_row(_char_equip_box, CHAR_ROW_HEIGHT))
+
+
+## 造一个背包格子：底板（颜色 = 选中态）+ 居中图标。
+## 格子里**不放文字** —— 名字与词条在格网下方的详情行（选中的那格才有）
+func _make_bag_cell() -> Panel:
+	var cell := Panel.new()
+	cell.custom_minimum_size = Vector2(BAG_CELL, BAG_CELL)
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := ColorRect.new()
+	bg.name = "BG"
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.color = Color(0.14, 0.14, 0.17, 1)
+	cell.add_child(bg)
+	var icon := ItemIcon.new()
+	icon.set_anchors_preset(Control.PRESET_CENTER)
+	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(icon)
+	_bag_grid.add_child(cell)
+	return cell
 
 
 ## 造一行：图标 + 文字。图标按部位画形状、按品质上色，与地上掉落物同一套。
@@ -431,6 +455,16 @@ func _bag_key(code: int) -> void:
 			_cursor += 1
 			_clamp_cursor()
 			refresh()
+		# 格子是 6 列网格：←→ 在格子里横着走（装备槽区里没意义但无害 ——
+		# 光标不会出界，clamp 兜着）
+		KEY_LEFT, KEY_A:
+			_cursor -= 1
+			_clamp_cursor()
+			refresh()
+		KEY_RIGHT, KEY_D:
+			_cursor += 1
+			_clamp_cursor()
+			refresh()
 		KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 			_use_cursor()
 		KEY_K:
@@ -537,8 +571,6 @@ func refresh_bag() -> void:
 		# 键位提示。**余额不再重复写在这行**（v2 八槽后面板变长了，这行摆不下）
 		# —— 元宝与精铁本来就常驻在 HUD 右上角，卖完钱立刻能看见进账
 		_bag_hint.text = "%s　·　%s" % [tr("UI_BAG_HINT"), tr("UI_BAG_SELL")]
-	var dim := Color(0.62, 0.6, 0.55, 1)
-	var normal := Color(0.9, 0.88, 0.84, 1)
 
 	# 上半：四个装备槽 —— 每行 [图标][槽位名　装备名　词条]
 	for i in ItemData.SLOT_IDS.size():
@@ -548,44 +580,59 @@ func refresh_bag() -> void:
 		if sel:
 			_row_label(_equip_rows[i]).modulate = Color(1, 1, 1, 1)
 
-	# 下半：背包列表（一屏 BAG_ROWS 行，随光标滚动）
+	# 下半：背包格子（2×6 网格，一页 12 格，超出靠光标翻页）。
+	# 格子里只放图标 —— 名字与词条在下方详情行（选中的那格才有），格子里塞文字就是截图里那种挤
 	var bag := PlayerState.bag
-	var top := _scroll_top(bag.size())
-	for r in BAG_ROWS:
-		var row := _bag_rows[r]
-		var icon := _row_icon(row)
-		var lbl := _row_label(row)
-		var idx := top + r
-		if idx >= bag.size():
-			# 空状态要可见：整个背包空着才写「（空）」，否则留空行
-			icon.visible = false
-			lbl.text = tr("UI_BAG_EMPTY") if (bag.is_empty() and r == 0) else ""
-			lbl.modulate = dim
-			continue
-		var uid := str(bag[idx])
+	var page := _bag_page()
+	for r in BAG_GRID_ROWS:
+		for c in BAG_COLS:
+			var cell := _bag_cells[r * BAG_COLS + c]
+			var bg := cell.get_node("BG") as ColorRect
+			var icon := cell.get_child(1) as ItemIcon
+			var idx := page * (BAG_COLS * BAG_GRID_ROWS) + r * BAG_COLS + c
+			var row_sel := (_cursor - ItemData.SLOT_IDS.size()) == idx
+			# 选中格：底板提亮 —— 光标在这里一眼可见，不需要再画箭头
+			bg.color = Color(0.34, 0.3, 0.18, 1) if row_sel else Color(0.14, 0.14, 0.17, 1)
+			if idx >= bag.size():
+				icon.visible = false
+				continue
+			var uid := str(bag[idx])
+			var it := PlayerState.item_of(uid)
+			icon.visible = true
+			icon.set_item(it)
+
+	# 详情行：光标在背包格上 = 那一件的名字与词条；背包整个空着要写明「（空）」——
+	# 格子全空 + 一句话都没有，玩家分不清「空」和「没画出来」
+	var detail_idx: int = _cursor - ItemData.SLOT_IDS.size()
+	if bag.is_empty():
+		_bag_detail.text = tr("UI_BAG_EMPTY")
+	elif detail_idx >= 0 and detail_idx < bag.size():
+		var uid := str(bag[detail_idx])
 		var it := PlayerState.item_of(uid)
-		var row_sel := (_cursor - ItemData.SLOT_IDS.size()) == idx
-		icon.visible = true
-		icon.set_item(it)
-		lbl.text = "%s%s　%s" % [
-			CURSOR_MARK if row_sel else INDENT,
+		_bag_detail.text = "%s　%s" % [
 			_item_name(it) if it != null else "?",
-			_stat_text(uid, it) if it != null else "",
-		]
-		lbl.modulate = Color(1, 1, 1, 1) if row_sel else normal
+			_stat_text(uid, it) if it != null else ""]
+	else:
+		_bag_detail.text = ""
+
+	# 材料行：五种材料常驻背包（含精铁 —— 它就是 shards，显示在这里，
+	# 主界面右上角只留元宝）。**这里就是材料数量的唯一显示位**
+	var cr := PlayerState.crafting()
+	var parts: Array[String] = []
+	for id in [PlayerState.MAT_REFINED_IRON, &"mat_black_iron", &"mat_sky_crystal", &"mat_dragon_soul", &"mat_taichu"]:
+		parts.append("%s%d" % [tr(cr.mat_key(id)), PlayerState.material_count(id)])
+	_mat_row.text = "　".join(parts)
 
 
-## 让光标始终落在可见的 6 行里
-func _scroll_top(count: int) -> int:
-	if count <= BAG_ROWS:
-		return 0
+## 背包格子当前页（每页 2×6=12 格）。光标越过页边界时自动翻页
+func _bag_page() -> int:
+	var bag: int = PlayerState.bag.size()
+	var per_page := BAG_COLS * BAG_GRID_ROWS
+	var pages := int(ceil(float(maxi(bag, 1)) / float(per_page)))
 	var idx: int = _cursor - ItemData.SLOT_IDS.size()
 	if idx < 0:
 		return 0
-	if idx < BAG_ROWS:
-		return 0
-	var top := idx - BAG_ROWS + 1
-	return clampi(top, 0, maxi(count - BAG_ROWS, 0))
+	return clampi(idx / per_page, 0, pages - 1)
 
 
 ## 装备名（高档加星）—— 名字用文字体现品质，颜色留给列表状态。
@@ -651,9 +698,9 @@ func refresh() -> void:
 	_portrait.set_exp(1.0 if needed <= 0 else float(exp_pts) / float(needed))
 	# 等级带上限：等级是「解锁内容的钥匙」，玩家得看得见离顶还有多远
 	_lv_label.text = "Lv.%d/%d" % [level, PlayerState.level_cap]
-	# 两笔钱都常驻：元宝（商店）/ 精铁（强化）。经济两条管道，玩家随时都得看得见余额
-	_bag_label.text = "%s ×%d　%s ×%d" % [
-		tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards]
+	# 主界面只显示元宝（2026-09-18 神圈注）。精铁搬进背包面板的材料行 ——
+	# 强化时打开背包/铁匠铺都看得见，战斗中它不是要盯的数字
+	_bag_label.text = "%s ×%d" % [tr("HUD_GOLD"), PlayerState.gold]
 
 	refresh_skill_bar()
 	refresh_stage_label()

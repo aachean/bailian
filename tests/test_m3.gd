@@ -511,11 +511,19 @@ func _t12_hud_shows_player_state() -> void:
 		await _pframes(2)
 		return
 
+	PlayerState.gold = 7
 	PlayerState.shards = 4
 	hud.call("refresh")
 	await _pframes(2)
 	var bag: String = (hud.get_node("Bag/Count") as Label).text
 	var lv: String = (hud.get_node("Status/Level") as Label).text
+	# 主界面只显示元宝（2026-09-18 神圈注）；精铁搬进**背包面板的材料行** ——
+	# 所以这里要开一次背包，材料行的「精铁4」才算数
+	hud.call("_unhandled_input", _make_action("bag"))
+	await _pframes(2)
+	var mat_row: String = (hud.get_node("BagPanel/MatRow") as Label).text
+	hud.call("_unhandled_input", _make_action("bag"))
+	await _pframes(2)
 	# 开角色面板：武器强化等级现在住在面板里（HUD 等级位显示角色等级）。
 	# ⚠️ v2 起属性表**拆成两栏**（左生存 / 右战力），精铁那一行在**右栏**里 ——
 	# 只看左边那个 Label 会得到「面板里没有精铁」这种假红
@@ -529,6 +537,8 @@ func _t12_hud_shows_player_state() -> void:
 	town.queue_free()
 	await _pframes(2)
 
-	_check("12", "左上状态栏 / 右上背包 / 角色面板各显其职",
-		bag.contains("4") and lv.begins_with("Lv.") and panel_all.contains("精铁"),
-		"背包「%s」　状态「%s」　面板含精铁行=%s" % [bag, lv, str(panel_all.contains("精铁"))])
+	_check("12", "左上状态栏 / 右上元宝 / 材料行与角色面板各显其职",
+		bag.contains("7") and not bag.contains("精铁") and lv.begins_with("Lv.") \
+			and mat_row.contains("精铁4") and panel_all.contains("精铁"),
+		"右上「%s」　材料行含精铁4=%s　状态「%s」　面板含精铁行=%s" % [
+			bag, str(mat_row.contains("精铁4")), lv, str(panel_all.contains("精铁"))])

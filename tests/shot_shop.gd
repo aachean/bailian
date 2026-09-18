@@ -27,13 +27,14 @@ func _ready() -> void:
 
 	panel.call("open")
 	await _frames(4)
-	# 光标移到货架尾部（制书区）：先翻到最后一页
-	var total: int = panel.call("_entries").size()
-	for _i in total:
+	# 光标移到右栏（制书区）：先翻到列表尾部
+	var gear: int = panel.call("_gear_offers").size()
+	var bps: int = panel.call("_bp_list").size()
+	for _i in gear + bps:
 		_tap_key(KEY_DOWN)
 		await _frames(1)
 	for _i in 3:
-		_tap_key(KEY_UP)      # 停在制书区中间，三行都进画面
+		_tap_key(KEY_UP)      # 停在制书区中间，几行都进画面
 		await _frames(2)
 	panel.call("refresh")
 	await _frames(3)

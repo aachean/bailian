@@ -131,6 +131,8 @@ func reset_for_new_game() -> void:
 	gold = 0
 	materials.clear()
 	blueprints.clear()
+	shop_offers.clear()
+	shop_refreshed_at = 0.0
 	character_id = ""
 	level = 1
 	exp = 0
@@ -158,6 +160,8 @@ func load_from(d: Dictionary) -> void:
 	next_uid = int(d.get("next_uid", 0))
 	materials = (d.get("materials", {}) as Dictionary).duplicate()
 	blueprints = (d.get("blueprints", []) as Array).duplicate()
+	shop_offers = (d.get("shop_offers", []) as Array).duplicate()
+	shop_refreshed_at = float(d.get("shop_refreshed_at", 0.0))
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
@@ -175,6 +179,8 @@ func save_to() -> Dictionary:
 		"gold": gold,
 		"materials": materials.duplicate(),
 		"blueprints": blueprints.duplicate(),
+		"shop_offers": shop_offers.duplicate(),
+		"shop_refreshed_at": shop_refreshed_at,
 		"character_id": character_id,
 		"level": level,
 		"exp": exp,
@@ -340,7 +346,11 @@ func spend_gold(n: int) -> bool:
 ## 失败返回空串（不在库存 / 不是装备 / 元宝不够 —— 界面负责区分原因）。
 ## 买来的是**新实例**：商店卖的是型号，玩家拿到的是自己那一件（与掉落同一模型）
 func buy_item(path: String) -> String:
-	if _shop == null or not _shop.has_stock(path):
+	# 货架有两份：stock（底线清单）与 shop_offers（本期随机货）——
+	# 买的是「这家店摆出来的东西」，两处都算在售
+	var sd := shop()
+	var on_sale: bool = sd != null and (sd.has_stock(path) or shop_offers.has(path))
+	if sd == null or not on_sale:
 		return ""
 	var it := load(path) as ItemData
 	if it == null:
@@ -499,6 +509,56 @@ func unlock_blueprint(path: String) -> bool:
 
 func has_blueprint(path: String) -> bool:
 	return blueprints.has(path)
+
+
+# ── 商店货架刷新（每 4 现实小时换一批装备；制书常驻）──────────
+
+## 当前货架（随机抽的装备路径数组）。**不是 ShopData.stock** ——
+## stock 是「这家店卖什么档次」的底线清单，offers 是这一批实际摆出来的货
+var shop_offers: Array = []
+
+## 上次刷新的时刻（Unix 秒）。存档 —— 关游戏时间也在走
+var shop_refreshed_at: float = 0.0
+
+
+## 货架过期了就重抽。**进商店面板前调**（打开时看一眼，不靠时钟轮询）。
+## 抽法：从已建档的掉落档次（普通/精良/优秀）里不重复抽 8 件 ——
+## 极品+永远不进货（途径隔离，ADR-0016），想要就打造。
+## 首次（没档/刚 reset）：立刻抽一批并把时刻设为现在
+func ensure_shop_fresh() -> void:
+	var hours := 4.0
+	var sd := shop()
+	if sd != null:
+		hours = float(sd.refresh_hours)
+	var now := Time.get_unix_time_from_system()
+	if shop_offers.is_empty() or now - shop_refreshed_at >= hours * 3600.0:
+		shop_offers = _roll_shop_offers(8)
+		shop_refreshed_at = now
+
+
+## 抽一批货架：三档混合（普通偏多）。不重复 —— 同一件摆两份没有意义
+func _roll_shop_offers(n: int) -> Array:
+	var pool: Array = []
+	for t in [ItemData.Tier.COMMON, ItemData.Tier.COMMON, ItemData.Tier.FINE, ItemData.Tier.UNCOMMON]:
+		pool.append_array(GameProgress.drop_pool(t))     # 普通抽两份权重
+	pool.shuffle()
+	var out: Array = []
+	for p in pool:
+		if not out.has(p):
+			out.append(p)
+		if out.size() >= n:
+			break
+	return out
+
+
+## 距下次刷新还剩多少秒（面板倒计时用；0 = 已过期，下次打开就换）
+func shop_refresh_in() -> float:
+	var hours := 4.0
+	var sd := shop()
+	if sd != null:
+		hours = float(sd.refresh_hours)
+	var left: float = shop_refreshed_at + hours * 3600.0 - Time.get_unix_time_from_system()
+	return maxf(left, 0.0)
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────
