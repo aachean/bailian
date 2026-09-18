@@ -7,6 +7,7 @@ script = ExtResource("1_ca8sn")
 id = &"duancuiqu"
 name_key = &"DUNGEON_DUANCUIQU"
 scene_path = "res://scenes/stages/duancuiqu.tscn"
+drop_tiers = Array[int]([0, 1])
 enemy_atk_scale = 0.73
 screen_count = 4
 rec_level = 12

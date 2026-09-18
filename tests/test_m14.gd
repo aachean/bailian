@@ -81,6 +81,7 @@ func _ready() -> void:
 	await _t7_forge_still_uses_shards()
 	await _t8_save_roundtrip()
 	await _t9_data_consistency()
+	await _t10_drop_pools()
 
 	# 还原全局状态（本进程内 autoload 已被改动；存档文件没碰过，
 	# 只有 T5 动了通关表 —— 它自己负责了备份还原）
@@ -360,3 +361,47 @@ func _t9_data_consistency() -> void:
 		stock_ok and all_priced and drops_ok and sell_ok,
 		"装备 %d 件有定价／%d 件（没定价的：%s）　卖价公式只在 ShopData 一处：floor(40×0.5)=20" % [
 			priced, files.size(), "无" if unpriced.is_empty() else ", ".join(unpriced.slice(0, 5))])
+
+
+## 副本掉落档次池（批 5）。守三条：
+##   ① 六个副本的池与设计表对上（漏落的副本会静默回落到怪身上的固定池，档次就乱了）
+##   ② **途径隔离**（ADR-0016）：任何实物池里不许出现极品(3)及以上 —— 那些只能来自打造
+##   ③ `roll_drop` 掷出来的件真的属于池内档次（索引按 tier 分桶没错位）
+const POOL_WANT := {
+	&"lichang": [0], &"duancuiqu": [0, 1], &"luhou": [1],
+	&"canjianlin": [1, 2], &"xiushi": [2], &"zhongxin": [2],
+}
+func _t10_drop_pools() -> void:
+	var out: Array[String] = []
+	var table_ok := true
+	var isolation_ok := true
+	for id in POOL_WANT:
+		var d := GameProgress.dungeon(id)
+		if d == null:
+			table_ok = false
+			out.append("%s 不在副本序列里" % id)
+			continue
+		var got: Array = d.drop_tiers
+		if got != (POOL_WANT[id] as Array):
+			table_ok = false
+			out.append("%s 池=%s（期望 %s）" % [id, str(got), str(POOL_WANT[id])])
+		for t in got:
+			if int(t) >= ItemData.Tier.RARE:
+				isolation_ok = false
+				out.append("%s 的实物池里出现了 %d 档（≥极品）" % [id, int(t)])
+
+	# ③ roll 的件必须属于池内档次；掷 60 次砺场池（单档普通），应全落普通
+	var roll_ok := true
+	var bad_tier := -1
+	for i in 60:
+		var path := GameProgress.roll_drop([0])
+		var it := load(path) as ItemData
+		if it == null or it.tier != ItemData.Tier.COMMON:
+			roll_ok = false
+			bad_tier = -1 if it == null else int(it.tier)
+			break
+	var pool_size := GameProgress.drop_pool(ItemData.Tier.COMMON).size()
+	_check("10", "掉落档次池：六副本对表；实物池无极品+；roll 的件属于池内档次",
+		table_ok and isolation_ok and roll_ok,
+		"　".join(out) + "　砺场掷 60 次全普通=%s（普通池 %d 件，坏档：%d）" % [
+			str(roll_ok), pool_size, bad_tier])

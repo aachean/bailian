@@ -7,6 +7,7 @@ script = ExtResource("1_byt73")
 id = &"lichang"
 name_key = &"DUNGEON_LICHANG"
 scene_path = "res://scenes/stages/lichang.tscn"
+drop_tiers = Array[int]([0])
 rec_level = 1
 enemy_atk_scale = 0.233
 

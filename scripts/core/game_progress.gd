@@ -16,9 +16,12 @@ extends Node
 ## 地图数据所在目录。**扫目录，不写死路径** —— 加一章 = 丢一个 map_*.tres 进来，
 ## 这一层一个字都不用改（第二章落地时就是改这里：从常量路径变成目录扫描）
 const MAP_DIR := "res://data/stages"
+const ITEM_DIR := "res://data/items"
 
 var _maps: Array[MapData] = []
 var _seq: Array[DungeonData] = []
+## 装备掉落索引：tier → 路径数组。懒加载（第一次掉落才扫目录），进程内缓存一份
+var _drop_index: Dictionary = {}
 
 
 ## 全部地图，按文件名排序（顺序稳定 —— 页签不会跳）。
@@ -65,6 +68,38 @@ func dungeon(id: StringName) -> DungeonData:
 		if d.id == id:
 			return d
 	return null
+
+
+## 某个档次的全部装备路径。**扫目录、不写死清单**（同 maps() 的态度）：
+## 加一件装备 = 往 `data/items/` 丢一个 .tres，这里和掉落池自动跟上，
+## 不改任何代码。 tier 必须是 `ItemData.Tier` 的枚举值；查不到 = 空数组
+func drop_pool(tier: int) -> Array[String]:
+	if _drop_index.is_empty():
+		for f in ResDir.files(ITEM_DIR):
+			if not f.ends_with(".tres"):
+				continue
+			var it := load("%s/%s" % [ITEM_DIR, f]) as ItemData
+			if it == null:
+				continue
+			var arr: Array = _drop_index.get(it.tier, [])
+			arr.append("%s/%s" % [ITEM_DIR, f])
+			_drop_index[it.tier] = arr
+		if _drop_index.is_empty():
+			push_error("GameProgress: 一件装备都没索引到（%s）" % ITEM_DIR)
+	var out: Array[String] = []
+	for p in _drop_index.get(tier, []):
+		out.append(str(p))
+	return out
+
+
+## 从副本档次池里掷一件装备的路径。**调用方自己决定掉不掉**（概率留在怪身上）；
+## 池为空 / 某档一件装备都索引不到时返回空串 —— **不静默装作掉过**，调用方
+## 拿到空串就跳过这次掉落（数字都不存在，硬掉一个 null 会在拾取时炸）
+func roll_drop(tiers: Array[int]) -> String:
+	var pool: Array[String] = []
+	while pool.is_empty() and not tiers.is_empty():
+		pool = drop_pool(tiers.pick_random())
+	return "" if pool.is_empty() else pool.pick_random()
 
 
 ## 这个副本开了没有。规则：**序列里的上一个副本通关了就开**，第一个天生就开。

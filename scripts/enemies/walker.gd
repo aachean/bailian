@@ -430,17 +430,39 @@ func _drop_shards() -> void:
 
 ## 死亡掉装备：按 EnemyData 的概率，从掉落池里随机抽一件扔在地上。
 ## item_path 必须在 add_child 【之前】设好 —— pickup 的 _ready 要拿它决定颜色
+##
+## 池有两级：**所在副本的档次池**（`DungeonData.drop_tiers`，掷一档再掷一件 ——
+## 砺场的怪和炉喉的怪靠这个掉不同的东西）优先；副本没有池
+## （测试房间 / 未定档）回落 `EnemyData.drop_items` 的固定路径。两级都空 = 不掉
 func _drop_item() -> void:
 	var host := get_tree().current_scene
-	if host == null or data.drop_items.is_empty():
+	if host == null:
 		return
 	if data.drop_item_chance < 1.0 and _rng.randf() > data.drop_item_chance:
 		return
-	var path: String = data.drop_items[_rng.randi_range(0, data.drop_items.size() - 1)]
+	var path := _roll_item_path()
+	if path.is_empty():
+		return
 	var p: Node2D = PICKUP.instantiate()
 	p.set("item_path", path)
 	host.add_child(p)
 	p.global_position = global_position + Vector2(_rng.randf_range(-18.0, 18.0), -8.0)
+
+
+## 抽一件装备路径。抽档次池走 GameProgress（whoami：内容结构层管内容索引）；
+## 注意用 Stage.atk_scale_for 同款反查 —— current_scene 在副本里就是关卡根，
+## 但测试里可能是别的，别依赖它
+func _roll_item_path() -> String:
+	var n: Node = get_parent()
+	while n != null:
+		if n is Stage:
+			var d := (n as Stage).dungeon_data
+			if d != null and not d.drop_tiers.is_empty():
+				return GameProgress.roll_drop(d.drop_tiers)
+			break
+		n = n.get_parent()
+	return "" if data.drop_items.is_empty() \
+		else data.drop_items[_rng.randi_range(0, data.drop_items.size() - 1)]
 
 
 ## 死亡掉元宝：一笔（一个拾取物，值 data.drop_gold）。

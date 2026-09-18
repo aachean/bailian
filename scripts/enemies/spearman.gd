@@ -296,18 +296,35 @@ func _drop_shards() -> void:
 			_rng.randf_range(-24.0, 24.0), _rng.randf_range(-16.0, 4.0))
 
 
-## 死亡掉装备（与 walker 同一契约）。item_path 要在 add_child 之前设
+## 死亡掉装备（与 walker 同一契约：副本档次池优先，无池回落固定路径）。
+## item_path 要在 add_child 之前设
 func _drop_item() -> void:
 	var host := get_tree().current_scene
-	if host == null or data.drop_items.is_empty():
+	if host == null:
 		return
 	if data.drop_item_chance < 1.0 and _rng.randf() > data.drop_item_chance:
 		return
-	var path: String = data.drop_items[_rng.randi_range(0, data.drop_items.size() - 1)]
+	var path := _roll_item_path()
+	if path.is_empty():
+		return
 	var p: Node2D = PICKUP.instantiate()
 	p.set("item_path", path)
 	host.add_child(p)
 	p.global_position = global_position + Vector2(_rng.randf_range(-18.0, 18.0), -8.0)
+
+
+## 抽一件装备路径 —— 与 walker._roll_item_path 同一份逻辑
+func _roll_item_path() -> String:
+	var n: Node = get_parent()
+	while n != null:
+		if n is Stage:
+			var d := (n as Stage).dungeon_data
+			if d != null and not d.drop_tiers.is_empty():
+				return GameProgress.roll_drop(d.drop_tiers)
+			break
+		n = n.get_parent()
+	return "" if data.drop_items.is_empty() \
+		else data.drop_items[_rng.randi_range(0, data.drop_items.size() - 1)]
 
 
 ## 死亡掉元宝：一笔（一个拾取物，值 data.drop_gold）。
