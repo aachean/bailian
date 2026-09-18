@@ -70,6 +70,29 @@ func dungeon(id: StringName) -> DungeonData:
 	return null
 
 
+## 玩家最近进入的地图（副本反查所属图；城镇里不设 —— 保留上一次的值）。
+## 还魂丹的「每章限购 / 进图补给」都以它为准
+var current_map_id: StringName = &""
+
+
+## 副本属于哪张地图。找不到返回空 —— 调用方当「无主副本」处理（不发补给）
+func map_of(dungeon_id: StringName) -> MapData:
+	for m in maps():
+		for d in m.dungeons:
+			if d != null and d.id == dungeon_id:
+				return m
+	return null
+
+
+## 进副本时登记所在图（关卡根节点 _ready 调）。**进新图顺带发还魂丹补给**
+## （每图第一次 +2，见 PlayerState.grant_map_supply）—— 发没发由 flags 记账
+func enter_dungeon(id: StringName) -> void:
+	var m := map_of(id)
+	if m != null:
+		current_map_id = m.id
+		PlayerState.grant_map_supply(m.id)
+
+
 ## 某个档次的全部装备路径。**扫目录、不写死清单**（同 maps() 的态度）：
 ## 加一件装备 = 往 `data/items/` 丢一个 .tres，这里和掉落池自动跟上，
 ## 不改任何代码。 tier 必须是 `ItemData.Tier` 的枚举值；查不到 = 空数组

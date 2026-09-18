@@ -110,6 +110,10 @@ func _ready() -> void:
 	_build_backdrop()
 	_collect_screens()
 	_build_barriers()
+	# 进图登记（还魂丹的「进图补给 / 每图限购」以此为准）。
+	# 只在真副本里发 —— 测试房间没有 dungeon_data，不该动补给账
+	if dungeon_data != null:
+		GameProgress.enter_dungeon(dungeon_data.id)
 	_build_banner()
 	_sleep_all()
 	if dungeon_data != null and _screens.is_empty():

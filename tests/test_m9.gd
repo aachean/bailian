@@ -480,7 +480,12 @@ func _t9_death_menu() -> void:
 	for m in re.search_all(joined):
 		leaks.append(m.get_string())
 	var two := texts.size() == 2
+	# 2026-09-18 还魂丹上线：进砺场送 2 枚（进图补给）→ **有丹时是三选一**，
+	# 没丹回二选一。两种形态都合法；第三行必须也接了动作（摆着不能点最静默）
+	var three := texts.size() == 3
 	var wired: bool = bool(dm.call("is_row_wired", 0)) and bool(dm.call("is_row_wired", 1))
+	if three:
+		wired = wired and bool(dm.call("is_row_wired", 2))
 	var town_ok := ResourceLoader.exists(TOWN_PATH)
 	# 光标往下走一格 → 停在第二项
 	dm.call("_move", 1)
@@ -495,10 +500,10 @@ func _t9_death_menu() -> void:
 	get_tree().paused = false
 	lv.queue_free()
 	await _pframes(3)
-	_check("9", "倒下 → 弹二选一（重新开始 / 返回城镇）；两个选项都接了动作；选「重新开始」真的重开",
-		two and opened and not before and leaks.is_empty() and wired and cursor_moved == 1 \
-			and called and town_ok,
-		"倒下前开着=%s → %d 帧后开着=%s　选项 %s（两项都接了动作=%s，↓ 后光标=%d）\n              选「重新开始」→ 副本被要求重开=%s　回城场景存在=%s　文案泄漏: %s" % [
+	_check("9", "倒下 → 弹选择界面（重开 / 回城；有还魂丹加第三项）；选项都接了动作；选「重新开始」真的重开",
+		(two or three) and opened and not before and leaks.is_empty() and wired \
+			and cursor_moved == 1 and called and town_ok,
+		"倒下前开着=%s → %d 帧后开着=%s　选项 %s（都接了动作=%s，↓ 后光标=%d）\n              选「重新开始」→ 副本被要求重开=%s　回城场景存在=%s　文案泄漏: %s" % [
 			str(before), revive_frames, str(opened), str(texts), str(wired),
 			cursor_moved, str(called), str(town_ok),
 			"无" if leaks.is_empty() else ", ".join(leaks)])

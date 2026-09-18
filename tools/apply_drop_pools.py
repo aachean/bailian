@@ -44,6 +44,16 @@ DUNGEON_IDS = {
 MAX_PHYSICAL_TIER = 2      # 途径隔离：实物掉落最高「优秀」（ADR-0016）
 DROP_FILE = DESIGN_DATA / "drop_by_dungeon.csv"
 
+## 稀有材料的掉落概率：materials 列里第 i 个非精铁料 → 这个概率。
+## 精铁走 EnemyData.drop_shards（保底），不进这张表
+MAT_DROP_CHANCE = [0.15, 0.06, 0.03, 0.015]
+MAT_IDS = {
+    "玄铁": "mat_black_iron",
+    "天晶": "mat_sky_crystal",
+    "龙魂": "mat_dragon_soul",
+    "太乙精金": "mat_taichu",
+}
+
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig")
@@ -80,6 +90,7 @@ def main() -> int:
         rows = list(csv.DictReader(fh))
 
     plans: dict[str, list[int]] = {}
+    mat_plans: dict[str, dict[str, float]] = {}
     for row in rows:
         if str(row["status"]).strip() != "已建":
             continue                      # ch3-5 的行留着，副本没建不落
@@ -93,6 +104,16 @@ def main() -> int:
         else:
             tiers = [tier_index(x) for x in raw.split(":") if x.strip()]
         plans[did] = tiers
+        # 稀有材料掉落（materials 列除精铁）：第 i 个 → MAT_DROP_CHANCE[i]
+        mats = [MAT_IDS[x] for x in str(row["materials"]).split(":")
+                if x.strip() in MAT_IDS]
+        mat_plans[did] = {m: MAT_DROP_CHANCE[i] for i, m in enumerate(mats)
+                          if i < len(MAT_DROP_CHANCE)}
+
+    # 设计表矛盾处理：断淬渠行 materials 列只写「精铁」，但同一行 note 明说
+    # 「玄铁此本起零星掉」、materials.json 也标玄铁解锁章=1（ch1末）—— 以 note 为准
+    if "duancuiqu" in mat_plans and "mat_black_iron" not in mat_plans["duancuiqu"]:
+        mat_plans["duancuiqu"]["mat_black_iron"] = MAT_DROP_CHANCE[0]
 
     # ── 落地 ──────────────────────────────────────────────────
     print("副本掉落档次池（读自 drop_by_dungeon.csv）：")
@@ -105,10 +126,16 @@ def main() -> int:
             arr = "Array[int]([])" if not tiers else \
                 "Array[int]([%s])" % ", ".join(str(t) for t in tiers)
             text = set_field(text, "drop_tiers", arr, "scene_path")
+            # 稀有材料掉落表（精铁走 EnemyData.drop_shards，不进这张表）
+            mat_str = ", ".join(f'"{k}": {v}'
+                                for k, v in sorted(mat_plans.get(did, {}).items()))
+            text = set_field(text, "material_drops", "{%s}" % mat_str, "drop_tiers")
             with f.open("w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)
         names = " / ".join(TIER_NAMES[t] for t in tiers) if tiers else "（无）"
-        print(f"  {did:<12} → {names}")
+        mats = "、".join(f"{k.split('_')[1]}{v}" for k, v
+                         in sorted(mat_plans.get(did, {}).items())) or "—"
+        print(f"  {did:<12} → {names}｜稀有料：{mats}")
 
     # ── 自检 ──────────────────────────────────────────────────
     print("\n自检：")

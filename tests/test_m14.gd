@@ -201,7 +201,8 @@ func _t4_shop_panel_buys() -> void:
 	panel.call("open")                    # open 内部会 ensure_shop_fresh 抽货架
 	await _pframes(2)
 	var opened: bool = bool(panel.call("is_open")) and get_tree().paused
-	var offers: Array = panel.call("_gear_offers")
+	var offers: Array = panel.call("_left_entries")
+	offers = offers.filter(func(e): return e != "revive")   # 尾部那条还魂丹不是装备
 	var first := load(str(offers[0])) as ItemData
 	var price := 0 if first == null else first.gold_price
 	_tap_key(KEY_J)                       # 光标默认在左栏第一件

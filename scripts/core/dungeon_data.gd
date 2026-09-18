@@ -78,6 +78,15 @@ extends Resource
 ## 由 `tools/apply_drop_pools.py` 从设计期表写入，**别手改**。
 @export var drop_tiers: Array[int] = []
 
+## 本副本的**稀有材料掉落**：材料 id → 每只怪死亡时的掉落概率。
+##
+## **精铁不在这里** —— 它走 `EnemyData.drop_shards`（每怪保底掉碎片的老机制，
+## 「砺场一次通关 ≈45 精铁」的账就是它算的）。这张表只管**稀有料**：
+## 设计表 `drop_by_dungeon.csv` 的 materials 列里除精铁外按序排（玄铁 0.15 /
+## 天晶 0.06 …，越往后越稀有概率越低），数量按怪种放大（小怪 1 / 精英 2 / Boss 3）。
+## 由 `tools/apply_drop_pools.py` 写入，**别手改**。
+@export var material_drops: Dictionary = {}
+
 
 ## 这个副本开工了没有（有没有场景可进）。
 ##

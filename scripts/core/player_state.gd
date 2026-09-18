@@ -131,6 +131,8 @@ func reset_for_new_game() -> void:
 	gold = 0
 	materials.clear()
 	blueprints.clear()
+	revive_tokens = 0
+	revive_bought.clear()
 	shop_offers.clear()
 	shop_refreshed_at = 0.0
 	character_id = ""
@@ -160,6 +162,8 @@ func load_from(d: Dictionary) -> void:
 	next_uid = int(d.get("next_uid", 0))
 	materials = (d.get("materials", {}) as Dictionary).duplicate()
 	blueprints = (d.get("blueprints", []) as Array).duplicate()
+	revive_tokens = int(d.get("revive_tokens", 0))
+	revive_bought = (d.get("revive_bought", {}) as Dictionary).duplicate()
 	shop_offers = (d.get("shop_offers", []) as Array).duplicate()
 	shop_refreshed_at = float(d.get("shop_refreshed_at", 0.0))
 	_ensure_uid_counter()
@@ -179,6 +183,8 @@ func save_to() -> Dictionary:
 		"gold": gold,
 		"materials": materials.duplicate(),
 		"blueprints": blueprints.duplicate(),
+		"revive_tokens": revive_tokens,
+		"revive_bought": revive_bought.duplicate(),
 		"shop_offers": shop_offers.duplicate(),
 		"shop_refreshed_at": shop_refreshed_at,
 		"character_id": character_id,
@@ -532,7 +538,7 @@ func ensure_shop_fresh() -> void:
 		hours = float(sd.refresh_hours)
 	var now := Time.get_unix_time_from_system()
 	if shop_offers.is_empty() or now - shop_refreshed_at >= hours * 3600.0:
-		shop_offers = _roll_shop_offers(8)
+		shop_offers = _roll_shop_offers(7)   # 7 件 + 尾部一条还魂丹 = 左栏 8 行正好
 		shop_refreshed_at = now
 
 
@@ -559,6 +565,59 @@ func shop_refresh_in() -> float:
 		hours = float(sd.refresh_hours)
 	var left: float = shop_refreshed_at + hours * 3600.0 - Time.get_unix_time_from_system()
 	return maxf(left, 0.0)
+
+
+# ── 还魂丹（原则 5.7：死亡罚效率不罚进度，丹是安全网不是免死金牌）──
+
+## 还魂丹持有数。用一枚 = 原地满血复活，省掉「重开本」这一趟
+var revive_tokens: int = 0
+
+## 每张地图已买的还魂丹数（map_id → n）。**限购按图记** ——
+## 设计 5.7：商店 200 元宝/个、每章限购 5；不限购它就成了「死了花钱续命」的常规操作
+var revive_bought: Dictionary = {}
+
+
+## 用一枚还魂丹。返回 false = 没丹了（调用方别把按钮按出「没反应」）
+func use_revive_token() -> bool:
+	if revive_tokens <= 0:
+		return false
+	revive_tokens -= 1
+	return true
+
+
+## 进图补给：每张地图**第一次进**送 2 枚（进图就领，与通关无关 ——
+## 「首通不附带奖励」的红线不能碰，进图补给是唯一合规的白送挂点）。
+## 返回 true = 这次真的发了（第一次进）
+func grant_map_supply(map_id: StringName) -> bool:
+	var key := "revive_supply_%s" % map_id
+	if flags.has(key):
+		return false
+	flags[key] = true
+	revive_tokens += 2
+	return true
+
+
+## 商店买还魂丹（限购：每图 5 枚）。map_id 用**玩家最近进的图** ——
+## 人在城镇买，账记到他要打的图上
+func buy_revive_token(map_id: StringName) -> bool:
+	var key := String(map_id)
+	var bought := int(revive_bought.get(key, 0))
+	if bought >= 5:
+		return false
+	if not spend_gold(REVIVE_PRICE):
+		return false
+	revive_bought[key] = bought + 1
+	revive_tokens += 1
+	return true
+
+
+func revive_bought_in(map_id: StringName) -> int:
+	return int(revive_bought.get(String(map_id), 0))
+
+
+## 还魂丹定价（200 元宝）。放这儿是因为唯一动它的两个界面（商店标价 / 买）
+## 都从这取 —— 别在面板里写第二份 200
+const REVIVE_PRICE := 200
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────

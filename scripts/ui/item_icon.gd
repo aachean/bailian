@@ -28,6 +28,8 @@ const MANA_COLOR := Color(0.4, 0.6, 0.95)
 ## 为什么进 ItemIcon 而不是另写一个图标类：三种新形态同样要「地上、面板两处同形同色」，
 ## 分家的话迟早漂移 —— 与「同一件装备四处同形同色」是同一条纪律
 var kind: StringName = &""
+## 材料掉落物用的辅助标识（哪种材料，决定矿石颜色）。非材料的图标不用它
+var kind_hint: StringName = &""
 
 ## 装备资源路径。空 = 不是装备（地上掉落物画碎片、面板里画空框）
 var item_path: String = ""
@@ -67,6 +69,9 @@ func _draw() -> void:
 			return
 		&"potion_mp":
 			_draw_potion(k, MANA_COLOR)
+			return
+		&"material":
+			_draw_ore(k)
 			return
 	if _item == null:
 		if empty_frame:
@@ -137,6 +142,30 @@ func _draw_shard(k: float) -> void:
 
 
 ## 元宝：金锭——梯形底座 + 顶上一颗鼓包，一眼「值钱」
+## 材料（掉落物）：矿石 / 晶体。五种材料一个形状、颜色区分 ——
+## 地上认出「这是料」比认出「是哪种料」更要紧，颜色是第二层信息
+func _draw_ore(k: float) -> void:
+	var c := Color(0.75, 0.72, 0.62, 1)      # 默认（精铁）土金
+	match kind_hint:
+		&"mat_black_iron":   c = Color(0.45, 0.45, 0.52, 1)
+		&"mat_sky_crystal":  c = Color(0.45, 0.7, 0.95, 1)
+		&"mat_dragon_soul":  c = Color(0.9, 0.4, 0.35, 1)
+		&"mat_taichu":       c = Color(0.95, 0.85, 0.4, 1)
+	var dark := c.darkened(0.4)
+	var hi := c.lightened(0.35)
+	draw_colored_polygon(_poly([
+		Vector2(8, 1.5), Vector2(14.5, 6), Vector2(12, 14), Vector2(4, 14),
+		Vector2(1.5, 6),
+	], k), c)
+	draw_colored_polygon(_poly([
+		Vector2(8, 4), Vector2(11.5, 6.5), Vector2(10, 11.5), Vector2(6, 11.5),
+		Vector2(4.5, 6.5),
+	], k), dark)
+	draw_colored_polygon(_poly([
+		Vector2(8, 2.5), Vector2(13, 6), Vector2(8, 6),
+	], k), hi)
+
+
 func _draw_gold(k: float) -> void:
 	var dark := GOLD_COLOR.darkened(0.35)
 	var hi := GOLD_COLOR.lightened(0.35)

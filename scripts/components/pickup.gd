@@ -34,6 +34,10 @@ var item_path: String = ""
 var gold_amount: int = 0
 ## 掉的是哪种药：&"hp" 回血 / &"mp" 回蓝。空 = 不是药
 var potion: StringName = &""
+## 掉的是哪种材料（&"mat_refined_iron" 等）。空 = 不是材料（批 6 尾巴：怪掉材料）
+var mat_id: StringName = &""
+## 材料数量（精英 / Boss 一死掉好几份，一次掉落物打包）
+var mat_amount: int = 1
 
 var _player: Node2D = null
 var _collected := false
@@ -51,6 +55,10 @@ func _ready() -> void:
 		_dress(&"potion_hp", 9.0)
 	elif potion == &"mp":
 		_dress(&"potion_mp", 9.0)
+	elif not mat_id.is_empty():
+		_dress(&"material", 8.5)
+		if _icon != null:
+			_icon.kind_hint = mat_id
 
 
 ## 掉落物统一换装：换形态 + 换大小。装备的图标比钱和药大一圈 ——
@@ -96,6 +104,9 @@ func _physics_process(delta: float) -> void:
 		elif potion == &"mp":
 			if _player.has_method("drink_mana"):
 				_player.call("drink_mana", RESTORE_MP)
+		elif not mat_id.is_empty():
+			if _player.has_method("collect_material"):
+				_player.call("collect_material", mat_id, mat_amount)
 		else:
 			# 精铁碎片 —— 四类掉落里最老的那一种，别在扩表时把它挤掉
 			# （2026-09-15 重写时丢过这个分支，m3/m11 的既有断言当场抓住）

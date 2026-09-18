@@ -70,6 +70,13 @@ layout_mode = 2
 focus_mode = 0
 text = "　返回城镇"
 
+[node name="Revive" type="Button" parent="Root/Panel/Box"]
+custom_minimum_size = Vector2(160, 30)
+layout_mode = 2
+focus_mode = 0
+visible = false
+text = "　还魂丹复活"
+
 [node name="Hint" type="Label" parent="Root/Panel"]
 layout_mode = 1
 anchors_preset = 12

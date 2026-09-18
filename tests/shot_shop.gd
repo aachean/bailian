@@ -28,7 +28,7 @@ func _ready() -> void:
 	panel.call("open")
 	await _frames(4)
 	# 光标移到右栏（制书区）：先翻到列表尾部
-	var gear: int = panel.call("_gear_offers").size()
+	var gear: int = panel.call("_left_entries").size()
 	var bps: int = panel.call("_bp_list").size()
 	for _i in gear + bps:
 		_tap_key(KEY_DOWN)

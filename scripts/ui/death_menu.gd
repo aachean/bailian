@@ -26,6 +26,7 @@ const INDENT := "　"        # 全角空格：与光标标记同宽，换行不�
 @onready var _title: Label = $Root/Panel/Title
 @onready var _restart_btn: Button = $Root/Panel/Box/Restart
 @onready var _town_btn: Button = $Root/Panel/Box/Town
+@onready var _revive_btn: Button = $Root/Panel/Box/Revive
 @onready var _hint: Label = $Root/Panel/Hint
 
 var _rows: Array[Button] = []
@@ -34,9 +35,10 @@ var _cursor := 0
 
 func _ready() -> void:
 	_root.visible = false
-	_rows = [_restart_btn, _town_btn]
+	_rows = [_restart_btn, _town_btn, _revive_btn]
 	_restart_btn.pressed.connect(_on_restart)
 	_town_btn.pressed.connect(_on_town)
+	_revive_btn.pressed.connect(_on_revive)
 	if not GameSettings.language_changed.is_connected(_on_language_changed):
 		GameSettings.language_changed.connect(_on_language_changed)
 	_refresh_texts()
@@ -55,6 +57,12 @@ func is_open() -> bool:
 func open() -> void:
 	_cursor = 0
 	_close_other_modal()
+	# 还魂丹选项**有丹才出现** —— 没丹时把它藏起来、从光标行里摘掉，
+	# 而不是摆一个点了没反应的按钮（最静默的那种失败）
+	_revive_btn.visible = PlayerState.revive_tokens > 0
+	_rows = [_restart_btn, _town_btn]
+	if _revive_btn.visible:
+		_rows.append(_revive_btn)
 	_root.visible = true
 	get_tree().paused = true
 	_refresh_texts()
@@ -107,7 +115,8 @@ func _activate() -> void:
 func _refresh_texts(_locale: String = "") -> void:
 	_title.text = tr("UI_DEATH_TITLE")
 	_hint.text = tr("UI_DEATH_HINT")
-	var names := [tr("UI_DEATH_RESTART"), tr("UI_DEATH_TOWN")]
+	var names := [tr("UI_DEATH_RESTART"), tr("UI_DEATH_TOWN"),
+		I18n.t(&"UI_DEATH_REVIVE", [PlayerState.revive_tokens])]
 	for i in _rows.size():
 		var mark := CURSOR if i == _cursor else INDENT
 		_rows[i].text = mark + names[i]
@@ -157,3 +166,16 @@ func _on_town() -> void:
 	_root.visible = false
 	SaveManager.write_progress(TOWN_PATH, {})
 	get_tree().change_scene_to_file(TOWN_PATH)
+
+
+## 还魂丹复活：**原地**满血爬起来，这一趟继续（进度不丢 —— 5.7「罚效率不罚进度」）。
+## 丹没了按钮就不出现（open 里已过滤），这里再验一次 —— 按钮与库存之间
+## 隔着一帧，别让「按下去丹不够」发生
+func _on_revive() -> void:
+	var player := get_parent()
+	if player == null or not player.has_method("revive_with_token"):
+		return
+	if not bool(player.call("revive_with_token")):
+		return
+	_root.visible = false
+	get_tree().paused = false

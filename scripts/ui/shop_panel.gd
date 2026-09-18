@@ -134,7 +134,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _move(dir: int) -> void:
-	var n := _gear_offers().size() + _bp_list().size()
+	var n := _left_entries().size() + _bp_list().size()
 	if n <= 0:
 		return
 	_cursor = wrapi(_cursor + dir, 0, n)
@@ -142,9 +142,12 @@ func _move(dir: int) -> void:
 	refresh()
 
 
-## 左栏 = 本期随机货架（PlayerState.shop_offers，装备路径）
-func _gear_offers() -> Array:
-	return PlayerState.shop_offers
+## 左栏条目 = 本期随机货架（装备路径）+ 尾部一条**还魂丹**（常驻消耗）。
+## 还魂丹每图限购 5（200 元宝，账记到最近进的图）
+func _left_entries() -> Array:
+	var out: Array = PlayerState.shop_offers.duplicate()
+	out.append("revive")
+	return out
 
 
 ## 右栏 = 逐件制书（66 本，装备路径）。书就是装备本身，索引用 drop_pool 现拼
@@ -157,11 +160,42 @@ func _bp_list() -> Array:
 
 ## 买光标那件。两个栏一个键，「为什么没买成」按条目类型区分着说
 func _buy_at_cursor() -> void:
-	var gear_n := _gear_offers().size()
-	if _cursor < gear_n:
-		_buy_gear(str(_gear_offers()[_cursor]))
+	var left := _left_entries()
+	var gear_n: int = PlayerState.shop_offers.size()
+	if _cursor < left.size():
+		var entry = left[_cursor]
+		if entry is String and entry == "revive":
+			_buy_revive()
+		elif entry is String:
+			_buy_gear(entry)
+		return
+	_buy_blueprint(str(_bp_list()[_cursor - left.size()]))
+
+
+## 买还魂丹：限购按图（玩家最近进的图，人在城镇买账记到要打的图上）
+func _buy_revive() -> void:
+	var map_id := _current_or_latest_map()
+	if PlayerState.gold < PlayerState.REVIVE_PRICE:
+		_msg = I18n.t(&"UI_SHOP_POOR", [PlayerState.REVIVE_PRICE - PlayerState.gold])
+		_msg_color = WARN
+		refresh()
+		return
+	if PlayerState.buy_revive_token(map_id):
+		_msg = I18n.t(&"UI_SHOP_REVIVE_OK", [PlayerState.revive_tokens])
+		_msg_color = GOLD
 	else:
-		_buy_blueprint(str(_bp_list()[_cursor - gear_n]))
+		_msg = I18n.t(&"UI_SHOP_REVIVE_LIMIT")
+		_msg_color = WARN
+	refresh()
+
+
+## 商店开在城镇 —— 城镇不设 current_map_id，账记到「已解锁的最新图」上：
+## 玩家攒丹是为了往后打，限购按他要打的图算
+func _current_or_latest_map() -> StringName:
+	if not GameProgress.current_map_id.is_empty():
+		return GameProgress.current_map_id
+	var seq := GameProgress.sequence()
+	return seq[seq.size() - 1].id if not seq.is_empty() else &""
 
 
 ## 买装备（左栏）。买完从货架上撤下 —— 摆着的东西买走了还摆着，那不是商店是仓库
@@ -255,18 +289,18 @@ func refresh() -> void:
 	_bp_header.text = tr("UI_SHOP_BP")
 	_update_refresh_label()
 
-	var gear := _gear_offers()
+	var gear := _left_entries()
 	var bps := _bp_list()
 	var total := gear.size() + bps.size()
 	if _cursor >= total:
 		_cursor = maxi(total - 1, 0)
-	var cursor_in_bp := _cursor >= gear.size()
+	var cursor_in_bp := _cursor >= PlayerState.shop_offers.size()
 	if cursor_in_bp:
-		_bp_top = clampi(_cursor - gear.size() - ROWS / 2, 0, maxi(bps.size() - ROWS, 0))
+		_bp_top = clampi(_cursor - PlayerState.shop_offers.size() - ROWS / 2, 0, maxi(bps.size() - ROWS, 0))
 	else:
 		_bp_top = clampi(_bp_top, 0, maxi(bps.size() - ROWS, 0))
 
-	# ── 左栏：装备货架 ──
+	# ── 左栏：装备货架（尾部一条常驻还魂丹）──
 	for r in ROWS:
 		var row := _rows[r]
 		var icon := row.get_child(0) as ItemIcon
@@ -274,8 +308,25 @@ func refresh() -> void:
 		if r >= gear.size():
 			icon.visible = false
 			# 货架空要看得见（刷新批没抽出来 / 全买光了是两种状态的开头）
-			lbl.text = tr("UI_SHOP_EMPTY") if (gear.is_empty() and r == 0) else ""
+			lbl.text = tr("UI_SHOP_EMPTY") if (PlayerState.shop_offers.is_empty() and r == 0) else ""
 			lbl.modulate = DIM
+			continue
+		# 还魂丹行：常驻消耗，显示持有数与限购余量
+		if gear[r] == "revive":
+			icon.visible = true
+			icon.empty_frame = true
+			icon.kind = &"potion_hp"
+			icon.queue_redraw()
+			var bought := PlayerState.revive_bought_in(_current_or_latest_map())
+			var mark := CURSOR_MARK if _cursor == r else INDENT
+			var limit_left := 5 - bought
+			lbl.text = "%s%s　%d　%s %d" % [mark, tr("UI_SHOP_REVIVE"),
+				PlayerState.REVIVE_PRICE, tr("UI_SHOP_LIMIT"), limit_left]
+			var can := limit_left > 0 and PlayerState.gold >= PlayerState.REVIVE_PRICE
+			if _cursor == r:
+				lbl.modulate = GOLD if can else WARN
+			else:
+				lbl.modulate = NORMAL if can else DIM
 			continue
 		var it := load(str(gear[r])) as ItemData
 		if it == null:
@@ -285,6 +336,7 @@ func refresh() -> void:
 			continue
 		icon.visible = true
 		icon.empty_frame = true
+		icon.kind = &""
 		icon.set_item(it)
 		var mark := CURSOR_MARK if _cursor == r else INDENT
 		var afford := PlayerState.gold >= it.gold_price

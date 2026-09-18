@@ -8,6 +8,7 @@ id = &"canjianlin"
 name_key = &"DUNGEON_CANJIANLIN"
 scene_path = "res://scenes/stages/canjianlin.tscn"
 drop_tiers = Array[int]([1, 2])
+material_drops = {"mat_black_iron": 0.15, "mat_sky_crystal": 0.06}
 enemy_atk_scale = 0.85
 screen_count = 3
 rec_level = 30

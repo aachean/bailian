@@ -388,6 +388,7 @@ func _on_died() -> void:
 	_drop_gold()
 	_drop_potions()
 	_drop_item()
+	_drop_material()
 	PlayerState.add_exp(data.exp_reward)   # 击杀经验进玩家成长
 
 
@@ -463,6 +464,44 @@ func _roll_item_path() -> String:
 		n = n.get_parent()
 	return "" if data.drop_items.is_empty() \
 		else data.drop_items[_rng.randi_range(0, data.drop_items.size() - 1)]
+
+
+## 掉稀有材料（批 6 尾巴）：按副本的 `material_drops` 逐料 roll。
+## 精铁不在表里（它走 drop_shards 保底）。数量按怪种放大：
+## 小怪 1 / 精英 2 / Boss 3 —— 料主要是精英和 Boss 的收成
+func _drop_material() -> void:
+	var n: Node = get_parent()
+	while n != null:
+		if n is Stage:
+			var d := (n as Stage).dungeon_data
+			if d != null:
+				for id in d.material_drops:
+					if _rng.randf() < float(d.material_drops[id]):
+						_spawn_material(StringName(String(id)), _mat_amount())
+			break
+		n = n.get_parent()
+
+
+## 这一击该掉几份料
+func _mat_amount() -> int:
+	match data.kind:
+		&"elite":
+			return 2
+		&"boss":
+			return 3
+		_:
+			return 1
+
+
+func _spawn_material(id: StringName, amount: int) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var p: Node2D = PICKUP.instantiate()
+	p.set("mat_id", id)
+	p.set("mat_amount", amount)
+	host.add_child(p)
+	p.global_position = global_position + Vector2(_rng.randf_range(-18.0, 18.0), -8.0)
 
 
 ## 死亡掉元宝：一笔（一个拾取物，值 data.drop_gold）。

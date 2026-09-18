@@ -687,6 +687,13 @@ func collect_shard() -> void:
 	_refresh_hud()
 
 
+## 拾取材料（Pickup 组件调，批 6 尾巴：怪掉材料）。进背包面板的材料行
+func collect_material(id: StringName, amount: int) -> void:
+	PlayerState.add_material(id, amount)
+	Audio.play(&"pickup")
+	_refresh_hud()
+
+
 ## 拾取元宝（Pickup 组件调）。元宝只进商店 —— 买装备、（以后）买别的。
 ## 真相同样只住在 PlayerState（与精铁同一条教训，不写第二份）
 func collect_gold(n: int) -> void:
@@ -855,6 +862,17 @@ func _open_death_menu() -> void:
 	global_position = _spawn_point
 	velocity = Vector2.ZERO
 	_health.heal_full()          # 发 revived → _on_revived 把 _reviving 放回去
+
+
+## 还魂丹复活（死亡界面第三选项）：**原地**满血爬起来，这一趟的进度保留 ——
+## 「罚效率不罚进度」里选了不罚的这一边。丹不够就一动不动（按钮根本不该出现，
+## 这里再兜一道）
+func revive_with_token() -> bool:
+	if not PlayerState.use_revive_token():
+		return false
+	velocity = Vector2.ZERO
+	_health.heal_full()          # 发 revived → _on_revived 恢复外观与碰撞
+	return true
 
 
 # ─────────────────────────────────────────────────────────────
