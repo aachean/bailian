@@ -246,19 +246,30 @@ def main() -> int:
                          defense=defense_v, atk_flat=atk_flat, sk=sk,
                          need=need, eff=eff, mult=atk_mult, lv=level_ref))
 
-    # ── 副本倍率：写 DungeonData.enemy_atk_scale ────────────────
-    # 一张章节行只锚定一个等级（ch1 = lv20），而 ch1 横跨 lv1（砺场）到 lv25（炉喉）。
-    # 共用的 walker.tres 只能存锚点值，「这个副本该多疼」由副本这一层的倍率补 ——
-    # 敌人运行时把它乘进 Hitbox.damage_scale（见 walker.gd / spearman.gd）
+    # ── 副本倍率：写 DungeonData ────────────────────────────────
+    # 两张表并行：
+    #   ① `enemy_atk_scale` —— **同一章里**的等级差（ch1 锚 lv20 却横跨 lv1~25），
+    #      小怪/精英/Boss 都乘
+    #   ② `enemy_hp_chapter` / `enemy_atk_chapter` —— **章差**（ADR-0024），
+    #      **只作用于小怪/精英**（Boss 的章差已经写进它自己的 .tres），
+    #      相对**第一章基准**
     stage_scales: dict[str, float] = {}
-    print("\n副本攻击倍率（承受力比 = 玩家血量(rec) ÷ 玩家血量(章锚点)）：")
+    chapter_scales: dict[str, tuple[float, float]] = {}
+    base_hp_trash = float(scaling["ch1"]["hp_trash"])
+    base_atk_trash = float(defense["ch1"]["need_trash_atk"])
+    print("\n副本倍率：等级差（承受力比 = 玩家血量(rec) ÷ 玩家血量(章锚点)）"
+          " ＋ 章差（相对第一章）：")
+    print(f"  {'副本':<12}{'章':<5}{'rec':>4}{'等级差':>9}{'血量章差':>10}{'伤害章差':>10}")
     for did, (chap, rec) in DUNGEONS.items():
         anchor = int(scaling[chap]["level"])
         hp_rec = player_hp_at(rec, hp_gain, hp_falloff, base_hp)
         hp_anchor = player_hp_at(anchor, hp_gain, hp_falloff, base_hp)
         scale = round(hp_rec / hp_anchor, 3)
+        hp_ch = round(float(scaling[chap]["hp_trash"]) / base_hp_trash, 4)
+        atk_ch = round(float(defense[chap]["need_trash_atk"]) / base_atk_trash, 4)
         stage_scales[did] = scale
-        print(f"  {did:<12} rec={rec:<3} 锚={anchor:<3} 倍率 {scale}")
+        chapter_scales[did] = (hp_ch, atk_ch)
+        print(f"  {did:<12}{chap:<5}{rec:>4}{scale:>9}{hp_ch:>10.4f}{atk_ch:>10.4f}")
         if dry:
             continue
         f = STAGE_DIR / f"dungeon_{did}.tres"
@@ -266,6 +277,8 @@ def main() -> int:
             raise SystemExit(f"❌ 副本数据不存在：{f}")
         text = read_text(f)
         text = set_field(text, "enemy_atk_scale", num(scale), "scene_path")
+        text = set_field(text, "enemy_hp_chapter", num(hp_ch), "enemy_atk_scale")
+        text = set_field(text, "enemy_atk_chapter", num(atk_ch), "enemy_hp_chapter")
         # rec_level 也顺手补齐：砺场那份靠默认值 1 撑着，别的工具（舆图上色）读它
         if field(text, "rec_level") is None:
             text = set_field(text, "rec_level", str(rec), "scene_path")
@@ -322,6 +335,31 @@ def main() -> int:
     assert lichang_hit <= 10, f"砺场小怪单发 {lichang_hit} 点，lv1 玩家挨不了 10 下"
     print(f"  ⑥ 砺场（lv1）小怪单发 ≈{lichang_hit} 点 ≤ 10 "
           f"（100 血挨 10 下+，v1 手感保住）✅")
+
+    # ⑦ 章差倍率必须等于「本章值 ÷ 第一章值」，且**第一章的副本恒 1.0**
+    #    （`.tres` 里存的就是第一章基准，三处口径必须一致 —— 见 DungeonData 的注释）
+    bad = []
+    for did, (chap, _rec) in DUNGEONS.items():
+        hp_ch, atk_ch = chapter_scales[did]
+        if abs(hp_ch - float(scaling[chap]["hp_trash"]) / base_hp_trash) > 1e-4 \
+                or abs(atk_ch - float(defense[chap]["need_trash_atk"]) / base_atk_trash) > 1e-4:
+            bad.append(did)
+        if chap == "ch1" and (hp_ch != 1.0 or atk_ch != 1.0):
+            bad.append(f"{did}(第一章却不是 1.0)")
+    assert not bad, f"章差倍率与设计表对不上：{bad}"
+    print("  ⑦ 章差倍率 = 本章值 ÷ 第一章值，且第一章恒 1.0（三处口径一致）✅")
+
+    # ⑧ 精英**沿用小怪那一格的章倍率**（不另开一格字段）——
+    #    代价是精英血量相对设计有偏差，把它量化出来并卡住上限
+    drift = []
+    for chap in scaling:
+        want = float(scaling[chap]["hp_elite_B"])
+        got = float(scaling["ch1"]["hp_elite_B"]) * (
+            float(scaling[chap]["hp_trash"]) / base_hp_trash)
+        if want > 0 and abs(got - want) / want > 0.10:
+            drift.append(f"{chap}: {got:.0f} vs {want:.0f}")
+    assert not drift, f"精英用同一格章倍率后偏差超过 10%：{drift}"
+    print("  ⑧ 精英沿用小怪那一格的章倍率（偏差 ≤10%，省一个字段）✅")
 
     print(f"\n{'（dry-run，未写文件）' if dry else '✅ 已写入 data/enemies/*.tres。'}"
           "接着跑：<godot> --headless --import")

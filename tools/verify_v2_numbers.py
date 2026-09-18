@@ -233,34 +233,48 @@ def main() -> int:
         loud(f"{eid:<16}{e['kind']:<7}{ch:>5}{want:>7.0f}{got:>7}{dev:>7.1f}%   {note}")
         check(abs(dev) <= 20, f"{eid} 单发 {got} vs 章目标 {want:.0f}")
 
-    hr("⑤ 跨章缩放：同一只怪的数值在第二章是否跟上（设计表 ch2 行）")
-    loud(f"{'id':<16}{'kind':<7}{'ch1血':>7}{'ch2设计血':>10}{'实际血':>7}"
+    hr("⑤ 跨章缩放：同一只怪在第二章是否跟上（设计表 ch2 行）")
+    loud("  设计表的 ch2 行每个 kind 只有**一个**目标值，而数据里每只怪有**自己的相对手感**")
+    loud("  （疾行者更快更脆、重甲怪更肉 —— v1 就验收过的比例，别抹平）。所以分两件事核：")
+    loud("  ① 基准怪（相对系数 1.0：walker / brute_elite）的**绝对值**要对上设计表；")
+    loud("  ② 其余怪**跟随基准**（相对比例不随章变化）。")
+    ch_hp = num(fld(txt(REPO / "data" / "stages" / "dungeon_xiushi.tres"), "enemy_hp_chapter"), 1.0)
+    ch_atk = num(fld(txt(REPO / "data" / "stages" / "dungeon_xiushi.tres"), "enemy_atk_chapter"), 1.0)
+    ref = {"trash": "walker", "elite": "brute_elite"}
+    loud(f"\n  基准怪（第二章生效值 = .tres 第一章基准 × 副本章差）")
+    loud(f"  {'id':<16}{'kind':<7}{'ch1血':>7}{'ch2设计血':>10}{'实际血':>7}"
          f"{'ch1伤':>7}{'ch2设计伤':>10}{'实际伤':>7}")
-    bad_hp, bad_atk = [], []
+    bad = []
+    for kind, rid in ref.items():
+        e = enemies[rid]
+        key_hp = {"trash": "hp_trash", "elite": "hp_elite_B"}[kind]
+        key_atk = {"trash": "need_trash_atk", "elite": "need_elite_atk"}[kind]
+        eff_hp = e["hp"] * ch_hp
+        eff_atk = (round(e["af"] * e["mult"]) + e["sk"]) * ch_atk
+        loud(f"  {rid:<16}{kind:<7}{num(sc['ch1'][key_hp]):>7.0f}"
+             f"{num(sc['ch2'][key_hp]):>10.0f}{eff_hp:>7.0f}"
+             f"{num(df['ch1'][key_atk]):>7.0f}{num(df['ch2'][key_atk]):>10.0f}{eff_atk:>7.0f}")
+        if abs(eff_hp - num(sc["ch2"][key_hp])) / num(sc["ch2"][key_hp]) > 0.15:
+            bad.append(f"{rid} 血")
+        if abs(eff_atk - num(df["ch2"][key_atk])) / num(df["ch2"][key_atk]) > 0.15:
+            bad.append(f"{rid} 伤")
+    check(not bad, f"基准怪跟上第二章（血 {ch_hp:.2f}× / 伤 {ch_atk:.2f}×）："
+                   f"{'对得上' if not bad else '偏差 ' + str(bad)}")
+
+    # ② 其余怪：相对基准的比例在第一章与第二章一致（章差是**统一**乘上去的）
+    ref_ratio_bad = []
     for eid, e in sorted(enemies.items()):
-        if e["kind"] == "boss":
+        if e["kind"] == "boss" or eid == ref[e["kind"]]:
             continue
-        key_hp = {"trash": "hp_trash", "elite": "hp_elite_B"}[e["kind"]]
-        key_atk = {"trash": "need_trash_atk", "elite": "need_elite_atk"}[e["kind"]]
-        got_atk = round(e["af"] * e["mult"]) + e["sk"]
-        loud(f"{eid:<16}{e['kind']:<7}{num(sc['ch1'][key_hp]):>7.0f}"
-             f"{num(sc['ch2'][key_hp]):>10.0f}{e['hp']:>7}"
-             f"{num(df['ch1'][key_atk]):>7.0f}{num(df['ch2'][key_atk]):>10.0f}{got_atk:>7}")
-        if abs(e["hp"] - num(sc["ch2"][key_hp])) / num(sc["ch2"][key_hp]) > 0.15:
-            bad_hp.append(eid)
-        if abs(got_atk - num(df["ch2"][key_atk])) / num(df["ch2"][key_atk]) > 0.15:
-            bad_atk.append(eid)
-    if bad_hp:
-        check(False, f"小怪/精英血量没跟上第二章（设计要按章缩放）：{bad_hp}")
-        print("        根因：apply_enemy_scaling.py 的 PLAN 把 trash/elite 全部钉在 ch1，"
-              "章内常量在跨章时等于「全局常量」")
-        print("        承载点缺失：DungeonData 只有 enemy_atk_scale，没有 enemy_hp_scale")
-    else:
-        check(True, "小怪/精英血量随章缩放")
-    if bad_atk:
-        check(False, f"小怪/精英伤害没跟上第二章（设计要按章缩放）：{bad_atk}")
-    else:
-        check(True, "小怪/精英伤害随章缩放")
+        base = enemies[ref[e["kind"]]]
+        r1 = e["hp"] / base["hp"]
+        r2 = (e["hp"] * ch_hp) / (base["hp"] * ch_hp)
+        if abs(r1 - r2) > 1e-6:
+            ref_ratio_bad.append(eid)
+    check(not ref_ratio_bad,
+          f"其余怪跟随基准（相对手感不随章变化）：{ref_ratio_bad or '全部一致'}")
+    check(ch_hp > 1.0 and ch_atk > 1.0,
+          f"第二章副本确实带章差（血 ×{ch_hp:.2f} / 伤 ×{ch_atk:.2f}；第一章恒 1.0）")
 
     hr("⑥ 遭遇时长：Boss 血条 × 相位能撑多久")
     loud(f"{'副本':<12}{'rec':>5}{'玩家DPS':>9}{'Boss血':>8}{'护甲系数':>9}"

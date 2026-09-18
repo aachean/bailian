@@ -11,5 +11,7 @@ drop_tiers = Array[int]([0])
 material_drops = {}
 rec_level = 1
 enemy_atk_scale = 0.233
+enemy_hp_chapter = 1
+enemy_atk_chapter = 1
 
 backdrop = &"grass"

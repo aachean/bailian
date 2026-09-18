@@ -82,8 +82,9 @@ func _ready() -> void:
 	_base_mask = collision_mask
 	if data == null:
 		data = load("res://data/enemies/spearman.tres") as EnemyData
-	health.max_hp = data.max_hp
-	health.hp = data.max_hp
+	# 血量按**本副本的章差**放大（ADR-0024）：data 里存的是第一章基准值
+	health.max_hp = maxi(1, int(round(float(data.max_hp) * Stage.hp_scale_for(self))))
+	health.hp = health.max_hp
 	health.post_hit_invincible = 0.10
 	# v2：与 walker 同一套 —— 敌人也有防御（平铺点数，走护甲曲线）
 	health.defense = data.defense
@@ -185,8 +186,9 @@ func _throw(player: Node2D) -> void:
 	throws_started += 1
 	var proj: Node2D = PROJECTILE.instantiate()
 	# 乘区放本副本的难度倍率 —— 与近战（walker 的 Hitbox.damage_scale）同一个出处，
-	# 掷出去的矛不能比挥出来的拳头另算一套强度
-	proj.damage_scale = Stage.atk_scale_for(self)
+	# 掷出去的矛不能比挥出来的拳头另算一套强度。
+	# **两格都要乘**：章差（第几章）× 等级差（同章里哪个副本），别只抄一半
+	proj.damage_scale = Stage.atk_scale_for(self) * Stage.atk_chapter_for(self)
 	var dir := Vector2(signf(player.global_position.x - global_position.x), 0.0)
 	get_tree().current_scene.add_child(proj)
 	proj.setup(

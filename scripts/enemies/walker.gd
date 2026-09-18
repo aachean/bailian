@@ -20,6 +20,14 @@ const RECOIL_DAMP := 30.0
 const RECOIL_KICK := 420.0
 const RECOIL_KICK_HEAVY := 1.6
 
+	## 这只怪在本副本里的血量上限 = 数据里的**第一章基准** × 本副本的**章差倍率**（ADR-0024）。
+##
+## Boss 不吃章差（它的章差已经写进自己的 `.tres` 了，再乘一次就是双重缩放）——
+## 判类型只在 `Stage.hp_scale_for` 那一处，这里不重复判
+func _scaled_max_hp() -> int:
+	return maxi(1, int(round(float(data.max_hp) * Stage.hp_scale_for(self))))
+
+
 ## 相位期间的后撤速度 = 追击速度 × 这个系数。
 ## 用系数而不是绝对速度：**「比追人时更快」才是这条机制的语义**（躲得掉才有威胁），
 ## 而追击速度本身住在 .tres（4.4）—— 换一只更快的 Boss 时这里不用动
@@ -95,8 +103,8 @@ func _ready() -> void:
 	_base_mask = collision_mask
 	if data == null:
 		data = load("res://data/enemies/walker.tres") as EnemyData
-	health.max_hp = data.max_hp
-	health.hp = data.max_hp
+	health.max_hp = _scaled_max_hp()
+	health.hp = health.max_hp
 	health.post_hit_invincible = 0.10
 	# v2：敌人也有防御了（平铺点数，走同一道护甲曲线）——
 	# 「打不动」是 Boss 的主要难度来源，不是血条长度（ADR-0019 / 设计原则 4.3）
@@ -105,7 +113,9 @@ func _ready() -> void:
 	# 敌人自己确实没有等级/强化 —— 但乘区不是空的：同一只 walker 同时摆在砺场（lv1）
 	# 和炉喉（lv25），靠这一格才有两种强度。留 1.0 就是「lv20 的伤害打 lv1 的玩家」
 	_hitbox.attack_flat = data.attack_power()
-	_hitbox.damage_scale = Stage.atk_scale_for(self)
+	# 两个乘区：**章差**（第几章，ADR-0024）× **等级差**（同章里哪个副本，按 rec_level）。
+	# 敌人自己没有等级/强化 —— 这两格就是它的「成长」。Boss 的章差恒 1（已写进 .tres）
+	_hitbox.damage_scale = Stage.atk_scale_for(self) * Stage.atk_chapter_for(self)
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 	health.revived.connect(_on_revived)
@@ -490,7 +500,7 @@ func apply_saved(d: Dictionary) -> void:
 	velocity = Vector2.ZERO
 	_stuck = 0
 	_enter(State.PATROL)
-	var hp := int(d.get("hp", data.max_hp))
+	var hp := int(d.get("hp", health.max_hp))
 	if hp <= 0:
 		health.hp = 0
 		health.is_dead = true

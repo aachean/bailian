@@ -577,13 +577,45 @@ func _apply_state(st: Dictionary) -> void:
 ## 向上找随时都读得到。**取不到就返回 1.0** —— 测试房间、独立场景、
 ## 还没重切的场景本来就没有副本语境，那里不该按别的副本的倍率打人
 static func atk_scale_for(node: Node) -> float:
+	var d := dungeon_of(node)
+	return 1.0 if d == null else d.enemy_atk_scale
+
+
+## 某个节点所在的副本数据（向上找 `Stage`）。找不到返回 null
+static func dungeon_of(node: Node) -> DungeonData:
 	var n: Node = node.get_parent()
 	while n != null:
 		if n is Stage:
-			var d := (n as Stage).dungeon_data
-			return 1.0 if d == null else d.enemy_atk_scale
+			return (n as Stage).dungeon_data
 		n = n.get_parent()
-	return 1.0
+	return null
+
+
+## 这只敌人的**章差 · 血量倍率**（`DungeonData.enemy_hp_chapter`，ADR-0024）。
+##
+## **Boss 恒 1.0**：它的章差已经写在自己的 `.tres` 里（按 rec_level 插值过），
+## 再乘一次就是双重缩放。**判类型只在这一处** —— 调用方别再各判一次
+static func hp_scale_for(node: Node) -> float:
+	if is_boss_enemy(node):
+		return 1.0
+	var d := dungeon_of(node)
+	return 1.0 if d == null else d.enemy_hp_chapter
+
+
+## 这只敌人的**章差 · 攻击倍率**。与 `atk_scale_for` 相乘使用：
+## 前者管「第几章」，后者管「同一章里哪个副本（按 rec_level）」
+static func atk_chapter_for(node: Node) -> float:
+	if is_boss_enemy(node):
+		return 1.0
+	var d := dungeon_of(node)
+	return 1.0 if d == null else d.enemy_atk_chapter
+
+
+## 这是不是 Boss。**读它身上的 `data.kind`**（duck-typing）而不是看场景名 ——
+## 敌人脚本里 `data` 是公开的 `@export`，这是唯一稳的判据
+static func is_boss_enemy(node: Node) -> bool:
+	var d = node.get("data")
+	return d is EnemyData and (d as EnemyData).kind == &"boss"
 func _restore_screens(scr: Dictionary) -> void:
 	var started: Array = scr.get("started", [])
 	var done: Array = scr.get("done", [])

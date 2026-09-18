@@ -57,6 +57,7 @@ func _ready() -> void:
 	await _t10_unlock_chain()
 	await _t11_mobs_inside_their_screen()
 	await _t12_dungeon_attack_scale()
+	await _t13_chapter_scale()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -112,6 +113,74 @@ func _t12_dungeon_attack_scale() -> void:
 	_check("12", "副本攻击倍率：砺场≈0.23 炉喉≈1.14（对表）；敌人反查拿得到、孤儿节点回落 1.0",
 		data_ok and runtime_ok,
 		"　".join(out) + "　运行时：砺场下 %.3f / 无关卡 %.2f" % [in_stage, no_stage])
+
+
+## **章差**的守门人（ADR-0024）：同一只 walker 在第一章是 30 血，在剑冢要变 69。
+##
+## 这条盯的是「跨章共用一份 data」这个结构带来的一类静默错误：
+## 数据里只存第一章基准，副本那一层乘章倍率。**乘漏了不会报错** ——
+## 表现只是「第二章的杂兵软得像纸」，而没有任何断言会红（测试全绿）。
+## 所以两头卡：**小怪/精英乘了、Boss 没乘**（Boss 的章差已经写进自己的 .tres，
+## 再乘一次就是双重缩放 —— 那是同一个 bug 的镜像版本）。
+func _t13_chapter_scale() -> void:
+	var stage := Stage.new()
+	stage.dungeon_data = GameProgress.dungeon(&"xiushi")     # 锈蚀甬道：章差 血×2.30 伤×1.93
+	add_child(stage)
+	var walker: Node2D = (load("res://scenes/enemies/walker.tscn") as PackedScene).instantiate()
+	var wdata: EnemyData = load("res://data/enemies/walker.tres")
+	walker.set("data", wdata)
+	stage.add_child(walker)
+	var boss: Node2D = (load("res://scenes/enemies/boss_xiushi.tscn") as PackedScene).instantiate()
+	var bdata: EnemyData = load("res://data/enemies/boss_xiushi.tres")
+	boss.set("data", bdata)
+	stage.add_child(boss)
+	await _pframes(2)
+
+	var wh: Health = walker.get_node("Health")
+	var bh: Health = boss.get_node("Health")
+	var d := GameProgress.dungeon(&"xiushi")
+	var want_hp := int(round(float(wdata.max_hp) * d.enemy_hp_chapter))
+	_check("13a", "小怪吃了章差（同一只 walker 在第二章更厚）",
+		wh.max_hp == want_hp and want_hp > wdata.max_hp,
+		"第一章基准 %d × 章差 %.2f = %d（实际 %d）" % [
+			wdata.max_hp, d.enemy_hp_chapter, want_hp, wh.max_hp])
+
+	# Boss 不吃章差：它的 4959 已经按 rec_level 插值过了
+	_check("13b", "Boss **不**吃章差（它的章差写在 .tres 里，乘两次就是双重缩放）",
+		bh.max_hp == bdata.max_hp and is_equal_approx(Stage.hp_scale_for(boss), 1.0),
+		"boss_xiushi 血量 %d（若被乘会是 %d）；hp_scale_for(boss)=%.2f" % [
+			bh.max_hp, int(round(float(bdata.max_hp) * d.enemy_hp_chapter)),
+			Stage.hp_scale_for(boss)])
+
+	# 伤害那一半：小怪乘、Boss 不乘
+	var wbox: Hitbox = walker.get_node("Hitbox")
+	var bbox: Hitbox = boss.get_node("Hitbox")
+	var want_scale := d.enemy_atk_scale * d.enemy_atk_chapter
+	_check("13c", "小怪伤害吃了章差、Boss 只吃等级差",
+		is_equal_approx(wbox.damage_scale, want_scale)
+			and is_equal_approx(bbox.damage_scale, d.enemy_atk_scale),
+		"小怪 damage_scale=%.3f（= 等级差 %.3f × 章差 %.3f）／ Boss=%.3f（= 等级差 %.3f）" % [
+			wbox.damage_scale, d.enemy_atk_scale, d.enemy_atk_chapter,
+			bbox.damage_scale, d.enemy_atk_scale])
+
+	# 第一章的副本恒 1.0：砺场那 30 血的手感是 M1/M3 验收过的，不许被章差碰
+	var lc := GameProgress.dungeon(&"lichang")
+	_check("13d", "第一章副本的章差恒 1.0（砺场手感不动）",
+		is_equal_approx(lc.enemy_hp_chapter, 1.0) and is_equal_approx(lc.enemy_atk_chapter, 1.0),
+		"砺场 血×%.2f 伤×%.2f" % [lc.enemy_hp_chapter, lc.enemy_atk_chapter])
+
+	# 孤儿节点（没有关卡语境的测试房间）回落 1.0 —— 那里不该按别的副本的倍率长
+	var orphan := Node2D.new()
+	add_child(orphan)
+	_check("13e", "没有副本语境的敌人回落 1.0（测试房间不该被腐蚀）",
+		is_equal_approx(Stage.hp_scale_for(orphan), 1.0)
+			and is_equal_approx(Stage.atk_chapter_for(orphan), 1.0),
+		"hp_scale_for=%.2f atk_chapter_for=%.2f" % [
+			Stage.hp_scale_for(orphan), Stage.atk_chapter_for(orphan)])
+
+	stage.queue_free()
+	orphan.queue_free()
+	await _pframes(2)
 
 
 func _check(id: String, desc: String, ok: bool, detail: String) -> void:
