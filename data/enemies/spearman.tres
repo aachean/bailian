@@ -6,9 +6,13 @@
 script = ExtResource("1_data")
 id = &"spearman"
 display_name = "掷矛手"
+kind = &"trash"
 max_hp = 22
 revive_delay = 0.0
 hurt_stun_frames = 16
+defense = 0
+atk_flat = 23
+atk_mult = 0.9
 patrol_speed = 30.0
 chase_speed = 60.0
 patrol_range = 60.0

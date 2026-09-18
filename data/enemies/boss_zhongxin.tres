@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"boss_zhongxin"
 display_name = "冢心剑灵"
-max_hp = 680
+kind = &"boss"
+max_hp = 5256
 revive_delay = 0.0
 hurt_stun_frames = 3
+defense = 60
+atk_flat = 79
+atk_mult = 1.1
 patrol_speed = 30.0
 chase_speed = 110.0
 patrol_range = 80.0

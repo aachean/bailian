@@ -81,6 +81,14 @@ func _ready() -> void:
 	health.max_hp = data.max_hp
 	health.hp = data.max_hp
 	health.post_hit_invincible = 0.10
+	# v2：敌人也有防御了（平铺点数，走同一道护甲曲线）——
+	# 「打不动」是 Boss 的主要难度来源，不是血条长度（ADR-0019 / 设计原则 4.3）
+	health.defense = data.defense
+	# 攻击的两半（与玩家同一条管线）：平铺点数走 attack_flat，乘区放**本副本的难度倍率**。
+	# 敌人自己确实没有等级/强化 —— 但乘区不是空的：同一只 walker 同时摆在砺场（lv1）
+	# 和炉喉（lv25），靠这一格才有两种强度。留 1.0 就是「lv20 的伤害打 lv1 的玩家」
+	_hitbox.attack_flat = data.attack_power()
+	_hitbox.damage_scale = Stage.atk_scale_for(self)
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 	health.revived.connect(_on_revived)

@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"boss2"
 display_name = "石甲卫"
-max_hp = 300
+kind = &"boss"
+max_hp = 1871
 revive_delay = 0.0
 hurt_stun_frames = 5
+defense = 30
+atk_flat = 30
+atk_mult = 1.05
 patrol_speed = 26.0
 chase_speed = 78.0
 patrol_range = 70.0

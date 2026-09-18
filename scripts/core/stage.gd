@@ -1,3 +1,4 @@
+class_name Stage
 extends Node2D
 ## 关卡根节点：**一个副本 = 一条多屏的路**。它负责五件事：
 ##   1. **相机边界**（bounds）—— 设成场景实际宽度，视野跟着玩家平滑滚动
@@ -564,7 +565,21 @@ func _apply_state(st: Dictionary) -> void:
 			e.call("apply_saved", d)
 
 
-## 按快照摆回推进状态：清过的屏直接放行，没清完的屏把该出的那一波摆出来
+## 某个节点所在副本的**敌人攻击倍率**（`DungeonData.enemy_atk_scale`）。
+##
+## ── 为什么由敌人反查，而不是关卡主动注入 ─────────────────────
+## 敌人的 `_ready` **早于**关卡根节点的 `_ready`（Godot 里子节点先 ready），
+## 注入会晚一步；而 `dungeon_data` 是场景里已经反序列化好的 `@export` 值，
+## 向上找随时都读得到。**取不到就返回 1.0** —— 测试房间、独立场景、
+## 还没重切的场景本来就没有副本语境，那里不该按别的副本的倍率打人
+static func atk_scale_for(node: Node) -> float:
+	var n: Node = node.get_parent()
+	while n != null:
+		if n is Stage:
+			var d := (n as Stage).dungeon_data
+			return 1.0 if d == null else d.enemy_atk_scale
+		n = n.get_parent()
+	return 1.0
 func _restore_screens(scr: Dictionary) -> void:
 	var started: Array = scr.get("started", [])
 	var done: Array = scr.get("done", [])

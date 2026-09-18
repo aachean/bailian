@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"boss_canjian"
 display_name = "残剑守"
-max_hp = 460
+kind = &"boss"
+max_hp = 4503
 revive_delay = 0.0
 hurt_stun_frames = 3
+defense = 60
+atk_flat = 89
+atk_mult = 1
 patrol_speed = 30.0
 chase_speed = 100.0
 patrol_range = 80.0

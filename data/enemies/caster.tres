@@ -6,9 +6,13 @@
 script = ExtResource("1_data")
 id = &"caster"
 display_name = "掷火者"
+kind = &"trash"
 max_hp = 26
 revive_delay = 0.0
 hurt_stun_frames = 14
+defense = 0
+atk_flat = 19
+atk_mult = 0.9
 patrol_speed = 26.0
 chase_speed = 46.0
 patrol_range = 50.0

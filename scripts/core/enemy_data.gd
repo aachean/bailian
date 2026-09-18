@@ -9,6 +9,13 @@ extends Resource
 @export var id: StringName = &""
 @export var display_name: String = ""
 
+@export_group("分类")
+## 小怪 / 精英 / Boss（`trash` / `elite` / `boss`）。
+## **只给数值工具与断言用**，AI 行为不看它 —— 但它决定了三件事：
+## ① 从阶段表取哪一档血量与单发伤害（ADR-0019）② 掉落档次池（ADR-0016/批 5）
+## ③ 断言里的伤害阶梯（小怪 < 精英、小怪 < Boss）
+@export var kind: StringName = &"trash"
+
 @export_group("存活")
 @export var max_hp: int = 30
 ## 被打死之后过多久满血重生。**<= 0 表示不重生。**
@@ -19,6 +26,24 @@ extends Resource
 @export var revive_delay: float = 2.0
 ## 被打中的硬直（帧 @60fps）。硬直里既不追人也不攻击
 @export var hurt_stun_frames: int = 14
+
+@export_group("防御（v2：平铺点数，走护甲曲线）")
+## 平铺防御点数。减伤 = `def/(100+def)`，卡 0.6（def=150 到顶，见 ADR-0019）。
+## **这是「敌人变强靠机制不靠堆血」那条原则的落点**（design-principles 4.3）：
+## Boss 的「打不动」来自它，而不是一根更长的血条。
+## 小怪 0（早期手感不动）／精英半个 boss 档／Boss 由阶段表的 `boss_def` 给
+@export var defense: int = 0
+
+@export_group("攻击（v2：平铺点数，与玩家同一套伤害合成）")
+## 该类的**阶段基准单发点数**（不含技能自己的 damage）。
+## 单发最终伤害 = `attack_skill.roll_damage() + attack_power()` ——
+## 技能那一份保留「重砸比普攻疼」的相对差，基准那一份负责整体重标。
+## **别逐怪拍数字**：按 kind + 章节从 `data/combat_defense.csv` 派生，
+## 见 `tools/apply_enemy_scaling.py`
+@export var atk_flat: int = 0
+## 这只怪的个体倍率。同一档内部的强弱差异走它（重甲 1.2、快攻 0.85），
+## 改它就是「这只怪比同类更疼」，不会碰到全章的基准
+@export var atk_mult: float = 1.0
 
 @export_group("AI")
 ## 巡逻速度 / 追击速度（像素/秒）
@@ -69,3 +94,14 @@ extends Resource
 @export var projectile_damage: int = 0
 ## 投射物最长飞行时间（秒），超时消散
 @export var projectile_life: float = 1.6
+
+
+## 这只怪的单发攻击力（点数）。**已经含个体倍率**
+func attack_power() -> int:
+	return int(round(float(atk_flat) * atk_mult))
+
+
+## 它挨打时实际吃到的减伤比例。与 `Health.armor_reduction()` 同一条曲线 ——
+## 放这里是为了让生成脚本与断言能**不看场景**就核对「def 有没有越过 0.6 红线」
+func armor_reduction() -> float:
+	return minf(float(defense) / (100.0 + float(defense)), Health.MAX_DAMAGE_REDUCTION)

@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"walker"
 display_name = "游荡者"
+kind = &"trash"
 max_hp = 30
 revive_delay = 0.0
 hurt_stun_frames = 14
+defense = 0
+atk_flat = 22
+atk_mult = 1
 patrol_speed = 40.0
 chase_speed = 85.0
 patrol_range = 70.0

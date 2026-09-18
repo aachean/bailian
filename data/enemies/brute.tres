@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"brute"
 display_name = "重锤兵"
+kind = &"trash"
 max_hp = 64
 revive_delay = 0.0
 hurt_stun_frames = 6
+defense = 0
+atk_flat = 15
+atk_mult = 1.2
 patrol_speed = 24.0
 chase_speed = 58.0
 patrol_range = 50.0

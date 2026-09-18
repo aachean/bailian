@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"dasher"
 display_name = "疾行者"
+kind = &"trash"
 max_hp = 18
 revive_delay = 0.0
 hurt_stun_frames = 10
+defense = 0
+atk_flat = 24
+atk_mult = 0.85
 patrol_speed = 55.0
 chase_speed = 145.0
 patrol_range = 80.0

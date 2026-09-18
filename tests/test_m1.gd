@@ -1091,6 +1091,13 @@ func _dist_walker_player() -> float:
 ## 玩家掉出世界（被挤下边缘 / 走出地图）：算死亡，在出生点满血重来
 func _t33_fall_out_of_world() -> void:
 	var h: Health = _player.get_node("Health")
+	# **先清干净再数基线**：前面「敌人贴脸等待」那一用例里怪可能已经把玩家打死了
+	# （敌人重标后小怪单发从 8 涨到 30，100 血撑不过四刀），残留的 DEAD 状态会让
+	# 这一次的循环第一帧就 break 出去、读到的是**上一次**死亡的账 ——
+	# 表现成「死亡计数 2→2」这种看起来像掉出世界没生效的假红。
+	# heal_full 会发 revived → 玩家把 state 放回 FREE
+	h.heal_full()
+	await get_tree().physics_frame
 	var deaths0: int = _player.deaths
 
 	# 世界右缘外（地面只到 x=640），掉下去必须触发死亡重生，不许无限下落

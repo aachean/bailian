@@ -85,6 +85,8 @@ func _ready() -> void:
 	health.max_hp = data.max_hp
 	health.hp = data.max_hp
 	health.post_hit_invincible = 0.10
+	# v2：与 walker 同一套 —— 敌人也有防御（平铺点数，走护甲曲线）
+	health.defense = data.defense
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 	health.revived.connect(_on_revived)
@@ -182,11 +184,20 @@ func _throw(player: Node2D) -> void:
 		return
 	throws_started += 1
 	var proj: Node2D = PROJECTILE.instantiate()
+	# 乘区放本副本的难度倍率 —— 与近战（walker 的 Hitbox.damage_scale）同一个出处，
+	# 掷出去的矛不能比挥出来的拳头另算一套强度
+	proj.damage_scale = Stage.atk_scale_for(self)
 	var dir := Vector2(signf(player.global_position.x - global_position.x), 0.0)
 	get_tree().current_scene.add_child(proj)
 	proj.setup(
 		global_position + Vector2(14.0 * float(_facing), -6.0),
-		dir, data.projectile_speed, data.projectile_damage, data.projectile_life, self)
+		dir, data.projectile_speed, _throw_damage(), data.projectile_life, self)
+
+
+## 矛的伤害 = 投射物自己的基准 + 这只怪的攻击点数（v2：与近战同一条管线）。
+## 分成两半的理由与 Hitbox 一样：**装备/阶段数值改的是「这个人」，不是「这一招」**
+func _throw_damage() -> int:
+	return data.projectile_damage + data.attack_power()
 
 
 func _enter(s: int) -> void:

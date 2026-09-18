@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"walker_elite"
 display_name = "渠底游荡者"
-max_hp = 34
+kind = &"elite"
+max_hp = 398
 revive_delay = 0.0
 hurt_stun_frames = 10
+defense = 15
+atk_flat = 68
+atk_mult = 1
 patrol_speed = 46.0
 chase_speed = 108.0
 patrol_range = 80.0

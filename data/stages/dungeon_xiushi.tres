@@ -7,6 +7,7 @@ script = ExtResource("1_ca8sn")
 id = &"xiushi"
 name_key = &"DUNGEON_XIUSHI"
 scene_path = "res://scenes/stages/xiushi.tscn"
+enemy_atk_scale = 1
 screen_count = 4
 rec_level = 42
 rec_weapon = 6

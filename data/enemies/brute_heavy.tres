@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"brute_heavy"
 display_name = "碎地重锤"
-max_hp = 68
+kind = &"elite"
+max_hp = 787
 revive_delay = 0.0
 hurt_stun_frames = 6
+defense = 15
+atk_flat = 56
+atk_mult = 1.15
 patrol_speed = 22.0
 chase_speed = 54.0
 patrol_range = 50.0

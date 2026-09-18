@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"dasher_elite"
 display_name = "疾行哨"
-max_hp = 22
+kind = &"elite"
+max_hp = 253
 revive_delay = 0.0
 hurt_stun_frames = 7
+defense = 15
+atk_flat = 70
+atk_mult = 0.85
 patrol_speed = 62.0
 chase_speed = 172.0
 patrol_range = 90.0

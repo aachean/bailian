@@ -56,6 +56,7 @@ func _ready() -> void:
 	await _t9_old_mechanisms_are_gone()
 	await _t10_unlock_chain()
 	await _t11_mobs_inside_their_screen()
+	await _t12_dungeon_attack_scale()
 
 	print("")
 	print("═══ %d 通过 ／ %d 失败 ═══" % [_pass, _fail])
@@ -64,6 +65,54 @@ func _ready() -> void:
 
 
 # ── 工具 ───────────────────────────────────────────────────────
+
+## 副本 id → [推荐等级, 攻击倍率]。与 `tools/apply_enemy_scaling.py` 落地的值对表 ——
+## **倍率的来历是「玩家承受力之比」**（血量(rec)/血量(章锚点)），改曲线或改 rec_level
+## 都要重跑那个脚本；这里的数字就是那次的快照，两边对不上 = 有人动了其中一边
+const DUNGEON_SCALE := {
+	&"lichang": [1, 0.233], &"duancuiqu": [12, 0.73], &"luhou": [25, 1.138],
+	&"canjianlin": [30, 0.85], &"xiushi": [42, 1.0], &"zhongxin": [55, 1.111],
+}
+
+## 同一只 walker 同时摆在砺场（lv1）和炉喉（lv25），靠 `DungeonData.enemy_atk_scale`
+## 才有两种强度。这条是「伤害按副本等级缩放」的守门人 —— **没有它的话这种错测不出来**：
+## 落地脚本自检只对锚点（lv20 的 30 点对表正确），全组测试也绿（没人断言砺场有多疼），
+## lv20 的伤害打在 lv1 玩家（100 血）身上就是四下一命，只有玩的人会撞上。所以两头卡：
+## 数据侧六个副本的倍率都对表；运行时侧挂进关卡的敌人反查得到倍率、孤儿节点回落 1.0
+func _t12_dungeon_attack_scale() -> void:
+	var out: Array[String] = []
+	var data_ok := true
+	for id in DUNGEON_SCALE:
+		var want: Array = DUNGEON_SCALE[id]
+		var d := GameProgress.dungeon(id)
+		if d == null:
+			data_ok = false
+			out.append("%s 不在副本序列里" % id)
+			continue
+		if d.rec_level != int(want[0]) or not is_equal_approx(d.enemy_atk_scale, float(want[1])):
+			data_ok = false
+			out.append("%s rec=%d scale=%.3f（期望 %d / %.3f）" % [
+				id, d.rec_level, d.enemy_atk_scale, int(want[0]), float(want[1])])
+
+	# 运行时反查：挂在关卡根下的节点拿得到倍率；没有关卡语境（测试房间）回落 1.0
+	var stage := Stage.new()
+	var probe := Node2D.new()
+	stage.add_child(probe)
+	stage.dungeon_data = GameProgress.dungeon(&"lichang")
+	add_child(stage)
+	var in_stage := Stage.atk_scale_for(probe)
+	var orphan := Node2D.new()
+	add_child(orphan)
+	var no_stage := Stage.atk_scale_for(orphan)
+	stage.queue_free()
+	orphan.queue_free()
+	await _pframes(2)
+
+	var runtime_ok := is_equal_approx(in_stage, 0.233) and is_equal_approx(no_stage, 1.0)
+	_check("12", "副本攻击倍率：砺场≈0.23 炉喉≈1.14（对表）；敌人反查拿得到、孤儿节点回落 1.0",
+		data_ok and runtime_ok,
+		"　".join(out) + "　运行时：砺场下 %.3f / 无关卡 %.2f" % [in_stage, no_stage])
+
 
 func _check(id: String, desc: String, ok: bool, detail: String) -> void:
 	if ok:
@@ -303,7 +352,14 @@ func _t4_sawtooth() -> void:
 ## **这条是 4.3 的守门人。**
 ## 「敌人变强靠配置不靠堆血量」—— 堆血量只是把同一场战斗拖长两分钟，
 ## 打法一点没变，玩家会无聊而不是被挑战。
-## 所以断言两头卡：**至少三项 AI 参数变凶**了，**同时血量没有翻倍**
+##
+## ── v2 改了判据的形状（2026-09-18，见 design-principles 4.3 的 v2 注）──
+## 旧判据是「AI 参数至少三项变凶 **且血量没翻倍**」。v2 给了精英明确的**时长预算**
+## （`elite_s` 12 秒），血量是按那个预算反推出来的 —— 「血量没翻倍」这条数字门槛
+## 与设计决策正面冲突了，硬守着它只会挡住重做。
+## 现在守的是**意图**：精英必须 ① AI 参数至少三项更凶 ② **带上护甲压力**（def 变高）
+## ③ 打得更疼（单发变高）。三条一起，「属性全调高、只有血条变长」照样过不了。
+## 血量比仍然打出来，是给人看的（它现在是预算的结果，不是随手拍的数）。
 func _t5_elite_is_config_not_hp() -> void:
 	var out: Array[String] = []
 	var ok := true
@@ -329,12 +385,18 @@ func _t5_elite_is_config_not_hp() -> void:
 		if elite.hurt_stun_frames < base.hurt_stun_frames:
 			sharper += 1
 			names.append("硬直 %d→%d" % [base.hurt_stun_frames, elite.hurt_stun_frames])
+		var armored := elite.defense > base.defense
+		var hits_harder := elite.attack_power() > base.attack_power()
+		if armored:
+			names.append("防御 %d→%d" % [base.defense, elite.defense])
+		if hits_harder:
+			names.append("单发 %d→%d" % [base.attack_power(), elite.attack_power()])
 		var hp_ratio := float(elite.max_hp) / float(base.max_hp)
 		out.append("%s：%s，血量 ×%.2f" % [
 			elite_id, "、".join(names) if not names.is_empty() else "（没有一项变凶）", hp_ratio])
-		if sharper < 3 or hp_ratio >= 1.5:
+		if sharper < 3 or not armored or not hits_harder:
 			ok = false
-	_check("5", "4.3：精英变体变的是**行为**（至少三项 AI 参数变凶），不是把血条拉长",
+	_check("5", "4.3：精英变强靠「更凶 + 护甲 + 打得更疼」，不是只把血条拉长",
 		ok,
 		"　".join(out))
 

@@ -7,9 +7,13 @@
 script = ExtResource("1_data")
 id = &"brute_elite"
 display_name = "炉前重锤"
-max_hp = 78
+kind = &"elite"
+max_hp = 905
 revive_delay = 0.0
 hurt_stun_frames = 4
+defense = 15
+atk_flat = 61
+atk_mult = 1.2
 patrol_speed = 28.0
 chase_speed = 74.0
 patrol_range = 60.0
