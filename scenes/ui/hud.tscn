@@ -141,38 +141,38 @@ theme_override_constants/separation = 3
 [node name="BagPanel" type="Panel" parent="."]
 theme_override_styles/panel = ExtResource("3_panelstyle")
 visible = false
-offset_left = 236.0
-offset_top = 36.0
-offset_right = 628.0
-offset_bottom = 321.0
+offset_left = 10.0
+offset_top = 34.0
+offset_right = 630.0
+offset_bottom = 320.0
 mouse_filter = 2
 
 [node name="Border" type="ColorRect" parent="BagPanel"]
-offset_right = 392.0
-offset_bottom = 285.0
+offset_right = 620.0
+offset_bottom = 286.0
 mouse_filter = 2
 color = Color(0.47, 0.4, 0.26, 1)
 
 [node name="BG" type="ColorRect" parent="BagPanel"]
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 390.0
-offset_bottom = 283.0
+offset_right = 618.0
+offset_bottom = 284.0
 mouse_filter = 2
 color = Color(0.09, 0.09, 0.12, 0.97)
 
 [node name="TitleBar" type="ColorRect" parent="BagPanel"]
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 390.0
+offset_right = 618.0
 offset_bottom = 26.0
 mouse_filter = 2
 color = Color(0.3, 0.24, 0.16, 1)
 
 [node name="Title" type="Label" parent="BagPanel"]
-offset_left = 10.0
+offset_left = 12.0
 offset_top = 4.0
-offset_right = 382.0
+offset_right = 300.0
 offset_bottom = 24.0
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.95, 0.87, 0.6, 1)
@@ -181,99 +181,99 @@ text = "背包"
 [node name="StatsL" type="Label" parent="BagPanel"]
 offset_left = 12.0
 offset_top = 30.0
-offset_right = 72.0
-offset_bottom = 124.0
+offset_right = 104.0
+offset_bottom = 128.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = ""
 
 [node name="StatsR" type="Label" parent="BagPanel"]
-offset_left = 76.0
+offset_left = 108.0
 offset_top = 30.0
-offset_right = 136.0
-offset_bottom = 124.0
+offset_right = 192.0
+offset_bottom = 128.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = ""
 
-[node name="Divider2" type="ColorRect" parent="BagPanel"]
+[node name="EquipRows" type="VBoxContainer" parent="BagPanel"]
 offset_left = 12.0
-offset_top = 146.0
-offset_right = 136.0
-offset_bottom = 148.0
+offset_top = 136.0
+offset_right = 192.0
+offset_bottom = 268.0
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Div1" type="ColorRect" parent="BagPanel"]
+offset_left = 200.0
+offset_top = 28.0
+offset_right = 203.0
+offset_bottom = 272.0
 mouse_filter = 2
 color = Color(0.4, 0.35, 0.25, 1)
 
 [node name="DetailName" type="Label" parent="BagPanel"]
-offset_left = 12.0
-offset_top = 150.0
-offset_right = 136.0
-offset_bottom = 186.0
+offset_left = 214.0
+offset_top = 30.0
+offset_right = 356.0
+offset_bottom = 72.0
 theme_override_font_sizes/font_size = 12
 autowrap_mode = 3
 text = ""
 
 [node name="DetailText" type="Label" parent="BagPanel"]
-offset_left = 12.0
-offset_top = 188.0
-offset_right = 136.0
+offset_left = 214.0
+offset_top = 78.0
+offset_right = 356.0
 offset_bottom = 268.0
 theme_override_font_sizes/font_size = 10
 autowrap_mode = 3
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = ""
 
-[node name="EquipRows" type="VBoxContainer" parent="BagPanel"]
-offset_left = 144.0
-offset_top = 30.0
-offset_right = 380.0
-offset_bottom = 166.0
-mouse_filter = 2
-theme_override_constants/separation = 0
-
-[node name="Divider" type="ColorRect" parent="BagPanel"]
-offset_left = 144.0
-offset_top = 168.0
-offset_right = 378.0
-offset_bottom = 170.0
+[node name="Div2" type="ColorRect" parent="BagPanel"]
+offset_left = 364.0
+offset_top = 28.0
+offset_right = 367.0
+offset_bottom = 272.0
 mouse_filter = 2
 color = Color(0.4, 0.35, 0.25, 1)
 
 [node name="BagGrid" type="GridContainer" parent="BagPanel"]
-offset_left = 144.0
-offset_top = 172.0
-offset_right = 380.0
-offset_bottom = 236.0
+offset_left = 380.0
+offset_top = 30.0
+offset_right = 620.0
+offset_bottom = 128.0
 mouse_filter = 2
-theme_override_constants/h_separation = 2
-theme_override_constants/v_separation = 2
+theme_override_constants/h_separation = 3
+theme_override_constants/v_separation = 3
 columns = 6
 
-[node name="BagDetail" type="Label" parent="BagPanel"]
-offset_left = 144.0
-offset_top = 238.0
-offset_right = 380.0
-offset_bottom = 252.0
-theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
-text = ""
-
 [node name="MatRow" type="Label" parent="BagPanel"]
-offset_left = 144.0
-offset_top = 254.0
-offset_right = 380.0
-offset_bottom = 268.0
+offset_left = 380.0
+offset_top = 134.0
+offset_right = 620.0
+offset_bottom = 150.0
 theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.72, 0.7, 0.66, 1)
 text = ""
 
-[node name="Hint" type="Label" parent="BagPanel"]
-offset_left = 144.0
-offset_top = 268.0
-offset_right = 380.0
-offset_bottom = 281.0
+[node name="BagEmpty" type="Label" parent="BagPanel"]
+offset_left = 380.0
+offset_top = 156.0
+offset_right = 620.0
+offset_bottom = 174.0
 theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(0.78, 0.74, 0.64, 1)
+theme_override_colors/font_color = Color(0.62, 0.6, 0.55, 1)
+text = ""
+
+[node name="Hint" type="Label" parent="BagPanel"]
+offset_left = 12.0
+offset_top = 274.0
+offset_right = 618.0
+offset_bottom = 286.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.72, 0.7, 0.66, 1)
 text = ""
 
 [node name="SkillPanel" type="Panel" parent="."]

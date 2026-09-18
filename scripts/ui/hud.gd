@@ -18,7 +18,7 @@ extends CanvasLayer
 const BAG_COLS := 6
 const BAG_GRID_ROWS := 2
 ## 背包格子边长（图标 16 + 内边距）。2 行 × 34 = 68，正好放进面板的格子区
-const BAG_CELL := 34.0
+const BAG_CELL := 36.0
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
 ## 装备槽行的高度（面板上半，8 行）
@@ -69,7 +69,7 @@ var _has_player := false
 @onready var _bag_title: Label = $BagPanel/Title
 @onready var _equip_box: VBoxContainer = $BagPanel/EquipRows
 @onready var _bag_grid: GridContainer = $BagPanel/BagGrid
-@onready var _bag_detail: Label = $BagPanel/BagDetail
+@onready var _bag_empty: Label = $BagPanel/BagEmpty
 @onready var _detail_name: Label = $BagPanel/DetailName
 @onready var _detail_text: Label = $BagPanel/DetailText
 @onready var _mat_row: Label = $BagPanel/MatRow
@@ -156,7 +156,7 @@ func _make_bag_cell() -> Panel:
 	# **手动居中，别用 anchors preset** —— GridContainer 的子 Panel 还没进树时
 	# size 是 0，PRESET_CENTER 算出的 offset 是 0，图标就从中心点向右下歪出去
 	# （2026-09-18 神截图圈注的「偏右下角」就是它）
-	icon.position = Vector2((BAG_CELL - ICON_SIZE) * 0.5, (BAG_CELL - ICON_SIZE) * 0.5)
+	icon.position = Vector2((BAG_CELL - ICON_SIZE) * 0.5, (BAG_CELL - ICON_SIZE) * 0.5)  # = 10,10
 	icon.size = Vector2(ICON_SIZE, ICON_SIZE)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.add_child(icon)
@@ -598,19 +598,10 @@ func refresh_bag() -> void:
 			icon.visible = true
 			icon.set_item(it)
 
-	# 详情行：光标在背包格上 = 那一件的名字与词条；背包整个空着要写明「（空）」——
-	# 格子全空 + 一句话都没有，玩家分不清「空」和「没画出来」
+	# 背包空着要写明「（空）」—— 格子全空 + 一句话都没有，
+	# 玩家分不清「空」和「没画出来」。选中详情在中栏（_refresh_detail_panel）
 	var detail_idx: int = _cursor - ItemData.SLOT_IDS.size()
-	if bag.is_empty():
-		_bag_detail.text = tr("UI_BAG_EMPTY")
-	elif detail_idx >= 0 and detail_idx < bag.size():
-		var uid := str(bag[detail_idx])
-		var it := PlayerState.item_of(uid)
-		_bag_detail.text = "%s　%s" % [
-			_item_name(it) if it != null else "?",
-			_stat_text(uid, it) if it != null else ""]
-	else:
-		_bag_detail.text = ""
+	_bag_empty.text = tr("UI_BAG_EMPTY") if bag.is_empty() else ""
 
 	_refresh_detail_panel(bag, detail_idx)
 

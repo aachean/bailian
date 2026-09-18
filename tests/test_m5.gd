@@ -448,7 +448,7 @@ func _t12_empty_bag_state() -> void:
 
 	var grid := (hud.get_node("BagPanel/BagGrid") as GridContainer)
 	var first_cell_icon := (grid.get_child(0).get_child(1) as ItemIcon)
-	var detail: String = (hud.get_node("BagPanel/BagDetail") as Label).text
+	var detail: String = (hud.get_node("BagPanel/BagEmpty") as Label).text
 	var equip_text := _hud_texts(hud)
 
 	_press("bag")

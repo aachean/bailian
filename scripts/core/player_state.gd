@@ -567,10 +567,16 @@ func ensure_shop_fresh() -> void:
 		hours = float(sd.refresh_hours)
 	_load_shop_state()
 	var now := Time.get_unix_time_from_system()
-	if shop_offers.is_empty() or now - shop_refreshed_at >= hours * 3600.0:
+	if now - shop_refreshed_at >= hours * 3600.0:
+		# 到点了：全部换新，时钟重置
 		shop_offers = _roll_shop_offers(7)   # 7 件 + 尾部一条还魂丹 = 左栏 8 行正好
 		shop_bp_offers = _roll_bp_offers(8)
 		shop_refreshed_at = now
+		save_shop_state()
+	elif shop_offers.is_empty():
+		# 没到点但装备卖光了：只补装备，**时钟不动**（制书不补 ——
+		# 「买了再想买只能等下次刷新」对书仍然成立）
+		shop_offers = _roll_shop_offers(7)
 		save_shop_state()
 
 
