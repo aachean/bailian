@@ -82,6 +82,7 @@ func _ready() -> void:
 	await _t8_save_roundtrip()
 	await _t9_data_consistency()
 	await _t10_drop_pools()
+	await _t11_disassemble_craft_loop()
 
 	# 还原全局状态（本进程内 autoload 已被改动；存档文件没碰过，
 	# 只有 T5 动了通关表 —— 它自己负责了备份还原）
@@ -405,3 +406,79 @@ func _t10_drop_pools() -> void:
 		table_ok and isolation_ok and roll_ok,
 		"　".join(out) + "　砺场掷 60 次全普通=%s（普通池 %d 件，坏档：%d）" % [
 			str(roll_ok), pool_size, bad_tier])
+
+
+## 回收闭环（批 6 · 原则 5.5）。守四条：
+##   ① 分解：材料到账（精铁进 shards、玄铁进 materials）、装备离包；**穿在身上的不收**
+##   ② 打造：档没解锁 / 材料不够都不发货；**付料是原子的**（不够就一分不动）
+##   ③ 制书：买 = 永久解锁并扣元宝；**重复买直接拒绝**（重复付费不该是可能的事故）
+##   ④ 铁律读进数据：每档分解产量 < 该档打造成本（堵「分解→重造」白嫖）
+##   装备全部从数据读（drop_pool 里拿现成件），不写死路径
+func _t11_disassemble_craft_loop() -> void:
+	_fresh_state()
+	# ── ① 分解 ──
+	var uncommon := GameProgress.drop_pool(ItemData.Tier.UNCOMMON)[0]   # 优秀档
+	var uid: String = PlayerState.add_item(uncommon)
+	var yld := PlayerState.disassemble(uid)
+	var d := PlayerState.disassemble_table().yield_for(int(ItemData.Tier.UNCOMMON))
+	var iron_gain := int(d.get("mat_refined_iron", 0))
+	var black_gain := int(d.get("mat_black_iron", 0))
+	var gone := not PlayerState.bag.has(uid)
+	var iron_ok: bool = PlayerState.shards == iron_gain and iron_gain > 0
+	var black_ok: bool = PlayerState.material_count(&"mat_black_iron") == black_gain
+	# 穿在身上的不收：从优秀档里挑一件当前角色穿得上的 → 穿上 → 拆（应失败、槽还在）
+	var wear_uid := ""
+	var wear_slot := &""
+	for p in GameProgress.drop_pool(ItemData.Tier.UNCOMMON):
+		var cand := load(str(p)) as ItemData
+		if cand != null and PlayerState.can_equip(cand):
+			wear_uid = PlayerState.add_item(str(p))
+			wear_slot = ItemData.SLOT_IDS[int(cand.slot)]   # 枚举序号 → 槽 id
+			break
+	PlayerState.equip(wear_uid)
+	var worn_refused := PlayerState.disassemble(wear_uid).is_empty() \
+		and PlayerState.equipped_uid(wear_slot) == wear_uid
+	PlayerState.unequip(&"weapon")
+	PlayerState.disassemble(wear_uid)      # 收尾拆掉，别把状态带给打造段
+
+	# ── ②③ 打造与制书 ──
+	var tier := ItemData.Tier.RARE                        # 极品（最低的可打造档）
+	var cost := PlayerState.crafting().cost_for(int(tier))
+	var craftable := GameProgress.drop_pool(tier)[0]
+	var bp_price := int(PlayerState.crafting().blueprint_price.get(str(int(tier)), 0))
+	var locked_refused := PlayerState.craft(craftable).is_empty()       # 没解锁
+	PlayerState.add_gold(bp_price)
+	var bought := PlayerState.unlock_tier(tier) and PlayerState.gold == 0 \
+		and PlayerState.tier_unlocked(tier)
+	var repurchase_refused: bool = not PlayerState.unlock_tier(tier)   # 重复买拒绝
+	# 材料不够：一分不动（原子），造不出
+	var before := PlayerState.material_count(&"mat_refined_iron")
+	var still_locked := PlayerState.craft(craftable).is_empty() \
+		and PlayerState.material_count(&"mat_refined_iron") == before
+	# 给足：新实例进包、料按配方扣减（注意前面分解段已有材料存量，验扣减不清零）
+	for id in cost:
+		PlayerState.add_material(StringName(String(id)), int(cost[id]))
+	var shards_full := PlayerState.shards
+	var black_full := PlayerState.material_count(&"mat_black_iron")
+	var new_uid := PlayerState.craft(craftable)
+	var crafted_ok: bool = not new_uid.is_empty() and PlayerState.bag.has(new_uid) \
+		and PlayerState.shards == shards_full - int(cost.get("mat_refined_iron", 0)) \
+		and PlayerState.material_count(&"mat_black_iron") == black_full - int(cost.get("mat_black_iron", 0))
+
+	# ── ④ 铁律（读数据重算，不抄落地脚本的结论）──
+	var table_ok := true
+	for t in PlayerState.crafting().recipes:
+		var c: Dictionary = PlayerState.crafting().cost_for(int(t))
+		var y: Dictionary = PlayerState.disassemble_table().yield_for(int(t))
+		for mid in c:
+			if int(y.get(mid, 0)) >= int(c[mid]):
+				table_ok = false
+
+	var ok := gone and iron_ok and black_ok and worn_refused \
+		and locked_refused and bought and repurchase_refused and still_locked \
+		and crafted_ok and table_ok
+	_check("11", "回收闭环：分解到账（穿的不收）；打造要解锁+付料（原子）；制书重复买拒绝；分解<打造",
+		ok,
+		"优秀档拆 %d 精铁+%d 玄铁　极品解锁 %d 元宝、打造新 uid=%s、料扣清=%s　铁律=%s" % [
+			iron_gain, black_gain, bp_price, str(not new_uid.is_empty()),
+			str(crafted_ok), str(table_ok)])

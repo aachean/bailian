@@ -129,6 +129,8 @@ var _stat_cache: Dictionary = {}
 func reset_for_new_game() -> void:
 	shards = 0
 	gold = 0
+	materials.clear()
+	unlocked_tiers.clear()
 	character_id = ""
 	level = 1
 	exp = 0
@@ -154,6 +156,8 @@ func load_from(d: Dictionary) -> void:
 	bag = (d.get("bag", []) as Array).duplicate()
 	forge = (d.get("forge", {}) as Dictionary).duplicate()
 	next_uid = int(d.get("next_uid", 0))
+	materials = (d.get("materials", {}) as Dictionary).duplicate()
+	unlocked_tiers = (d.get("unlocked_tiers", []) as Array).duplicate()
 	_ensure_uid_counter()
 	flags = (d.get("flags", {}) as Dictionary).duplicate()
 	var slots := (d.get("skill_slots", []) as Array)
@@ -169,6 +173,8 @@ func save_to() -> Dictionary:
 	return {
 		"shards": shards,
 		"gold": gold,
+		"materials": materials.duplicate(),
+		"unlocked_tiers": unlocked_tiers.duplicate(),
 		"character_id": character_id,
 		"level": level,
 		"exp": exp,
@@ -359,6 +365,131 @@ func sell_item(uid: String) -> int:
 	equipment_changed.emit()
 	add_gold(gain)
 	return gain
+
+
+# ── 材料与打造（批 6 · 回收闭环，原则 5.5）────────────────────
+
+## 打造/强化的经济数据（懒加载 —— 测试与开局都未必用到）
+var _crafting: CraftingData = null
+var _disassemble: DisassembleData = null
+
+const CRAFTING_PATH := "res://data/economy/crafting.tres"
+const DISASSEMBLE_PATH := "res://data/economy/disassemble.tres"
+
+## 材料的元 id。**精铁就是 shards**（强化主料的唯一真相，不搬家 ——
+## 材料字典里没有它，靠 MAT_REFINED_IRON 这个 id 转发到 shards）
+const MAT_REFINED_IRON := &"mat_refined_iron"
+
+
+## 四种稀有材料的持有量：id → 数量。精铁不在里面（见 MAT_REFINED_IRON）
+var materials: Dictionary = {}
+
+## 已用制书解锁的打造档次（ItemData.Tier 值）。买制书 = 永久解锁，不消耗 ——
+## 「一次性解锁」的语义是「这份档的打造许可到手了」，不是「造一件用一本」
+var unlocked_tiers: Array = []
+
+
+func crafting() -> CraftingData:
+	if _crafting == null:
+		_crafting = load(CRAFTING_PATH) as CraftingData
+	return _crafting
+
+
+func disassemble_table() -> DisassembleData:
+	if _disassemble == null:
+		_disassemble = load(DISASSEMBLE_PATH) as DisassembleData
+	return _disassemble
+
+
+## 某种材料的持有量。精铁转发 shards，其余查 materials
+func material_count(id: StringName) -> int:
+	return shards if id == MAT_REFINED_IRON else int(materials.get(String(id), 0))
+
+
+## 加材料。数量可为负吗？不 —— 扣材料一律走 pay_materials（原子检查），这里只加
+func add_material(id: StringName, n: int) -> void:
+	if n <= 0:
+		return
+	if id == MAT_REFINED_IRON:
+		shards += n
+	else:
+		var k := String(id)
+		materials[k] = int(materials.get(k, 0)) + n
+
+
+## 原子付料：**先验够不够、再一次扣清** —— 半路断货的扣一半是最难看的 bug。
+## 返回 false 时一个子都不会动。精铁那份转给 shards
+func pay_materials(cost: Dictionary) -> bool:
+	for id in cost:
+		if material_count(StringName(String(id))) < int(cost[id]):
+			return false
+	for id in cost:
+		var k := String(id)
+		var n := int(cost[id])
+		if id == String(MAT_REFINED_IRON):
+			shards -= n
+		else:
+			materials[k] = int(materials.get(k, 0)) - n
+	return true
+
+
+## 干跑版：只验够不够，一分不动。界面在「能不能造」的着色与提示上用它 ——
+## 刷新一帧跑一次真扣款就成事故了
+func pay_materials_dry_run(cost: Dictionary) -> bool:
+	for id in cost:
+		if material_count(StringName(String(id))) < int(cost[id]):
+			return false
+	return true
+
+
+## 分解一件**背包里的**装备 → 材料（按档；强化等级不返还 —— 见 disassemble.tres 注）。
+## 返回产量字典（空 = 拆不了：不在包里 / 资源丢失 / 这个档没登记产量）。
+## 与「出售」互不兑换（原则 5.1）：卖走元宝、拆走材料，玩家按缺什么选
+func disassemble(uid: String) -> Dictionary:
+	if not bag.has(uid):
+		return {}
+	var it := item_of(uid)
+	if it == null:
+		return {}
+	var yld: Dictionary = disassemble_table().yield_for(int(it.tier))
+	if yld.is_empty():
+		return {}
+	_remove_from_bag(uid)
+	for id in yld:
+		add_material(StringName(String(id)), int(yld[id]))
+	equipment_changed.emit()
+	return yld
+
+
+## 打造：材料 + 该档制书（已解锁）→ 一件**全新实例**进背包。
+## 返回新 uid（空串 = 造不了；原因只有调用方需要时才查 —— 界面上逐条说）：
+## 档没解锁 / 材料不够 / 路径不是装备。打造不做「缺一件也造，回头补」——
+## 那等于让玩家欠账，欠账清单是另一套系统
+func craft(path: String) -> String:
+	var it := load(path) as ItemData
+	if it == null:
+		return ""
+	if not unlocked_tiers.has(int(it.tier)):
+		return ""
+	if not pay_materials(crafting().cost_for(int(it.tier))):
+		return ""
+	return add_item(path)
+
+
+## 买制书：解锁某档打造。价格真相在 CraftingData.blueprint_price（商店面板标同一份）。
+## 已解锁的再买 = 白花钱，直接拒绝 —— 「重复付费解锁已拥有的东西」不该是可能的事故
+func unlock_tier(tier: int) -> bool:
+	if unlocked_tiers.has(tier):
+		return false
+	var price := int(crafting().blueprint_price.get(str(tier), 0))
+	if price <= 0 or not spend_gold(price):
+		return false
+	unlocked_tiers.append(tier)
+	return true
+
+
+func tier_unlocked(tier: int) -> bool:
+	return unlocked_tiers.has(tier)
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────

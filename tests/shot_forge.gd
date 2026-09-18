@@ -74,7 +74,38 @@ func _ready() -> void:
 		await _frames(3)
 	await _shot("forge_maxed.png")
 
-	# ── 五、关掉之后：角色面板上「武器强化 +N/上限」长什么样 ──────
+	# ── 五、打造页（Tab 切过去）：解锁行亮、缺料行暗、锁定行带制书价 ──
+	_tap_key(KEY_TAB)
+	await _frames(4)
+	PlayerState.gold = 200
+	PlayerState.shards = 30
+	PlayerState.add_material(&"mat_black_iron", 5)
+	PlayerState.add_material(&"mat_sky_crystal", 3)
+	panel.call("refresh")
+	await _frames(3)
+	await _shot("craft_page.png")
+
+	# ── 六、买制书：光标在极品档（未解锁），J = 解锁 ──────────────
+	_tap_key(KEY_J)
+	await _frames(4)
+	await _shot("craft_bp.png")
+
+	# ── 七、再按 J：材料刚好够一件 → 打造成功 ─────────────────────
+	_tap_key(KEY_J)
+	await _frames(4)
+	await _shot("craft_ok.png")
+
+	# ── 八、分解：切回强化页，K 拆掉背包里那把白装 ─────────────────
+	_tap_key(KEY_TAB)
+	await _frames(4)
+	for _i in 3:
+		_tap_key(KEY_DOWN)         # 移到背包第一件（前几行是身上穿的）
+		await _frames(2)
+	_tap_key(KEY_K)
+	await _frames(4)
+	await _shot("dismantle.png")
+
+	# ── 九、关掉之后：角色面板上「武器强化 +N/上限」长什么样 ──────
 	_tap_key(KEY_ESCAPE)
 	await _frames(4)
 	_press("panel")

@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="DisassembleData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/disassemble_data.gd" id="1_dis"]
+
+[resource]
+script = ExtResource("1_dis")
+yields = {"0": {"mat_refined_iron": 2}, "1": {"mat_refined_iron": 4}, "2": {"mat_black_iron": 2, "mat_refined_iron": 6}, "3": {"mat_black_iron": 4, "mat_refined_iron": 6, "mat_sky_crystal": 2}, "4": {"mat_black_iron": 6, "mat_dragon_soul": 1, "mat_refined_iron": 10, "mat_sky_crystal": 3}, "5": {"mat_black_iron": 8, "mat_dragon_soul": 2, "mat_refined_iron": 12, "mat_sky_crystal": 5, "mat_taichu": 1}}

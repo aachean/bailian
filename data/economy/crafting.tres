@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CraftingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/crafting_data.gd" id="1_craft"]
+
+[resource]
+script = ExtResource("1_craft")
+recipes = {"3": {"mat_black_iron": 5, "mat_refined_iron": 8, "mat_sky_crystal": 3}, "4": {"mat_black_iron": 8, "mat_dragon_soul": 3, "mat_refined_iron": 12, "mat_sky_crystal": 6}, "5": {"mat_black_iron": 12, "mat_dragon_soul": 6, "mat_refined_iron": 18, "mat_sky_crystal": 9, "mat_taichu": 3}}
+blueprint_price = {"3": 120, "4": 400, "5": 900}
+material_value = {"mat_black_iron": 8, "mat_dragon_soul": 32, "mat_refined_iron": 4, "mat_sky_crystal": 16, "mat_taichu": 64}
+material_name_key = {"mat_refined_iron": &"MAT_REFINED_IRON", "mat_black_iron": &"MAT_BLACK_IRON", "mat_sky_crystal": &"MAT_SKY_CRYSTAL", "mat_dragon_soul": &"MAT_DRAGON_SOUL", "mat_taichu": &"MAT_TAICHU"}

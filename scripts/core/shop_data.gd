@@ -19,6 +19,11 @@ extends Resource
 ## 出售折价率。0.5 = 半价回收（造梦西游观感）
 @export_range(0.0, 1.0, 0.05) var sell_ratio: float = 0.5
 
+## 制书上架：tier(int，字符串 key) → 元宝价。价格真相在 CraftingData.blueprint_price，
+## 这里存的是「上架了哪几档」+ 面板直接标价用的快照 —— 两边由 apply_economy.py 同源生成。
+## **养成材料不上架**（原则 5.1：精铁↔元宝互不兑换），上架的只有制书这种「解锁」类商品
+@export var blueprint_tiers: Dictionary = {}
+
 
 func has_stock(path: String) -> bool:
 	return stock.has(path)

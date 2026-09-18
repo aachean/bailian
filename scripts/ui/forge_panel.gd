@@ -30,6 +30,9 @@ const WARN := Color(0.95, 0.52, 0.45, 1)
 
 var _cursor := 0
 var _rows: Array[HBoxContainer] = []
+## 页签：0 = 强化 / 1 = 打造。回收闭环（批 6）的两半都从铁匠铺进 ——
+## 一个面板两个动作，比两个面板少一次「走近一个台子只为一件事」
+var _page := 0
 ## 上一次操作的结果（强化成功 / 精铁不够 / 已到顶）。**不静默**：
 ## 按了键什么也没发生，玩家分不清是「没反应」还是「条件不满足」
 var _msg := ""
@@ -110,18 +113,33 @@ func _unhandled_input(event: InputEvent) -> void:
 				_move(-1)
 			KEY_DOWN, KEY_S:
 				_move(1)
+			KEY_TAB:
+				_page = 1 - _page          # 两页互切；光标各自记得住
+				_cursor = 0
+				_msg = ""
+				refresh()
 			KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-				_forge_at_cursor()
+				if _page == 0:
+					_forge_at_cursor()
+				else:
+					_craft_at_cursor()
+			KEY_K:
+				if _page == 0:
+					_disassemble_at_cursor()
 		get_viewport().set_input_as_handled()
 
 
 func _move(dir: int) -> void:
-	var n := PlayerState.forgeable_uids().size()
+	var n := _list_len()
 	if n <= 0:
 		return
 	_cursor = wrapi(_cursor + dir, 0, n)
 	_msg = ""
 	refresh()
+
+
+func _list_len() -> int:
+	return PlayerState.forgeable_uids().size() if _page == 0 else _craft_paths().size()
 
 
 ## 强化光标那件。三种结果都要说出来（成功 / 到顶 / 精铁不够）
@@ -144,6 +162,95 @@ func _forge_at_cursor() -> void:
 	_msg = I18n.t(&"UI_FORGE_OK", [PlayerState.forge_level(uid)])
 	_msg_color = GOLD
 	refresh()
+
+
+## 分解光标那件（K）。回收闭环的「拆」半边 —— 与强化同一个列表、同一套光标。
+## **穿在身上的不收**（与出售同规矩）：先卸下再来，说出来而不是静默失败
+func _disassemble_at_cursor() -> void:
+	var uid := selected_uid()
+	if uid.is_empty():
+		return
+	if not PlayerState.bag.has(uid):
+		_msg = tr("UI_FORGE_DISMANTLE_WORN")
+		_msg_color = WARN
+		refresh()
+		return
+	var yld := PlayerState.disassemble(uid)
+	if yld.is_empty():
+		_msg = tr("UI_FORGE_DISMANTLE_NONE")
+		_msg_color = DIM
+		refresh()
+		return
+	var parts: Array[String] = []
+	for id in yld:
+		var mid := StringName(String(id))
+		parts.append("%s×%d" % [tr(PlayerState.crafting().mat_key(mid)), int(yld[id])])
+	_msg = I18n.t(&"UI_FORGE_DISMANTLE_OK", ["、".join(parts)])
+	_msg_color = GOLD
+	refresh()
+
+
+## 打造光标那件（打造页 J）。档没解锁时 J 是**买制书** ——
+## 解锁与打造在一个键里闭环，不用再回商店跑一趟（商店也上架，同价）
+func _craft_at_cursor() -> void:
+	var path := selected_craft_path()
+	if path.is_empty():
+		return
+	var it := load(path) as ItemData
+	if it == null:
+		return
+	var tier := int(it.tier)
+	if not PlayerState.tier_unlocked(tier):
+		var price := int(PlayerState.crafting().blueprint_price.get(str(tier), 0))
+		if PlayerState.unlock_tier(tier):
+			_msg = I18n.t(&"UI_CRAFT_BP_BOUGHT", [tr(it.name_key), price])
+			_msg_color = GOLD
+		else:
+			_msg = I18n.t(&"UI_CRAFT_BP_POOR", [price])
+			_msg_color = WARN
+		refresh()
+		return
+	if not PlayerState.pay_materials_dry_run(PlayerState.crafting().cost_for(tier)):
+		_msg = I18n.t(&"UI_CRAFT_POOR", [_missing_text(PlayerState.crafting().cost_for(tier))])
+		_msg_color = WARN
+		refresh()
+		return
+	var uid := PlayerState.craft(path)
+	_msg = I18n.t(&"UI_CRAFT_OK", [tr(it.name_key)])
+	_msg_color = GOLD
+	refresh()
+	if uid.is_empty():
+		_msg = tr("UI_FORGE_DISMANTLE_NONE")   # 理论到不了（上面已 dry-run 过）；
+		_msg_color = WARN                       # 兜一句，别让「没反应」出现
+		refresh()
+
+
+## 「缺什么、还缺多少」拼一句话 —— 只列不够的料
+func _missing_text(cost: Dictionary) -> String:
+	var parts: Array[String] = []
+	for id in cost:
+		var mid := StringName(String(id))
+		var have := PlayerState.material_count(mid)
+		if have < int(cost[id]):
+			parts.append("%s %d/%d" % [tr(PlayerState.crafting().mat_key(mid)), have, int(cost[id])])
+	return "、".join(parts) if not parts.is_empty() else "—"
+
+
+## 打造页的列表：全部可打造档（≥极品）的装备型号，按档升序、目录序稳定 ——
+## 光标不会因为数据刷新而跳。**用 drop_pool 的索引**（它就是「档次 → 装备」
+## 的唯一索引，加装备自动跟上），不用在这里再扫一遍目录
+func _craft_paths() -> Array[String]:
+	var out: Array[String] = []
+	for t in [ItemData.Tier.RARE, ItemData.Tier.EPIC, ItemData.Tier.LEGENDARY]:
+		out.append_array(GameProgress.drop_pool(t))
+	return out
+
+
+func selected_craft_path() -> String:
+	var list := _craft_paths()
+	if _cursor < 0 or _cursor >= list.size():
+		return ""
+	return list[_cursor]
 
 
 # ── 绘制 ───────────────────────────────────────────────────────
@@ -176,6 +283,14 @@ func _build_rows() -> void:
 
 
 func refresh() -> void:
+	if _page == 0:
+		_refresh_forge()
+	else:
+		_refresh_craft()
+
+
+## 强化页（原样，标题与提示换成带 Tab/分解的版本）
+func _refresh_forge() -> void:
 	_title.text = tr("UI_FORGE_TITLE")
 	_status.text = "%s ×%d　%s" % [
 		tr("HUD_SHARD"), PlayerState.shards,
@@ -221,6 +336,61 @@ func refresh() -> void:
 			lbl.modulate = GOLD
 		else:
 			lbl.modulate = NORMAL
+
+
+## 打造页：可打造档（极品+）的型号列表。**没解锁的档照常列出来、写成锁的样子** ——
+## 玩家得看见「后面还有东西」，锁着的门比消失的墙更想让人打开
+func _refresh_craft() -> void:
+	_title.text = tr("UI_CRAFT_TITLE")
+	# 状态行带元宝与精铁：打造的两条通用料。其余材料缺什么，J 的时候会说
+	_status.text = "%s ×%d　%s ×%d　%s" % [
+		tr("HUD_GOLD"), PlayerState.gold, tr("HUD_SHARD"), PlayerState.shards,
+		tr("UI_CRAFT_STATUS") if _msg.is_empty() else _msg]
+	if not _msg.is_empty():
+		_status.modulate = _msg_color
+	else:
+		_status.modulate = Color(1, 1, 1, 1)
+	_hint.text = tr("UI_CRAFT_HINT")
+
+	var list := _craft_paths()
+	if _cursor >= list.size():
+		_cursor = maxi(list.size() - 1, 0)
+	var top := _scroll_top(list.size(), ROWS)
+	for r in ROWS:
+		var idx := top + r
+		var row := _rows[r]
+		var icon := row.get_child(0) as ItemIcon
+		var lbl := row.get_child(1) as Label
+		if idx >= list.size():
+			icon.visible = false
+			lbl.text = ""
+			lbl.modulate = DIM
+			continue
+		icon.visible = true
+		icon.empty_frame = true
+		var path := str(list[idx])
+		var it := load(path) as ItemData
+		icon.set_item(it)
+		if it == null:
+			lbl.text = INDENT + path
+			lbl.modulate = DIM
+			continue
+		var mark := CURSOR_MARK if idx == _cursor else INDENT
+		if not PlayerState.tier_unlocked(int(it.tier)):
+			var bp := int(PlayerState.crafting().blueprint_price.get(str(int(it.tier)), 0))
+			lbl.text = "%s%s　🔒 %s" % [mark, tr(it.name_key),
+				I18n.t(&"UI_CRAFT_BP_LOCKED", [bp])]
+			lbl.modulate = DIM
+			continue
+		var cost := PlayerState.crafting().cost_for(int(it.tier))
+		var parts: Array[String] = []
+		for id in cost:
+			var mid := StringName(String(id))
+			parts.append("%s×%d" % [tr(PlayerState.crafting().mat_key(mid)), int(cost[id])])
+		lbl.text = "%s%s　%s" % [mark, tr(it.name_key), "　".join(parts)]
+		# 够料才亮 —— 一眼分得出「现在就能造」和「还差料」
+		lbl.modulate = GOLD if idx == _cursor \
+			else (NORMAL if PlayerState.pay_materials_dry_run(cost) else DIM)
 
 
 ## 这件装备现在装在哪（「武器」/「背包」）—— 列表里两类混排，得看得出来
