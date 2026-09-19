@@ -89,6 +89,10 @@ func _ready() -> void:
 	_build_skill_bar()
 	_build_skill_panel()
 	_apply_portrait()
+	# 面板行重建（重活）改由信号驱动，不再每帧轮询：装备/技能变了才重建对应面板。
+	# 连续量（血蓝条 / 经验 / 冷却 / 材料数）仍走 _process 的 _refresh_status（见文件头轮询理由）
+	PlayerState.equipment_changed.connect(_on_equipment_changed)
+	PlayerState.skills_changed.connect(_on_skills_changed)
 	refresh()
 
 
@@ -106,7 +110,7 @@ func _apply_portrait() -> void:
 
 
 func _process(_delta: float) -> void:
-	refresh()
+	_refresh_status()      # 每帧只刷连续量；面板行重建走信号（见 _ready）
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -788,7 +792,10 @@ func _stat_text(uid: String, it: ItemData) -> String:
 
 # ─────────────────────────────────────────────────────────────
 
-func refresh() -> void:
+## 每帧刷新的**连续量**：血 / 蓝条、经验环、等级、元宝、技能栏（冷却遮罩 + 消耗品次数）、
+## 屏号。这些每帧都可能变（战斗中掉血、放技能走冷却），轮询比给每个点接信号便宜又不漏
+## （见文件头）。**面板行重建（重活）不在这里** —— 它走 refresh() + 信号驱动（见 _process）
+func _refresh_status() -> void:
 	if not _has_player or _player == null or not is_instance_valid(_player):
 		return
 	var h := _player.get_node("Health") as Health
@@ -814,8 +821,26 @@ func refresh() -> void:
 	refresh_skill_bar()
 	refresh_stage_label()
 
+
+## 全量刷新：连续量 + 打开着的面板。_ready 与各操作处理器（换装 / 装技能后）调它。
+## 每帧的 _process 只调 _refresh_status（不重建面板行）；面板行重建改由信号驱动 ——
+## equipment_changed → 背包面板，skills_changed → 技能面板（见 _ready 的连接）
+func refresh() -> void:
+	_refresh_status()
 	if _bag_open:
 		refresh_bag()
+	if _skill_open:
+		refresh_skill_panel()
+
+
+## 装备/背包/强化变了 → 只在背包面板开着时重建它的行（关着时下次打开会刷）
+func _on_equipment_changed() -> void:
+	if _bag_open:
+		refresh_bag()
+
+
+## 携带技能变了 → 技能栏图标随连续量下一帧自然更新；技能面板开着才重建行
+func _on_skills_changed() -> void:
 	if _skill_open:
 		refresh_skill_panel()
 
