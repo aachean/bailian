@@ -876,31 +876,22 @@ func _refresh_stats_block(h: Health) -> void:
 	var flat: int = int(_player.get_node("Hitbox").attack_flat)
 	var def: int = 0 if h == null else h.defense
 	var red: float = 0.0 if h == null else h.effective_reduction()
-	# 攻击面板（方案 A，2026-09-19 神拍板）：**第一眼给结果，来源降一行**。
-	# 结果 = 连招第一段的期望伤害（不含随机浮动）：(技能基础 + 装备平铺) × 成长乘区。
-	# 旧版「+8 ×1.59」把加数和乘数混在一行，玩家拼不出公式（神原话：看不懂）。
-	# 来源行只有数字没有词 —— 右栏只有 84px 宽，10px 字号装不下注解；
-	# 想看来源的选中武器详情栏有逐件明细（STAT_ATK / 强化%）。
-	var basis := 0
-	var combo: Array = _player.get("attack_combo")
-	if combo.size() > 0 and combo[0] is SkillData:
-		basis = int(round(float((combo[0] as SkillData).damage + float(flat)) * dmg))
 	var lines: Array[String] = [
 		"%s %d / %d" % [tr("PANEL_LEVEL"), level, PlayerState.level_cap],
 		_exp_line(level, exp_pts),
 		"%s %d / %d" % [tr("PANEL_HP"), hp, max_hp],
 		"%s %d / %d" % [tr("PANEL_MP"), mp, max_mp],
-		"%s %s≈%d" % [tr("PANEL_ATK"), tr("PANEL_ATK_BASIS"), basis],
-		"+%d ×%.2f" % [flat, dmg],
-		# 防御：平铺点数 + 它换来的减伤比例（由 Health 的护甲曲线算，不重复实现）。
-		# 这行本来就是「结果优先」的形态，方案 A 之后攻防两行结构对称了
+		# 攻击在 v2 是两个数（4.1 要求两个都看得见）：平铺点数 + 乘区倍率。
+		# 实际伤害 = (技能基础 + 平铺) × 倍率 × 目标护甲 —— 面板把前两项如实摆出来
+		"%s +%d ×%.2f" % [tr("PANEL_ATK"), flat, dmg],
+		# 防御同理：平铺点数 + 它换来的减伤比例（由 Health 的护甲曲线算，不重复实现）
 		"%s %d（-%d%%）" % [tr("PANEL_DEF"), def, int(round(red * 100.0))],
 		_weapon_forge_line(),
 	]
 	# 左右两栏（生存 / 战力）—— 单栏 7 行在这个字体的行高下塞不下，
 	# 两栏各 4 行是 CharPanel 时代验证过不叠字的摆法
 	_stats_l.text = "\n".join(lines.slice(0, 4))
-	_stats_r.text = "\n".join(lines.slice(4, 8))
+	_stats_r.text = "\n".join(lines.slice(4, 7))
 
 
 ## 技能栏：5 格技能 + 2 格消耗品。
