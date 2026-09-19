@@ -18,7 +18,7 @@ UI_FORGE_STAND_HINT,"J 打造（制书与材料在背包）","J to craft (books 
 UI_ANVIL_TITLE,"铁匠铺","Forge"
 UI_ANVIL_HINT,"按 J 打开","Press J to open"
 UI_FORGE_TITLE,"铁匠铺 · 强化","Forge · Upgrade"
-UI_FORGE_HINT,"↑↓ 选择　·　J 强化　·　K 分解　·　Tab 打造　·　Esc 离开","↑↓ select　·　J upgrade　·　K dismantle　·　Tab craft　·　Esc leave"
+UI_FORGE_HINT,"↑↓ 选择　·　J 强化　·　K 分解　·　Esc 离开","↑↓ select　·　J upgrade　·　K dismantle　·　Esc leave"
 UI_FORGE_STATUS,"选一件装备强化","Pick a piece to upgrade"
 UI_FORGE_EMPTY,"（没有可强化的装备）","(nothing to upgrade)"
 UI_FORGE_MAXED,"已到顶","maxed"
@@ -31,7 +31,7 @@ UI_FORGE_DISMANTLE_NONE,"这件拆不出材料","Nothing to salvage from this"
 UI_FORGE_DISMANTLE_OK,"分解获得：%s","Salvaged: %s"
 UI_CRAFT_TITLE,"铁匠铺 · 打造","Forge · Craft"
 UI_CRAFT_STATUS,"选一件装备打造（🔒 = 先买制书）","Pick a piece to craft (🔒 = buy blueprint first)"
-UI_CRAFT_HINT,"↑↓ 选择　·　J 打造 / 买制书　·　Tab 强化　·　Esc 离开","↑↓ select　·　J craft / buy blueprint　·　Tab upgrade　·　Esc leave"
+UI_CRAFT_HINT,"↑↓ 选择　·　J 打造 / 买制书　·　Esc 离开","↑↓ select　·　J craft / buy blueprint　·　Esc leave"
 UI_CRAFT_OK,"打造完成：%s","Crafted: %s"
 UI_CRAFT_POOR,"材料不够：%s","Missing materials: %s"
 UI_CRAFT_BP_BOUGHT,"已买下 %s 的制作书（%d 元宝）","Bought %s's blueprint (%d gold)"
@@ -373,7 +373,7 @@ UI_BAG_DETAIL_HINT,"选中装备
 查看详情","Pick a piece"
 UI_BAG_DISMANTLE,分解可得,"Salvage"
 UI_FORGE_TAG,强化,forge
-UI_SHOP_BP_OK,"已买下 %s 的制作书！去铁匠铺打造（Tab 切到打造页）","Bought %s's blueprint! Craft it at the forge (Tab to switch)"
+UI_SHOP_BP_OK,"已买下 %s 的制作书！去锻造台打造","Bought %s's blueprint! Craft it at the forge station"
 UI_SHOP_BP_OWNED,"这本书已经买过了","Blueprint already owned"
 MAT_REFINED_IRON,精铁,精铁
 MAT_BLACK_IRON,玄铁,玄铁

@@ -74,8 +74,8 @@ func _ready() -> void:
 		await _frames(3)
 	await _shot("forge_maxed.png")
 
-	# ── 五、打造页（Tab 切过去）：解锁行亮、缺料行暗、锁定行带制书价 ──
-	_tap_key(KEY_TAB)
+	# ── 五、打造页（锻造台入口，ADR-0030：Tab 已删，用 open_craft 落打造页）──
+	panel.call("open_craft")
 	await _frames(4)
 	PlayerState.gold = 200
 	PlayerState.shards = 30
@@ -95,8 +95,8 @@ func _ready() -> void:
 	await _frames(4)
 	await _shot("craft_ok.png")
 
-	# ── 八、分解：切回强化页，K 拆掉背包里那把白装 ─────────────────
-	_tap_key(KEY_TAB)
+	# ── 八、分解：回强化页（铁砧入口，ADR-0030），K 拆掉背包里那把白装 ──
+	panel.call("open")
 	await _frames(4)
 	for _i in 3:
 		_tap_key(KEY_DOWN)         # 移到背包第一件（前几行是身上穿的）

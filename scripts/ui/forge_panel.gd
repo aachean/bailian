@@ -71,7 +71,9 @@ func is_open() -> bool:
 
 # ── 入口 ───────────────────────────────────────────────────────
 
+## 铁砧入口：**只强化页**（ADR-0030：铁砧≠锻造台，一座台子一个功能，不再 Tab 跨越）
 func open() -> void:
+	_page = 0
 	_cursor = 0
 	_msg = ""
 	# 顺序照 death_menu：**先让路、再暂停**。反过来的话，让路过程中任何一句
@@ -84,11 +86,11 @@ func open() -> void:
 	refresh()
 
 
-## 锻造台的入口：直接落在打造页（2026-09-18 神要求补锻造台 ——
-## 打造藏在 Tab 页里玩家找不到，所以给打造单独一座台子）
+## 锻造台入口：**只打造页**（ADR-0030）。两个入口共用同一个面板场景，
+## 但各自锁死自己那一页 —— Tab 跨越已删，铁砧练不了、锻造台打造不了对方的活
 func open_craft() -> void:
-	open()
-	_page = 1
+	open()          # 复用开面板的通用流程（让路 + 暂停）
+	_page = 1       # 再锁到打造页（open() 里锁的是 0）
 	_cursor = 0
 	refresh()
 
@@ -122,11 +124,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_move(-1)
 			KEY_DOWN, KEY_S:
 				_move(1)
-			KEY_TAB:
-				_page = 1 - _page          # 两页互切；光标各自记得住
-				_cursor = 0
-				_msg = ""
-				refresh()
 			KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				if _page == 0:
 					_forge_at_cursor()
