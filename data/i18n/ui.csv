@@ -370,3 +370,5 @@ UI_SHOP_SUPPLY_OK,"补给包到手：血 %d 次 / 蓝 %d 次","Supply pack — H
 UI_POTION_EMPTY,"%s 用完了（商店可补）","Out of %s — buy more at the shop"
 UI_POTION_HP_FULL,"生命已满","Health is full"
 UI_POTION_MP_FULL,"蓝量已满","Mana is full"
+UI_ITEM_UNUSABLE,"用不了","can't use"
+UI_BAG_LOCKED_LINE,"✕ 这个角色用不了（K 卖 / 分解）","✕ unusable by this character (K sell / salvage)"

@@ -381,6 +381,9 @@ func refresh() -> void:
 		var row := _rows[r]
 		var icon := row.get_child(0) as ItemIcon
 		var lbl := row.get_child(1) as Label
+		# 行节点是**复用**的（每行一份图标），所以每轮先把「用不了」的记号清掉 ——
+		# 漏清一次，上一行的斜杠会留在这一行上，而这种错只有肉眼能发现
+		icon.locked = false
 		if r >= gear.size():
 			icon.visible = false
 			# 货架空要看得见（刷新批没抽出来 / 全买光了是两种状态的开头）
@@ -452,7 +455,14 @@ func refresh() -> void:
 		icon.set_item(it)
 		var mark := CURSOR_MARK if _cursor == r else INDENT
 		var afford := PlayerState.gold >= it.gold_price
-		lbl.text = "%s%s　%d" % [mark, tr(it.name_key), it.gold_price]
+		# **非本职业的武器要在行上写出来**（[ADR-0025](../docs/adr/0025-skill-pool-module-and-unfiltered-drops.md) §2.2）：
+		# 别的职业的武器在这里是正常商品、买得到，但买了只能卖或分解 ——
+		# 加满 4 职业后这是 3/4 的武器行，不标就等于每期都在卖陷阱。
+		# 注意**不禁止购买**（它本来就是经济来源），只把话说清楚
+		var usable := PlayerState.can_equip(it)
+		icon.locked = not usable
+		lbl.text = "%s%s　%d%s" % [mark, tr(it.name_key), it.gold_price,
+			"" if usable else "　" + tr("UI_ITEM_UNUSABLE")]
 		# 名字颜色 = 品质色（档色是唯一色源 tier_color）。选中提亮一档当高亮，
 		# 买不起压暗 —— 颜色仍然在说「这是哪个档」
 		var c: Color = it.tier_color()
@@ -466,6 +476,8 @@ func refresh() -> void:
 		var row := _bp_rows[r]
 		var icon := row.get_child(0) as ItemIcon
 		var lbl := row.get_child(1) as Label
+		# 同左栏：行是复用的，每轮先清「用不了」的记号
+		icon.locked = false
 		var idx := _bp_top + r
 		if idx >= bps.size():
 			icon.visible = false
@@ -485,10 +497,15 @@ func refresh() -> void:
 		var mark := CURSOR_MARK if sel else INDENT
 		var price := int(PlayerState.crafting().blueprint_price.get(str(int(bp_it.tier)), 0))
 		var owned := PlayerState.has_blueprint(str(bps[idx]))
+		# 制书也要标：**做出来穿不上的书，是这个界面上最贵的一次误买**
+		# （至尊制书 10000 元宝），而它以前一点提示都没有
+		var craftable := PlayerState.can_equip(bp_it)
+		icon.locked = not craftable
 		# 书名就是装备名（制书·寒月剑），颜色跟装备的档走；已有的置灰 ——
 		# 钱再多也不卖第二本
-		lbl.text = "%s📖 %s　%d" % [mark,
-			I18n.t(&"UI_BP_TIER", [tr(bp_it.name_key)]), price]
+		lbl.text = "%s📖 %s　%d%s" % [mark,
+			I18n.t(&"UI_BP_TIER", [tr(bp_it.name_key)]), price,
+			"" if craftable else "　" + tr("UI_ITEM_UNUSABLE")]
 		if owned:
 			lbl.modulate = DIM
 		else:

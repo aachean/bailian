@@ -648,6 +648,10 @@ func refresh_bag() -> void:
 			var it := PlayerState.item_of(uid)
 			icon.visible = true
 			icon.set_item(it)
+			# **格子上就标出「本角色用不了」**，不能等玩家按 J 才知道。
+			# 掉落不按职业过滤（ADR-0025 §2），加满 4 职业后这件事是常态而非意外 ——
+			# 一个剑客档里混着刀和杖，没有标记时「能不能穿」只能靠一件件试
+			icon.locked = it != null and not PlayerState.can_equip(it)
 
 	# 背包空着要写明「（空）」—— 格子全空 + 一句话都没有，
 	# 玩家分不清「空」和「没画出来」。选中详情在中栏（_refresh_detail_panel）
@@ -705,6 +709,10 @@ func _refresh_detail_panel(bag: Array, detail_idx: int) -> void:
 		lines.append("%s +%d（%s +%d%%）" % [tr("UI_FORGE_TAG"), lv,
 			tr("STAT_FORGE"), int(round(PlayerState.forge_atk(uid) * 100.0))])
 	lines.append("%s %d" % [tr("HUD_GOLD"), int(it.gold_price)])
+	# **「用不了」要说全**：格子上那道斜杠只是「有问题」，
+	# 这里回答「为什么、能拿它干什么」—— 光有符号没有句子，玩家还是得自己猜
+	if not PlayerState.can_equip(it):
+		lines.insert(0, tr("UI_BAG_LOCKED_LINE"))
 	# 分解产物：让玩家在拆之前就知道能得什么 —— 回收闭环看得见才有人走
 	var yld: Dictionary = PlayerState.disassemble_table().yield_for(int(it.tier))
 	if not yld.is_empty():

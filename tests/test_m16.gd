@@ -34,6 +34,7 @@ func _ready() -> void:
 	await _t5_menu_character_page()
 	await _t6_old_save_falls_back()
 	await _t7_weapon_type_gate()
+	await _t8_gate_is_visible()
 
 	SaveGuard.restore(_bak)
 	PlayerState.character_id = ""
@@ -250,3 +251,81 @@ func _t7_weapon_type_gate() -> void:
 		"弓手+剑拒=%s　弓手+本命弓=%s　剑客+弓拒=%s　剑客+剑=%s　刀（无职业，剑客）=拒%s　杖（无职业，弓手）=拒%s" % [
 			str(sword_refused), str(bow_ok), str(bow_on_sword), str(sword_on_sword),
 			str(blade_locked), str(staff_locked)])
+
+
+## **门要在界面上看得见**（[ADR-0025](../docs/adr/0025-skill-pool-module-and-unfiltered-drops.md) §2.2）。
+##
+## §2 裁定「掉落 / 货架 / 制书都不按职业过滤」——别的职业的武器是**经济来源**。
+## 代价很硬：加满 4 职业之后，任意角色**只有 1/4 的武器能用**，
+## 也就是说「这个东西我用不了」从偶发变成了常态。
+## 而在此之前，玩家要**按下 J** 才会看到那句提示 —— 背包格、商店行上什么都没有。
+## 在 10000 元宝的至尊制书上，那个顺序就是「先让你买，再告诉你穿不上」。
+##
+## 这一组盯三处 + 一句话：背包格 / 商店装备行 / 商店制书行都要带记号，
+## 详情栏要把**为什么、能拿它干什么**说全（符号只说「有问题」，说不出原因）。
+func _t8_gate_is_visible() -> void:
+	const SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"
+	const BLADE := "res://data/items/wp_u5200_0_u73afu9996u5200.tres"
+	const STAFF := "res://data/items/wp_u6756_0_u6843u6728u6756.tres"
+
+	PlayerState.reset_for_new_game()
+	PlayerState.character_id = "swordsman"
+	PlayerState._character = null
+	PlayerState._character_loaded_for = ""
+
+	var room := (ROOM as PackedScene).instantiate()
+	add_child(room)
+	await _pframes(5)
+	var player := room.get_node("Player")
+	var hud := player.get_node("HUD")
+
+	# 剑（能用）与刀（用不了）各一件进背包 —— 同一屏里两种状态并存，
+	# 这样断言才分得清「标记跟着装备走」和「整屏都变暗了」
+	PlayerState.add_item(SWORD)
+	PlayerState.add_item(BLADE)
+	hud.call("toggle_bag")
+	await _pframes(4)
+
+	# ① 背包格
+	var grid := hud.get_node("BagPanel/BagGrid")
+	var ok_icon := (grid.get_child(0) as Panel).get_child(1) as ItemIcon
+	var bad_icon := (grid.get_child(1) as Panel).get_child(1) as ItemIcon
+	# **先在节点还活着的时候把值取出来**：下面要 queue_free 掉这个 room，
+	# 之后再读 icon.locked 就是访问已释放对象（真踩了：断言没跑到，
+	# 组里却打印「7 通过 / 0 失败」—— 只有脚本报错说了实话）
+	var ok_locked := ok_icon.locked
+	var bad_locked := bad_icon.locked
+	var grid_ok: bool = ok_locked == false and bad_locked == true
+
+	# ② 商店两栏（不 open —— open 会暂停世界；refresh 本身不要求可见）
+	var shop := player.get_node("ShopPanel")
+	PlayerState.gold = 100000
+	PlayerState.shop_offers = [SWORD, BLADE]
+	PlayerState.shop_bp_offers = [STAFF]
+	shop.call("refresh")
+	var gear_rows := shop.get_node("Root/Panel/Rows")
+	var bp_rows := shop.get_node("Root/Panel/BPRows")
+	var unusable := tr("UI_ITEM_UNUSABLE")
+	var gear_ok_txt: bool = not str((gear_rows.get_child(0) as Node).get_child(1).text).contains(unusable)
+	var gear_bad_txt: bool = str((gear_rows.get_child(1) as Node).get_child(1).text).contains(unusable)
+	var gear_bad_icon: bool = ((gear_rows.get_child(1) as Node).get_child(0) as ItemIcon).locked
+	var bp_bad_txt: bool = str((bp_rows.get_child(0) as Node).get_child(1).text).contains(unusable)
+	var bp_bad_icon: bool = ((bp_rows.get_child(0) as Node).get_child(0) as ItemIcon).locked
+
+	# ③ 详情栏那句人话（符号说不出「所以能拿它干什么」）
+	hud.call("_refresh_detail_panel", PlayerState.bag, 1)
+	var detail := str((hud.get("_detail_text") as Label).text)
+
+	hud.call("toggle_bag")
+	get_tree().paused = false
+	PlayerState.reset_for_new_game()
+	room.queue_free()
+	await _pframes(2)
+
+	_check("8", "「用不了」在列表上就看得见：背包格 / 商店装备行 / 制书行都有记号，详情栏说清怎么办",
+		grid_ok and gear_ok_txt and gear_bad_txt and gear_bad_icon and bp_bad_txt and bp_bad_icon
+			and detail.contains(tr("UI_BAG_LOCKED_LINE")),
+		"背包格 剑斜杠=%s（必须 false）　刀斜杠=%s（必须 true）\n              商店行 剑**无**记号=%s（必须 true）　刀有记号=%s（必须 true）　刀图标斜杠=%s\n              制书行 有记号=%s 图标斜杠=%s　详情栏=%s" % [
+			str(ok_locked), str(bad_locked),
+			str(gear_ok_txt), str(gear_bad_txt), str(gear_bad_icon),
+			str(bp_bad_txt), str(bp_bad_icon), detail.split("\n")[0]])
