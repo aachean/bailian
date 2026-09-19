@@ -51,12 +51,18 @@ const UID_SEP := "#"
 const PROGRESSION_PATH := "res://data/progression.tres"
 ## 强化的唯一真相（品质上限 / 成本递增 / 收益递减）
 const FORGE_PATH := "res://data/forge.tres"
-## 商店的唯一真相（库存 / 出售折价率）。买与卖的钱都从这儿过（ADR 无，计划 §3.7）
-const SHOP_PATH := "res://data/shop.tres"
 
 @onready var progression: ProgressionData = load(PROGRESSION_PATH) as ProgressionData
 @onready var _forge: ForgeData = load(FORGE_PATH) as ForgeData
-@onready var _shop: ShopData = load(SHOP_PATH) as ShopData
+
+## 经济域服务（元宝 / 买卖 / 商店货架）。逻辑住 EconomyService，本类只转发（门面）。
+## 见 ADR-0027：PlayerState 拆解的第一个域。懒加载 —— 与 _crafting 同一条路
+var _economy_svc: EconomyService = null
+
+func economy() -> EconomyService:
+	if _economy_svc == null:
+		_economy_svc = EconomyService.new(self)
+	return _economy_svc
 
 ## 等级上限（给界面用，省得到处 PlayerState.progression.level_cap）
 @onready var level_cap: int = progression.level_cap
@@ -325,60 +331,28 @@ func forgeable_uids() -> Array:
 # 与精铁（shards）刻意**互不兑换** —— 两笔钱让玩家每次花钱都要判断该用哪个；
 # 能互换就等于只有一种。精铁只进强化，元宝只进商店。
 
-## 商店数据（库存 / 折价率）。界面要列货架、要算卖价都从这儿拿，
-## 别摸 _shop 私有成员
+## 商店数据（库存 / 折价率）。→ 经济域
 func shop() -> ShopData:
-	return _shop
+	return economy().shop()
 
+## 元宝进账。→ 经济域
 func add_gold(n: int) -> void:
-	if n <= 0:
-		return
-	gold += n
-	gold_changed.emit(gold)
+	economy().add_gold(n)
 
 
-## 花 n 个元宝。花不起返回 false —— 「为什么没花成」由调用方说出来（不静默）
+## 花 n 个元宝，花不起返回 false（不静默）。→ 经济域
 func spend_gold(n: int) -> bool:
-	if n <= 0 or gold < n:
-		return false
-	gold -= n
-	gold_changed.emit(gold)
-	return true
+	return economy().spend_gold(n)
 
 
-## 从商店买一件（必须在库存里）。成功 = 扣钱 + 新实例进背包，返回 uid；
-## 失败返回空串（不在库存 / 不是装备 / 元宝不够 —— 界面负责区分原因）。
-## 买来的是**新实例**：商店卖的是型号，玩家拿到的是自己那一件（与掉落同一模型）
+## 从商店买一件，成功返回新实例 uid、失败返回空串。→ 经济域
 func buy_item(path: String) -> String:
-	# 货架有两份：stock（底线清单）与 shop_offers（本期随机货）——
-	# 买的是「这家店摆出来的东西」，两处都算在售
-	var sd := shop()
-	var on_sale: bool = sd != null and (sd.has_stock(path) or shop_offers.has(path))
-	if sd == null or not on_sale:
-		return ""
-	var it := load(path) as ItemData
-	if it == null:
-		return ""
-	if not spend_gold(it.gold_price):
-		return ""
-	return add_item(path)
+	return economy().buy_item(path)
 
 
-## 出售一件**背包里的**装备，换元宝。价格只有一套算法：
-## 卖价 = 定价 × 折价率（ShopData.sell_ratio，向下取整）。
-## 返回进账（0 = 卖不了）。穿在身上的不收 —— 先卸下再来，
-## 「一个按键卖掉正在穿的甲」不该是可能发生的事故
+## 出售背包里的一件装备换元宝，返回进账（0 = 卖不了）。→ 经济域
 func sell_item(uid: String) -> int:
-	if not bag.has(uid):
-		return 0
-	var it := item_of(uid)
-	if it == null:
-		return 0
-	var gain := _shop.sell_price(int(it.gold_price))
-	_remove_from_bag(uid)
-	equipment_changed.emit()
-	add_gold(gain)
-	return gain
+	return economy().sell_item(uid)
 
 
 # ── 材料与打造（批 6 · 回收闭环，原则 5.5）────────────────────
@@ -515,7 +489,10 @@ func has_blueprint(path: String) -> bool:
 	return blueprints.has(path)
 
 
-# ── 商店货架刷新（每 4 现实小时换一批装备；制书也随机）──────────
+# ── 商店货架（刷新逻辑 → EconomyService，ADR-0027）───────────────
+#
+# **刷新逻辑住 EconomyService**（_load_shop_state / _roll_* / SHOP_STATE_PATH 都搬过去了）；
+# 下面这三个字段留在容器上，因为 shop_panel.gd 直接读写它们（门面过渡期）。
 #
 # ── 刷新状态住**全局文件**，不进存档槽（2026-09-18 神圈注）────────
 # 「每 4 现实小时」意味着时钟属于**现实世界**，不属于某个存档：
@@ -523,115 +500,31 @@ func has_blueprint(path: String) -> bool:
 # 回到 4:00:00。user://shop_refresh.cfg 是唯一真相：所有存档槽共享
 # 同一家店的同一批货、同一个钟 —— 商店是「世界的店」，不随读档回滚。
 
-const SHOP_STATE_PATH := "user://shop_refresh.cfg"
-
 ## 当前货架（随机抽的装备路径数组）。**不是 ShopData.stock** ——
-## stock 是「这家店卖什么档次」的底线清单，offers 是这一批实际摆出来的货
+## stock 是「这家店卖什么档次」的底线清单，offers 是这一批实际摆出来的货。
+## **字段留在容器上**：shop_panel.gd 直接 `.erase()`、测试直接赋值（门面过渡期，Phase 6 再掏薄）
 var shop_offers: Array = []
 
-## 本期的**随机制书货架**（装备路径数组）。每期独立 roll：
-## 10% 极品 / 5% 传说 / 1% 至尊（2026-09-18 神定的概率与定价），
-## 出了就随机该档的一件装备。**本期限购 1 本**：买走即从货架上撤下，
-## 再想要只能等下次刷新
+## 本期的**随机制书货架**（装备路径数组）。每期独立 roll，**本期限购 1 本**（买走即撤）
 var shop_bp_offers: Array = []
 
 ## 上次刷新的时刻（Unix 秒，现实时间）
 var shop_refreshed_at: float = 0.0
 
 
-## 从全局文件恢复货架状态（ensure_shop_fresh 开头调 —— 打开商店看一眼）
-func _load_shop_state() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(SHOP_STATE_PATH) != OK:
-		return
-	shop_offers = cfg.get_value("shop", "offers", [])
-	shop_bp_offers = cfg.get_value("shop", "bp_offers", [])
-	shop_refreshed_at = float(cfg.get_value("shop", "refreshed_at", 0.0))
-
-
-## 货架状态写回全局文件。抽新货 / 买走撤下时都要调 ——
-## 状态只在内存里的话，退出游戏就丢，时钟又回 4 小时
+## 货架状态写回全局文件（抽新货 / 买走撤下时调）。→ 经济域
 func save_shop_state() -> void:
-	var cfg := ConfigFile.new()
-	cfg.set_value("shop", "offers", shop_offers)
-	cfg.set_value("shop", "bp_offers", shop_bp_offers)
-	cfg.set_value("shop", "refreshed_at", shop_refreshed_at)
-	cfg.save(SHOP_STATE_PATH)
+	economy().save_shop_state()
 
 
-## 货架过期了就重抽。**进商店面板前调**（打开时看一眼，不靠时钟轮询）。
-## 装备：从已建档的掉落档次（普通/精良/优秀）里不重复抽 7 件 ——
-## 极品+永远不进货（途径隔离，ADR-0016）。
-## 制书：8 个书位独立 roll（10/5/1%），出书才占位。
-## 首次（没有任何记录）：立刻抽一批并把时刻设为现在
+## 货架过期了就重抽（进商店面板前调）。→ 经济域
 func ensure_shop_fresh() -> void:
-	var hours := 4.0
-	var sd := shop()
-	if sd != null:
-		hours = float(sd.refresh_hours)
-	_load_shop_state()
-	var now := Time.get_unix_time_from_system()
-	if now - shop_refreshed_at >= hours * 3600.0:
-		# 到点了：全部换新，时钟重置
-		shop_offers = _roll_shop_offers(7)   # 7 件 + 尾部一条还魂丹 = 左栏 8 行正好
-		shop_bp_offers = _roll_bp_offers(8)
-		shop_refreshed_at = now
-		save_shop_state()
-	elif shop_offers.is_empty():
-		# 没到点但装备卖光了：只补装备，**时钟不动**（制书不补 ——
-		# 「买了再想买只能等下次刷新」对书仍然成立）
-		shop_offers = _roll_shop_offers(7)
-		save_shop_state()
+	economy().ensure_shop_fresh()
 
 
-## 抽一批装备货架：三档混合（普通偏多）。不重复 —— 同一件摆两份没有意义
-func _roll_shop_offers(n: int) -> Array:
-	var pool: Array = []
-	for t in [ItemData.Tier.COMMON, ItemData.Tier.COMMON, ItemData.Tier.FINE, ItemData.Tier.UNCOMMON]:
-		pool.append_array(GameProgress.drop_pool(t))     # 普通抽两份权重
-	pool.shuffle()
-	var out: Array = []
-	for p in pool:
-		if not out.has(p):
-			out.append(p)
-		if out.size() >= n:
-			break
-	return out
-
-
-## 抽本期的制书：8 个书位，每位独立 roll 档次（2026-09-18 神定：
-## 极品 10% / 传说 5% / 至尊 1%，其余 84% 这期不出）——
-## 出了就随机该档的一件装备。**独立 roll 天然混合档次**，不会一整批全是同一档
-func _roll_bp_offers(slots: int) -> Array:
-	var out: Array = []
-	for _i in slots:
-		var r := randf()
-		var tier := -1
-		if r < 0.10:
-			tier = ItemData.Tier.RARE
-		elif r < 0.15:
-			tier = ItemData.Tier.EPIC
-		elif r < 0.16:
-			tier = ItemData.Tier.LEGENDARY
-		if tier < 0:
-			continue
-		var pool := GameProgress.drop_pool(tier)
-		if pool.is_empty():
-			continue
-		var path: String = pool.pick_random()
-		if not out.has(path):
-			out.append(path)
-	return out
-
-
-## 距下次刷新还剩多少秒（面板倒计时用；0 = 已过期，下次打开就换）
+## 距下次刷新还剩多少秒（面板倒计时用）。→ 经济域
 func shop_refresh_in() -> float:
-	var hours := 4.0
-	var sd := shop()
-	if sd != null:
-		hours = float(sd.refresh_hours)
-	var left: float = shop_refreshed_at + hours * 3600.0 - Time.get_unix_time_from_system()
-	return maxf(left, 0.0)
+	return economy().shop_refresh_in()
 
 
 # ── 还魂丹（原则 5.7：死亡罚效率不罚进度，丹是安全网不是免死金牌）──
