@@ -175,6 +175,44 @@ func _activate() -> void:
 			_go_home()
 
 
+## 鼠标点第 i 个地图页签 / 第 i 行副本。只认左键按下；Label 自己收点击
+##（_make_label 默认 IGNORE，建行时改成 STOP 了），点击不会漏到下面
+func _on_tab_gui_input(event: InputEvent, i: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_click_tab(i)
+		get_viewport().set_input_as_handled()
+
+
+func _on_atlas_row_gui_input(event: InputEvent, i: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_click_atlas_row(i)
+		get_viewport().set_input_as_handled()
+
+
+## 点页签 i → 换到那张地图（**单击即生效**：换地图只是换个看法，不带走任何东西）。
+## `_switch_map` 收的是**增量**不是目标下标，所以要减掉当前值 ——
+##「同一张地图」直接忽略：按了等于没按的操作不该有反馈
+func _click_tab(i: int) -> void:
+	var ms := GameProgress.maps()
+	if i < 0 or i >= ms.size() or i == _map_idx:
+		return
+	_switch_map(i - _map_idx)
+
+
+## 点副本行 i → 光标移过去 → **单击即进**（进副本是导航，不是消费，走「便宜」档）。
+## **不可选的行（没开 / 没开工）整行忽略** —— 键盘光标本来就到不了那里，
+## 让它点得进去就等于用鼠标开了一道后门
+func _click_atlas_row(i: int) -> void:
+	if i < 0 or i >= _rows.size():
+		return
+	if not bool(_rows[i].get("sel", false)):
+		return
+	_cursor = i
+	_activate()
+
+
 func _enter_dungeon(id: StringName) -> void:
 	var d := GameProgress.dungeon(id)
 	if d == null or not d.is_ready():
@@ -220,10 +258,15 @@ func _build() -> void:
 	if ms.is_empty():
 		return
 	_map_idx = clampi(_map_idx, 0, ms.size() - 1)
-	# 页签列出**全部**地图，当前那张金字、其余压暗 —— 玩家要看得见「后面还有一章」
+	# 页签列出**全部**地图，当前那张金字、其余压暗 —— 玩家要看得见「后面还有一章」。
+	# 鼠标信号**必须在这里连**：页签和下面的副本行都是本函数重建出来的
+	#（remove_child + queue_free 再来一遍），只在 _ready 连一次的话第二次就没了
 	for i in ms.size():
 		var cur := i == _map_idx
-		_tabs.add_child(_make_label(tr(ms[i].name_key), GOLD if cur else DIM, cur))
+		var tab := _make_label(tr(ms[i].name_key), GOLD if cur else DIM, cur)
+		tab.mouse_filter = Control.MOUSE_FILTER_STOP
+		tab.gui_input.connect(_on_tab_gui_input.bind(i))
+		_tabs.add_child(tab)
 	var m := ms[_map_idx]
 	if m == null:
 		return
@@ -240,8 +283,11 @@ func _build() -> void:
 				kind = "locked"
 		_rows.append({"kind": kind, "dungeon": d.id, "sel": selectable})
 	_rows.append({"kind": "back", "sel": true})
-	for r in _rows:
-		_list.add_child(_make_label("", NORMAL, bool(r.get("sel", false))))
+	for i in _rows.size():
+		var lbl := _make_label("", NORMAL, bool(_rows[i].get("sel", false)))
+		lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+		lbl.gui_input.connect(_on_atlas_row_gui_input.bind(i))
+		_list.add_child(lbl)
 
 
 ## 一行 = 一个 Label。**代码建而不是写进 tscn**：行数由数据决定，

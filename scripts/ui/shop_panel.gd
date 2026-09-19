@@ -62,8 +62,8 @@ var _clock_accum := 0.0
 
 func _ready() -> void:
 	_root.visible = false
-	_build_rows(_list, _rows, GEAR_ROWS)
-	_build_rows(_bp_box, _bp_rows, ROWS)
+	_build_rows(_list, _rows, GEAR_ROWS, 0)
+	_build_rows(_bp_box, _bp_rows, ROWS, 1)
 	# 左栏是固定行数的**无滚动**列 —— 条目一多就会「上架了但看不见」。
 	# 让它在启动时就炸，别等到玩家逛商店发现少了东西（本项目的「不能静默」）
 	assert(_left_entries().size() <= GEAR_ROWS,
@@ -154,6 +154,46 @@ func _move(dir: int) -> void:
 	_cursor = wrapi(_cursor + dir, 0, n)
 	_msg = ""
 	refresh()
+
+
+## 鼠标点第 r 行（col 告诉我们点的是哪一栏）。只认左键按下；
+## 图标/文字都是 IGNORE，点击会穿到行上到这里
+func _on_shop_row_gui_input(event: InputEvent, col: int, r: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_click_shop(col, r)
+		get_viewport().set_input_as_handled()
+
+
+## 分级点击（**可被测试直接调**，不依赖真实鼠标 —— 验证不靠点不到的像素）。
+##
+## 商店**全买都走两步**：点一次只是选中高亮（右侧价格/详情跟着刷），
+## 点**已经选中的同一行**才真买。理由是这一屏上最贵的一次误点 = 至尊制书 10000 元宝，
+## 而「选中」和「买下」在视觉上本来就该分得开。
+##
+## 「第几行」→ 列表绝对索引是本函数唯一的复杂点，**两栏各算各的**：
+##   左栏没有滚动窗口（条目 ≤ GEAR_ROWS），所以行号**就是**绝对索引；
+##   右栏有 `_bp_top` 滚动窗口，要加上窗口顶 + 左栏长度。
+## 点在空行上（货架没抽满 / 制书行不满 8 行）一律忽略 —— 那里没有东西可买
+func _click_shop(col: int, r: int) -> void:
+	if r < 0:
+		return
+	var left := _left_entries()
+	var idx := 0
+	if col == 0:
+		if r >= left.size():
+			return
+		idx = r
+	else:
+		if _bp_top + r >= _bp_list().size():
+			return
+		idx = left.size() + _bp_top + r
+	if idx == _cursor:
+		_buy_at_cursor()
+	else:
+		_cursor = idx
+		_msg = ""
+		refresh()
 
 
 ## 左栏条目 = 本期随机货架（装备路径）+ 常驻的**还魂丹**与**三种消耗品**。
@@ -324,12 +364,18 @@ func _buy_blueprint(bp_path: String) -> void:
 
 ## 行节点全部由代码建（与铁匠铺同一套做法）：手写 tscn 的嵌套 parent 路径
 ## 容易静默丢节点，能省的静态节点就省掉
-func _build_rows(box: VBoxContainer, into: Array[HBoxContainer], n: int) -> void:
-	for _i in n:
+##
+## `col` = 这一批行属于哪一栏（0 左栏货/消耗品，1 右栏制书）。鼠标点击要靠它把
+## 「第几行」换回列表的绝对索引 —— **两栏的换算方式不同**，见 `_click_shop`。
+## 行是**建一次复用**的，所以信号也只连一次（不同于舆图的行重建）
+func _build_rows(box: VBoxContainer, into: Array[HBoxContainer], n: int, col: int) -> void:
+	for i in n:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
 		row.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# 鼠标：行收点击（子节点 icon/label 仍 IGNORE，点击穿到行上到这里）
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.gui_input.connect(_on_shop_row_gui_input.bind(col, i))
 
 		var icon := ItemIcon.new()
 		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
