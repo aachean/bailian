@@ -586,7 +586,7 @@ func _apply_upgrade() -> void:
 	_base_defense = int(bonus.get("def_flat", 0))
 	_health.defense = _base_defense
 	_refresh_blade()
-	_refresh_hud()
+	# HUD 不再主动推：Phase 4 起 HUD 每帧刷连续量（血蓝/元宝/技能栏），换装后自更新
 
 
 ## 光刃跟着武器变：颜色取品质色（与面板图标、地上掉落物同一个色源），
@@ -676,6 +676,8 @@ func _heal_fx(amount: int) -> void:
 	tw.tween_callback(lbl.queue_free)
 
 
+## 强制 HUD 立刻全量刷一次。**产品代码不再调它**（Phase 4 起 HUD 每帧自刷连续量、
+## 面板走信号）—— 仅留给截图脚本（tests/shot_potion.gd）在拍照前把状态同步到位
 func _refresh_hud() -> void:
 	var hud := get_node_or_null("HUD")
 	if hud != null and hud.has_method("refresh"):
@@ -691,14 +693,12 @@ func _refresh_hud() -> void:
 func collect_shard() -> void:
 	PlayerState.shards += 1
 	Audio.play(&"pickup")
-	_refresh_hud()
 
 
 ## 拾取材料（Pickup 组件调，批 6 尾巴：怪掉材料）。进背包面板的材料行
 func collect_material(id: StringName, amount: int) -> void:
 	PlayerState.add_material(id, amount)
 	Audio.play(&"pickup")
-	_refresh_hud()
 
 
 ## 拾取元宝（Pickup 组件调）。元宝只进商店 —— 买装备、（以后）买别的。
@@ -706,7 +706,6 @@ func collect_material(id: StringName, amount: int) -> void:
 func collect_gold(n: int) -> void:
 	PlayerState.add_gold(n)
 	Audio.play(&"pickup")
-	_refresh_hud()
 
 
 ## 喝回血药（Pickup 组件调 —— 药掉在地上，走近直接生效，不进背包）。
@@ -787,7 +786,6 @@ func use_potion(kind: StringName) -> bool:
 		mp = mini(mp + int(ceil(float(max_mp) * POTION_MP_RATIO)), max_mp)
 		Audio.play(&"pickup")
 		_pickup_fx_text("+%d" % (mp - before), FLOAT_MANA)
-	_refresh_hud()
 	return true
 
 
