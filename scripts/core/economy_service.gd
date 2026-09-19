@@ -91,6 +91,11 @@ func sell_item(uid: String) -> int:
 	if it == null:
 		return 0
 	var gain := shop().sell_price(int(it.gold_price))
+	# 卖价 ≤ 0 的东西**不收**（不是「卖了 0 元宝」）—— 否则会「装备从背包消失、
+	# 0 进账、返回值 0 与『卖不了』分不清」= 静默销毁。返回 0 让调用方按「没卖成」处理。
+	# 现状 132 件装备无一 price=0，这是防御缺口而非活跃 bug（B1，2026-09-19）
+	if gain <= 0:
+		return 0
 	_s._remove_from_bag(uid)      # ← 跨域契约：出背包是物品域的事
 	_s.equipment_changed.emit()
 	add_gold(gain)

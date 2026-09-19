@@ -180,7 +180,13 @@ func craft(path: String) -> String:
 		return ""
 	if not has_blueprint(path):
 		return ""
-	if not pay_materials(crafting().cost_for(int(it.tier))):
+	# 这个档没有配方 = 不可打造。**不能空配方也放行** —— pay_materials({}) 两个循环
+	# 都不执行会直接返回 true，等于免料出装（B3，2026-09-19）。crafting.tres 只定义 tier3/4/5，
+	# 低档拿不到制书本就打不出来，这是防御缺口而非活跃 bug；但守门要显式
+	var cost := crafting().cost_for(int(it.tier))
+	if cost.is_empty():
+		return ""
+	if not pay_materials(cost):
 		return ""
 	return _s.add_item(path)          # ← 跨域：进背包是物品域的事
 
