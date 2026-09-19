@@ -138,10 +138,19 @@ func _unhandled_input(event: InputEvent) -> void:
 ## 能省的静态节点就省掉 —— 少一个节点就少一次静默丢节点的机会。
 ## 每行 = [装备图标][文字]，图标走 ItemIcon（程序化矢量图，不引贴图）
 func _build_rows() -> void:
-	for _i in ItemData.SLOT_IDS.size():
-		_equip_rows.append(_make_row(_equip_box))
-	for _i in BAG_COLS * BAG_GRID_ROWS:
-		_bag_cells.append(_make_bag_cell())
+	# 鼠标：装备槽行与背包格都收左键点击（子节点仍 IGNORE，点击穿到行/格上）。
+	# 穿/卸装备是廉价可逆的 → **单击即生效**（分级点击的「便宜」档，见 _click_* ）。
+	# 连一次即可 —— 行/格是建好复用的
+	for i in ItemData.SLOT_IDS.size():
+		var row := _make_row(_equip_box)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.gui_input.connect(_on_equip_row_gui_input.bind(i))
+		_equip_rows.append(row)
+	for k in BAG_COLS * BAG_GRID_ROWS:
+		var cell := _make_bag_cell()
+		cell.mouse_filter = Control.MOUSE_FILTER_STOP
+		cell.gui_input.connect(_on_bag_cell_gui_input.bind(k))
+		_bag_cells.append(cell)
 
 
 ## 造一个背包格子：底板（颜色 = 选中态）+ 居中图标。
@@ -563,6 +572,39 @@ func _sell_cursor() -> void:
 func _clamp_cursor() -> void:
 	var total: int = ItemData.SLOT_IDS.size() + PlayerState.bag.size()
 	_cursor = clampi(_cursor, 0, maxi(total - 1, 0))
+
+
+## 鼠标点装备槽第 i 行 / 背包第 k 格。只认左键按下；子节点 IGNORE，点击穿到行/格上
+func _on_equip_row_gui_input(event: InputEvent, i: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_click_equip_slot(i)
+
+
+func _on_bag_cell_gui_input(event: InputEvent, k: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_click_bag_cell(k)
+
+
+## 点装备槽 i → 光标移过去 → **单击即卸下**（等同 J；穿/卸廉价可逆，走「便宜」档）。
+## **可被测试直接调**，不依赖真实鼠标。空槽 _use_cursor 自会兜住（unequip 空槽是 no-op）
+func _click_equip_slot(i: int) -> void:
+	if i < 0 or i >= ItemData.SLOT_IDS.size():
+		return
+	_cursor = i
+	_use_cursor()
+
+
+## 点背包第 k 格（屏上 0..格数-1）→ 按当前显示页算绝对背包索引 → 光标移过去 → **单击穿上**。
+## 点到空格忽略。`_bag_page()` 用的是点击前的 _cursor（= 当前渲染的那一页），所以页号一致
+func _click_bag_cell(k: int) -> void:
+	var per_page := BAG_COLS * BAG_GRID_ROWS
+	var idx := _bag_page() * per_page + k
+	if idx < 0 or idx >= PlayerState.bag.size():
+		return
+	_cursor = ItemData.SLOT_IDS.size() + idx
+	_use_cursor()
 
 
 func _pause_menu_open() -> bool:
