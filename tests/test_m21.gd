@@ -1,5 +1,8 @@
 extends Node
-## 《百炼》自动验收：**鼠标点击映射**（第 4 批 4b：商店两栏 + 舆图页签/行）。
+## 《百炼》自动验收：**鼠标点击映射**（第 4 批 4b：**四个面板**）。
+## 商店两栏 / 舆图页签与行先做（#1~#8），铁匠铺两页 / 背包槽与格后补（#9~#14）——
+## 补的理由记在案：那两个面板的鼠标当时**只出了截图**，而截图拍不出点击行为，
+## 等于完全没验过。**四个面板现在齐了。**
 ##
 ## 跑法（无头）：
 ##     godot --headless --fixed-fps 60 --path <项目根> res://tests/test_m21.tscn
@@ -37,12 +40,17 @@ var _pass := 0
 var _fail := 0
 var _shop: Node
 var _atlas: Node
+var _forge: Node
+var _hud: Node
+## 背包一页几格。**从 HUD 自己的常量算出来，不在这儿再写一份 30** ——
+## 数字只有一个家（改了 BAG_COLS 就该跟着变，而不是悄悄算错页号）
+var _bag_per_page := 0
 
 
 func _ready() -> void:
 	await get_tree().process_frame
 	print("")
-	print("═══ 《百炼》鼠标点击映射自动验收（4b：商店 / 舆图）═══")
+	print("═══ 《百炼》鼠标点击映射自动验收（4b：四个面板）═══")
 
 	var room := ROOM.instantiate()
 	add_child(room)
@@ -50,11 +58,17 @@ func _ready() -> void:
 	var player := room.get_node("Player")
 	_shop = player.get_node_or_null("ShopPanel")
 	_atlas = player.get_node_or_null("Atlas")
-	if _shop == null or _atlas == null:
-		_check("0", "两个面板都找得到", false,
-			"ShopPanel=%s　Atlas=%s" % [str(_shop != null), str(_atlas != null)])
+	_forge = player.get_node_or_null("ForgePanel")
+	_hud = player.get_node_or_null("HUD")
+	var ok := _shop != null and _atlas != null and _forge != null and _hud != null
+	if not ok:
+		_check("0", "四个面板都找得到", false,
+			"商店=%s 舆图=%s 铁匠铺=%s HUD=%s" % [str(_shop != null), str(_atlas != null),
+				str(_forge != null), str(_hud != null)])
 		_done()
 		return
+	var hud_consts: Dictionary = _hud.get_script().get_script_constant_map()
+	_bag_per_page = int(hud_consts["BAG_COLS"]) * int(hud_consts["BAG_GRID_ROWS"])
 
 	await _t1_shop_left_first_click_selects()
 	await _t2_shop_left_second_click_buys()
@@ -64,6 +78,12 @@ func _ready() -> void:
 	await _t6_atlas_tab_switches_map()
 	await _t7_atlas_locked_row_ignored()
 	await _t8_atlas_out_of_range_ignored()
+	await _t9_forge_two_step()
+	await _t10_forge_out_of_range_ignored()
+	await _t11_forge_craft_window_translation()
+	await _t12_hud_click_slot_unequips()
+	await _t13_hud_click_bag_cell_equips()
+	await _t14_hud_bag_second_page()
 
 	_done()
 
@@ -244,6 +264,134 @@ func _t8_atlas_out_of_range_ignored() -> void:
 			rows.size(), rows.size() + 5, cur, last])
 
 
+# ── 9~11. 铁匠铺 ─────────────────────────────────────────────────
+
+## 两步：点一次只选中，再点同一行才强化。与商店同理 —— 强化**要花精铁**，
+## 「一点就强化」在屏幕上完全看不出（光标本来就会跟过去），只有精铁能作证
+func _t9_forge_two_step() -> void:
+	_prep_forge()
+	var list: Array = PlayerState.forgeable_uids()
+	if list.size() < 2:
+		_check("9", "铁匠铺两步点击", false, "只有 %d 件可强化，至少要 2 件" % list.size())
+		return
+	_forge.set("_cursor", 0)
+	_forge.call("refresh")
+	var sh0 := PlayerState.shards
+	_forge.call("_click_index", 1)                 # 第一次：只选中
+	var cur_sel := int(_forge.get("_cursor"))
+	var sh_sel := PlayerState.shards
+	# 光标的**指向**要在确认前读：确认后列表可能重排，拿重排后的读数是自欺
+	var uid := str(_forge.call("selected_uid"))
+	var lv0 := PlayerState.forge_level(uid)
+	var cost := PlayerState.forge_cost(uid)
+	_forge.call("_click_index", 1)                 # 第二次：真强化
+	var lv1 := PlayerState.forge_level(uid)
+	_check("9", "铁匠铺：点一次只选中（精铁不动），再点同一行才强化（扣精铁、等级 +1）",
+		cur_sel == 1 and sh_sel == sh0 and lv1 == lv0 + 1 and PlayerState.shards == sh0 - cost,
+		"点一次后：光标=%d 精铁=%d（该没动）｜ 点两次后：+%d → +%d　精铁 %d → %d（该扣 %d）" % [
+			cur_sel, sh_sel, lv0, lv1, sh0, PlayerState.shards, cost])
+
+
+## 越界（点到空槽）忽略。强化页只有 8 格，列表再长也填不满 16 格里的后 8 个
+func _t10_forge_out_of_range_ignored() -> void:
+	_prep_forge()
+	_forge.set("_cursor", 0)
+	_forge.call("refresh")
+	var n := int(_forge.call("_list_len"))
+	_forge.call("_click_index", n)
+	_forge.call("_click_index", -1)
+	var cur := int(_forge.get("_cursor"))
+	_check("10", "铁匠铺：点越界的显示槽 = 忽略（光标不动）",
+		cur == 0, "列表 %d 件　点了 %d 和 -1 → 光标 = %d（必须还是 0）" % [n, n, cur])
+
+
+## 打造页的**窗口顶换算**。与商店右栏是同一类问题，但机制不同：这里的窗口
+## 由 `_grid_top` 按「行」对齐算，而且**随光标移动**（所以不能像商店那样
+## 「读文字 → 把光标挪走 → 再点」—— 光标一走窗口就跟着走了）。
+## 断言取语义：第 0 格此刻显示哪本书，点下去光标就该落在那一本上
+func _t11_forge_craft_window_translation() -> void:
+	_prep_forge()
+	_forge.set("_page", 1)
+	_forge.set("_cursor", 20)                      # 挪到深处，好让 _view_top 非 0
+	_forge.call("refresh")
+	var top := int(_forge.get("_view_top"))
+	if top <= 0:
+		_check("11", "铁匠铺打造页窗口换算", false,
+			"_view_top 仍是 0 —— 这条会退化成假绿（66 件配 16 格窗口不该为 0）")
+		return
+	# 第 0 格此刻显示的是哪本书
+	var shown := ((_forge.get("_rows")[0] as HBoxContainer).get_child(1) as Label).text
+	_forge.call("_click_index", top)               # = 点第 0 格
+	var cur := int(_forge.get("_cursor"))
+	var paths: Array = _forge.call("_craft_paths")
+	var target: ItemData = null
+	if cur >= 0 and cur < paths.size():
+		target = load(str(paths[cur])) as ItemData
+	var hit: bool = target != null and tr(target.name_key) in shown
+	_check("11", "铁匠铺打造页：点第 0 格 = 选中**那一格显示的那本书**（窗口顶≠0 时也对）",
+		hit, "窗口顶 _view_top=%d　第 0 格显示「%s」　点后光标=%d → 列表序 #%d = %s" % [
+			top, shown, cur, cur, tr(target.name_key) if target != null else "?"])
+
+
+# ── 12~14. 背包面板（HUD）────────────────────────────────────────
+
+## 穿/卸是**廉价可逆** → **单击即生效**（与商店 / 铁匠铺的两步正好相反）。
+## 这条同时卡住两件事：点对了槽、以及「只点一次就够」
+func _t12_hud_click_slot_unequips() -> void:
+	var uid := _equip_something()
+	if uid.is_empty():
+		_check("12", "背包：点装备槽 = 单击卸下", false, "没有穿得上的装备，摆不出这个状态")
+		return
+	var si := _slot_of(uid)
+	_hud.call("_click_equip_slot", si)
+	var left := str(PlayerState.equipped_uid(ItemData.SLOT_IDS[si]))
+	_check("12", "背包：点装备槽 = **单击即卸下**（廉价可逆，不走两步）",
+		left == "", "%s 槽穿上 uid=%s → 单击后 = %s" % [
+			String(ItemData.SLOT_IDS[si]), uid, left if left != "" else "（空）"])
+
+
+## 点背包格 = 单击穿上。空格要忽略（这里只验非空那一半，空格的守卫在 #14 里一并走）
+func _t13_hud_click_bag_cell_equips() -> void:
+	_prep_bag(4)
+	var bag := PlayerState.bag
+	if bag.is_empty():
+		_check("13", "背包：点背包格 = 单击穿上", false, "背包一件都没塞进去")
+		return
+	var uid := str(bag[0])
+	# 光标先落在「槽之后第一位」→ _bag_page() 才是第 0 页（点哪一格按点击前的光标算页）
+	_hud.set("_cursor", ItemData.SLOT_IDS.size())
+	_hud.call("_click_bag_cell", 0)
+	var si := _slot_of(uid)
+	_check("13", "背包：点背包格 = **单击即穿上**（廉价可逆）",
+		si >= 0 and PlayerState.bag.find(uid) < 0,
+		"点第 0 格（背包首件 %s）→ %s；仍在背包里 = %s" % [
+			uid, ("%s 槽" % String(ItemData.SLOT_IDS[si])) if si >= 0 else "没穿上",
+			str(PlayerState.bag.find(uid) >= 0)])
+
+
+## **背包第二页** —— 与商店右栏同源的坑：格号要先乘页。
+## `_click_bag_cell(0)` 在第 2 页必须对应背包第 31 件，而不是第 1 件
+func _t14_hud_bag_second_page() -> void:
+	_prep_bag(_bag_per_page + 5)                        # 每页 30，塞 35 件 → 第二页有 5 件
+	var slots: int = ItemData.SLOT_IDS.size()
+	var bag := PlayerState.bag
+	if bag.size() <= _bag_per_page:
+		_check("14", "背包第二页格号换算", false,
+			"背包只有 %d 件，撑不到第二页（要 >%d）" % [bag.size(), _bag_per_page])
+		return
+	# 光标先落进第二页 —— _click_bag_cell 正是按「点之前光标所在的页」算绝对索引
+	_hud.set("_cursor", slots + _bag_per_page + 2)
+	var page := int(_hud.call("_bag_page"))
+	var want := str(bag[page * _bag_per_page + 0])
+	_hud.call("_click_bag_cell", 0)
+	var si := _slot_of(want)
+	_check("14", "背包第二页：点第 0 格 = 穿的是第 %d 件（页号要按点击前的光标算）" % (_bag_per_page + 1),
+		page == 1 and si >= 0,
+		"背包 %d 件　点击前的页 = %d　第 0 格应对应背包 #%d = %s → %s" % [
+			bag.size(), page, page * _bag_per_page, want,
+			("落在 %s 槽" % String(ItemData.SLOT_IDS[si])) if si >= 0 else "没穿上"])
+
+
 # ── 工具 ─────────────────────────────────────────────────────────
 
 ## 摆一个「可点」的商店状态：7 件货架（或 2 件）+ 500 元宝。
@@ -261,6 +409,60 @@ func _prep_shop(few_offers: bool = false) -> void:
 	_shop.set("_cursor", 0)
 	_shop.set("_bp_top", 0)
 	_shop.call("refresh")
+
+
+## 往背包里塞 `count` 件**穿得上**的装备，光标归零。
+## 路径取真实池子（遍历全部 6 档），**不手编** —— 而且必须先过 `can_equip` 这道门：
+## 塞进去却穿不上的武器会让「点格穿装备」那两条永远走不到「穿上」那一步
+func _prep_bag(count: int = 6) -> void:
+	PlayerState.reset_for_new_game()
+	PlayerState.gold = 5000
+	PlayerState.shards = 200
+	var pool: Array = []
+	for t in range(6):                       # ItemData.Tier 共 6 档：COMMON..LEGENDARY
+		pool.append_array(GameProgress.drop_pool(t))
+	for p in pool:
+		if PlayerState.bag.size() >= count:
+			break
+		var it := load(str(p)) as ItemData
+		if it == null or not PlayerState.can_equip(it):
+			continue
+		PlayerState.add_item(str(p))
+	_hud.set("_cursor", 0)
+
+
+## 摆一个能强化的状态：背包里有东西、精铁给够。
+## **不调 `open()`**：它会暂停场景树、还要拉 HUD 让路，而这一组根本不看可见性
+func _prep_forge() -> void:
+	_prep_bag(6)
+	PlayerState.shards = 200
+	_forge.set("_page", 0)
+	_forge.set("_cursor", 0)
+	_forge.set("_view_top", 0)
+	_forge.call("refresh")
+
+
+## 往包里塞一件穿得上的装备并**真的穿上**，返回它的 uid（摆不出来就返回空串）
+func _equip_something() -> String:
+	_prep_bag(6)
+	for u in PlayerState.bag:
+		var uid := str(u)
+		var it := PlayerState.item_of(uid)
+		if it == null or not PlayerState.can_equip(it):
+			continue
+		PlayerState.equip(uid)
+		if _slot_of(uid) >= 0:
+			return uid
+	return ""
+
+
+## 某个 uid 现在穿在哪个槽上（没穿返回 -1）。**反查而不是读物品自带的 slot 字段**：
+## 这几条要验的正是「穿到哪儿去了」，拿实现自己的字段去推就成了拿实现验实现
+func _slot_of(uid: String) -> int:
+	for i in ItemData.SLOT_IDS.size():
+		if str(PlayerState.equipped_uid(ItemData.SLOT_IDS[i])) == uid:
+			return i
+	return -1
 
 
 func _done() -> void:
