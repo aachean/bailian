@@ -42,16 +42,56 @@ const STRUCTURE_VERSION := 11
 ## 存档槽数量（2026-09-15 黑盒反馈：3 不够，扩到 15，菜单每页 5 个翻 3 页）。
 ## 槽位文件名不变（save_N.cfg）
 const SLOT_COUNT := 15
-const LAST_SLOT_PATH := "user://last_slot.cfg"
+
+# ── 存档根目录：默认就是玩家的 user://，带隔离标记时换到子目录 ────────
+#
+# **为什么必须有这个**：无头测试用的 `user://` 和玩家 `play-bailian.bat` 用的是
+# **同一个目录**。原来只靠 `SaveGuard`「先备份 → 跑测试 → 还回去」兜底，
+# 但那条路天生脆弱：**测试只要崩一次或超时，还原那一步就不执行**，
+# 脏档留在原处，而之后每次运行都会忠实地把脏档再备份一遍 ——
+# 于是污染是**粘住**的，越跑越洗不掉。
+# （2026-09-20 实际发生过：玩家的 last_slot 被测试改成 1、槽 1 被写成空壳，
+#  表现是「点继续游戏进了一个没进度的世界，存档列表里那槽也没信息」。）
+#
+# 现在改成**测试根本不碰玩家的档**：`run_tests.py` 给每个测试进程加
+# `-- --isolated-saves`，见到它就把根目录换成 test_saves/，并把那一份先清空
+# （每个测试进程从干净的一份开始，互相不串味）。
+# `SaveGuard` 保留，但它从「唯一防线」降级成多一层保险。
+const SAVE_ROOT_DEFAULT := "user://"
+const SAVE_ROOT_ISOLATED := "user://test_saves/"
+## run_tests.py 传的标记。放在 `--` 之后，走 OS.get_cmdline_user_args() 取
+const ISOLATED_FLAG := "--isolated-saves"
+
+## 存档根目录。**正常游玩恒为 SAVE_ROOT_DEFAULT** —— 只有带标记启动才会变
+var save_root := SAVE_ROOT_DEFAULT
 
 ## 正在玩的槽（1 起）。菜单开始 / 读档时设置，游戏内写档都用它
 var current_slot: int = 1
 
 
+func _ready() -> void:
+	if not (ISOLATED_FLAG in OS.get_cmdline_user_args()):
+		return
+	save_root = SAVE_ROOT_ISOLATED
+	# 每个测试进程从干净的一份开始 —— 上一层跑剩的槽会让这一层的结果不可复现
+	var abs_dir := ProjectSettings.globalize_path(save_root)
+	var d := DirAccess.open(abs_dir)
+	if d != null:
+		for f in d.get_files():
+			d.remove(f)
+	DirAccess.make_dir_recursive_absolute(abs_dir)
+
+
 # ── 槽位与路径 ─────────────────────────────────────────────────
 
 func slot_path(slot: int) -> String:
-	return "user://save_%d.cfg" % slot
+	return "%ssave_%d.cfg" % [save_root, slot]
+
+
+## 「最近玩的槽」那个文件的路径。**别再往代码里写死 user://last_slot.cfg** ——
+## 隔离跑的时候它必须跟着 save_root 走，否则测试照样会改到玩家的 last_slot
+func last_slot_path() -> String:
+	return "%slast_slot.cfg" % save_root
 
 
 func slot_exists(slot: int) -> bool:
@@ -61,7 +101,7 @@ func slot_exists(slot: int) -> bool:
 ## 最近一次玩的槽；从没玩过返回 0
 func last_slot() -> int:
 	var cfg := ConfigFile.new()
-	if cfg.load(LAST_SLOT_PATH) != OK:
+	if cfg.load(last_slot_path()) != OK:
 		return 0
 	return int(cfg.get_value("slot", "n", 0))
 
@@ -69,7 +109,7 @@ func last_slot() -> int:
 func _remember_slot(slot: int) -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("slot", "n", slot)
-	cfg.save(LAST_SLOT_PATH)
+	cfg.save(last_slot_path())
 
 
 # ── 进入游戏的两个入口 ─────────────────────────────────────────

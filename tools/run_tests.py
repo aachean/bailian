@@ -28,6 +28,12 @@ SUMMARY = re.compile(r"通过\s*[／/]\s*(\d+)\s*失败")
 COUNT = re.compile(r"(\d+)\s*通过\s*[／/]\s*(\d+)\s*失败")
 TIMEOUT_S = 120
 
+## 让每个测试进程把存档写到自己的目录里，**不碰玩家的 user://**。
+## 放在 `--` 之后（Godot 把它交给 OS.get_cmdline_user_args()），
+## SaveManager 见到它就把根目录换成 user://test_saves/ 并先清空。
+## 少了这个参数，跑一次回归就会往玩家的真档里写 —— 而且测试崩了还擦不干净。
+ISOLATED_FLAG = "--isolated-saves"
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -51,7 +57,7 @@ def main() -> int:
         try:
             proc = subprocess.run(
                 [str(GODOT), "--headless", "--fixed-fps", "60", "--path", str(REPO),
-                 f"res://tests/{scene.name}"],
+                 f"res://tests/{scene.name}", "--", ISOLATED_FLAG],
                 cwd=REPO, capture_output=True, text=True, encoding="utf-8",
                 errors="replace", timeout=TIMEOUT_S,
             )

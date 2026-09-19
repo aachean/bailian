@@ -86,7 +86,13 @@ func _t1_menu_buttons() -> void:
 	await _steps(2)
 
 
-## 「继续」只在有进度时出现；读档列表里空槽置灰、有档可选
+## 「继续」只在**真有进度**时出现；读档列表里空槽置灰、有档可选。
+##
+## **「有进度」的判据是「快照里有 player」，不是「文件在不在」**。空壳槽
+## （`start_new_game` 写过、却从没落盘过）文件在、版本也够，但里面没有角色数据 ——
+## 旧判定只看文件在不在，于是「继续游戏」会一声不吭进一个没有进度的世界
+## （2026-09-20 玩家实际遭遇：last_slot 被测试改成 1，而槽 1 是空壳）。
+## 所以这条现在**两头都卡**：空壳槽必须**不**出现，真落了盘的槽必须出现。
 func _t2_continue_visibility() -> void:
 	_wipe_all_slots()
 	var menu := MENU.instantiate()
@@ -100,8 +106,18 @@ func _t2_continue_visibility() -> void:
 	await _steps(2)
 	var cont_hidden: bool = not cont.visible
 
-	# 在槽 2 开档：继续出现（回最近槽），读档列表里槽 2 可选、槽 1 仍置灰
+	# 空壳槽：`start_new_game` 只写了版本号与关卡路径，快照是空的 ——
+	# 「继续」**不该**出现。少了这一半，「继续游戏进空世界」那个 bug 就会悄悄回来
 	SaveManager.start_new_game(2, "res://scenes/stages/town.tscn")
+	menu._refresh_texts()
+	await _steps(2)
+	var cont_on_shell: bool = cont.visible
+
+	# 槽 2 真落一次盘（快照里有 player）：继续出现（回最近槽），
+	# 读档列表里槽 2 可选、槽 1 仍置灰
+	PlayerState.reset_for_new_game()
+	SaveManager.write_progress("res://scenes/stages/town.tscn",
+		{"player": PlayerState.save_to()})
 	menu._refresh_texts()
 	await _steps(2)
 	var cont_shown: bool = cont.visible
@@ -112,10 +128,10 @@ func _t2_continue_visibility() -> void:
 	menu._slot_mode = menu.SlotMode.START
 	menu._refresh_texts()
 
-	_check("2", "「继续」回最近槽；读档列表空槽置灰",
-		cont_hidden and cont_shown and load_mode_ok,
-		"无进度隐藏=%s　有进度显示=%s　读档模式槽2可选/槽1置灰=%s" % [
-			str(cont_hidden), str(cont_shown), str(load_mode_ok)])
+	_check("2", "「继续」只在快照里真有 player 时出现（空壳槽不算）；读档列表空槽置灰",
+		cont_hidden and (not cont_on_shell) and cont_shown and load_mode_ok,
+		"全空隐藏=%s　空壳槽也隐藏=%s　真落盘后显示=%s　读档模式槽2可选/槽1置灰=%s" % [
+			str(cont_hidden), str(cont_on_shell), str(cont_shown), str(load_mode_ok)])
 	menu.queue_free()
 	await _steps(2)
 

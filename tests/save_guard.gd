@@ -29,7 +29,7 @@ static func backup() -> Dictionary:
 		var p := SaveManager.slot_path(s)
 		if FileAccess.file_exists(p):
 			out["slot_%d" % s] = FileAccess.get_file_as_bytes(p)
-	var lp: String = SaveManager.LAST_SLOT_PATH
+	var lp: String = SaveManager.last_slot_path()
 	if FileAccess.file_exists(lp):
 		out["last"] = FileAccess.get_file_as_bytes(lp)
 	return out
@@ -47,7 +47,7 @@ static func restore(bak: Dictionary) -> void:
 				f.close()
 		elif FileAccess.file_exists(p):
 			SaveManager.erase_slot(s)
-	var lp: String = SaveManager.LAST_SLOT_PATH
+	var lp: String = SaveManager.last_slot_path()
 	if bak.has("last"):
 		var f2 := FileAccess.open(lp, FileAccess.WRITE)
 		if f2 != null:

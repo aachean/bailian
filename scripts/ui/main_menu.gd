@@ -187,8 +187,9 @@ func _refresh_texts(_locale: String = "") -> void:
 
 
 func _refresh_continue() -> void:
-	var last := SaveManager.last_slot()
-	_continue_btn.visible = last > 0 and SaveManager.slot_exists(last)
+	# 按钮只在**真有一个能继续的槽**时出现。以前判的是「最近那个槽的文件在不在」——
+	# 空壳槽也满足，于是点下去进了个没有进度的世界（见 _on_continue 的注释）
+	_continue_btn.visible = _resumable_slot() > 0
 
 
 func _refresh_slot_buttons() -> void:
@@ -411,10 +412,46 @@ func _begin_new_game(slot: int) -> void:
 	get_tree().change_scene_to_file(LEVEL_PATH)
 
 
+## 「继续游戏」= 回到最近玩过的那个槽。
+##
+## **但它必须真的有进度**。空壳槽（`state={}`：开过新档、却从没落过盘）照样能过
+## `slot_usable()` 的检查 —— 那一关只看「格式读不读得懂」，不看里面有没有东西。
+## 静默进去的后果是玩家以为「我的进度没了」（2026-09-20 实际发生：last_slot 被
+## 测试改成 1，而槽 1 是空壳，于是继续游戏一声不吭地进了个全新世界）。
+##
+## 所以：先认最近那个，它没进度就按 saved_at 退到最近**有**进度的槽；
+## 一个都没有才说话（不静默）。
 func _on_continue() -> void:
+	var slot := _resumable_slot()
+	if slot > 0:
+		_enter_slot(slot)
+		return
+	_slots_title.text = tr("UI_SLOT_NO_PROGRESS")
+
+
+## 挑一个「真能继续」的槽。0 = 一个都没有
+func _resumable_slot() -> int:
 	var last := SaveManager.last_slot()
-	if last > 0 and SaveManager.slot_usable(last):
-		_enter_slot(last)
+	if _slot_has_progress(last):
+		return last
+	var best := 0
+	var best_at := -1
+	for s in range(1, SaveManager.SLOT_COUNT + 1):
+		if not _slot_has_progress(s):
+			continue
+		var at := int(SaveManager.read_slot_info(s).get("saved_at", 0))
+		if at > best_at:
+			best_at = at
+			best = s
+	return best
+
+
+## 这一槽有东西可继续吗。判据是**快照里有 player** ——
+## 版本号只说明「格式读得懂」，不代表里面真有角色数据（空壳槽就是后者）
+func _slot_has_progress(slot: int) -> bool:
+	if slot <= 0 or not SaveManager.slot_usable(slot):
+		return false
+	return SaveManager.read_state(slot).has("player")
 
 
 ## 从槽位进入：场景 + 快照 + 玩家数据，三样都从档里来。
