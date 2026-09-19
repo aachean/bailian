@@ -15,8 +15,10 @@ extends CanvasLayer
 ## 挂在玩家节点下，`process_mode = ALWAYS` + `get_tree().paused = true`，
 ## 打开时先把 HUD 的面板让开，自己开着的时候别人不开（互查 is_open）。
 
-## 一次显示几行（多出来的靠光标滚动）
+## 一次显示几「行」（多出来的靠光标滚动）。强化页 1 列 = 8 件；打造页 2 列 = 16 件
 const ROWS := 8
+## 单元格总数 = 行 × 最大列数（2）。行节点一次建好 16 个复用；强化页只用前 8 个、后 8 个藏起来
+const CELLS := 16
 const CURSOR_MARK := "▶ "
 const INDENT := "   "
 const ROW_HEIGHT := 18.0
@@ -41,7 +43,9 @@ var _msg_color := DIM
 @onready var _root: Control = $Root
 @onready var _title: Label = $Root/Panel/Title
 @onready var _status: Label = $Root/Panel/Status
-@onready var _list: VBoxContainer = $Root/Panel/Rows
+## 场景节点是 GridContainer（ADR-0030 后为制作书两栏改的）。columns 按页设：
+## 强化页 = 1 列（等同旧 VBox），打造页 = 2 列（制作书 66 件，两栏一屏 16 件、滚动减半）
+@onready var _list: GridContainer = $Root/Panel/Rows
 @onready var _hint: Label = $Root/Panel/Hint
 
 
@@ -121,9 +125,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match (event as InputEventKey).keycode:
 			KEY_UP, KEY_W:
-				_move(-1)
+				_move(-_cols())          # 上：跨一整行（两栏页 = -2）
 			KEY_DOWN, KEY_S:
-				_move(1)
+				_move(_cols())           # 下：跨一整行
+			KEY_LEFT, KEY_A:
+				_move(-1)                # 左：同行内走一格（单列页等同上一件）
+			KEY_RIGHT, KEY_D:
+				_move(1)                 # 右：同行内走一格
 			KEY_J, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				if _page == 0:
 					_forge_at_cursor()
@@ -135,11 +143,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _move(dir: int) -> void:
+## 当前页的列数：强化页 1、打造页 2（制作书两栏）
+func _cols() -> int:
+	return 2 if _page == 1 else 1
+
+
+## 光标移动。**步长 = dir × 列数**：上下键在两栏页跨一整行（±2），左右键走一格（±1）。
+## `_unhandled_input` 传进来的 dir 已经是「行方向 ±1」或「列方向 ±1×(1/列数)」的意图，
+## 这里统一按「绝对索引增量」处理（调用方给的就是增量本身）
+func _move(delta: int) -> void:
 	var n := _list_len()
 	if n <= 0:
 		return
-	_cursor = wrapi(_cursor + dir, 0, n)
+	_cursor = wrapi(_cursor + delta, 0, n)
 	_msg = ""
 	refresh()
 
@@ -264,7 +280,7 @@ func selected_craft_path() -> String:
 ## 行节点全部由代码建（与 HUD 面板同一套做法）：手写 tscn 的嵌套 parent 路径
 ## 容易静默丢节点，能省的静态节点就省掉
 func _build_rows() -> void:
-	for _i in ROWS:
+	for _i in CELLS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
 		row.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
@@ -289,6 +305,12 @@ func _build_rows() -> void:
 
 
 func refresh() -> void:
+	# 列数按页设：强化页 1 列（8 件），打造页 2 列（16 件）。
+	# 用不到的格子整行藏起来 —— GridContainer 只排 visible 的子节点，藏了就不占位
+	_list.columns = _cols()
+	var shown := ROWS * _cols()
+	for i in _rows.size():
+		_rows[i].visible = i < shown
 	if _page == 0:
 		_refresh_forge()
 	else:
@@ -361,8 +383,10 @@ func _refresh_craft() -> void:
 	var list := _craft_paths()
 	if _cursor >= list.size():
 		_cursor = maxi(list.size() - 1, 0)
-	var top := _scroll_top(list.size(), ROWS)
-	for r in ROWS:
+	# 两栏页：可见 16 格，滚动窗口的 top 落在整行边界（cols 的倍数），列才不会错位
+	var shown := ROWS * _cols()
+	var top := _grid_top(list.size(), _cols())
+	for r in shown:
 		var idx := top + r
 		var row := _rows[r]
 		var icon := row.get_child(0) as ItemIcon
@@ -411,6 +435,17 @@ func _scroll_top(total: int, rows: int) -> int:
 	if total <= rows:
 		return 0
 	return clampi(_cursor - rows / 2, 0, total - rows)
+
+
+## 两栏页的滚动窗口顶端（绝对索引）。**按「行」算再乘回列数** —— 保证 top 落在整行边界，
+## 列不错位，且光标所在行一定在可见窗口内。cols=1 时退化成与 _scroll_top 等价
+func _grid_top(total: int, cols: int) -> int:
+	var total_rows := int(ceil(float(total) / float(cols)))
+	if total_rows <= ROWS:
+		return 0
+	var cursor_row := _cursor / cols                       # 光标在第几行（整除）
+	var top_row := clampi(cursor_row - ROWS / 2, 0, total_rows - ROWS)
+	return top_row * cols
 
 
 func _hud() -> Node:

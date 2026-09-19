@@ -54,14 +54,16 @@ theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.72, 0.7, 0.66, 1)
 horizontal_alignment = 1
 
-[node name="Rows" type="VBoxContainer" parent="Root/Panel"]
+[node name="Rows" type="GridContainer" parent="Root/Panel"]
 layout_mode = 1
 anchor_bottom = 1.0
 offset_left = 14.0
 offset_top = 52.0
 offset_right = -14.0
 offset_bottom = -28.0
-theme_override_constants/separation = 0
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 0
+columns = 1
 
 [node name="Hint" type="Label" parent="Root/Panel"]
 layout_mode = 1
