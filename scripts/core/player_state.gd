@@ -49,14 +49,11 @@ const UID_SEP := "#"
 
 ## 成长曲线的唯一真相（等级上限 / 经验幂函数 / 每级给多少）
 const PROGRESSION_PATH := "res://data/progression.tres"
-## 强化的唯一真相（品质上限 / 成本递增 / 收益递减）
-const FORGE_PATH := "res://data/forge.tres"
 
 @onready var progression: ProgressionData = load(PROGRESSION_PATH) as ProgressionData
-@onready var _forge: ForgeData = load(FORGE_PATH) as ForgeData
 
 ## 经济域服务（元宝 / 买卖 / 商店货架）。逻辑住 EconomyService，本类只转发（门面）。
-## 见 ADR-0027：PlayerState 拆解的第一个域。懒加载 —— 与 _crafting 同一条路
+## 见 ADR-0027：PlayerState 拆解的第一个域。懒加载
 var _economy_svc: EconomyService = null
 
 func economy() -> EconomyService:
@@ -67,14 +64,30 @@ func economy() -> EconomyService:
 ## 等级上限（给界面用，省得到处 PlayerState.progression.level_cap）
 @onready var level_cap: int = progression.level_cap
 
+## 成长域服务（等级 / 经验 / flags）。懒加载
+var _growth_svc: GrowthService = null
 
-## 升到下一级需要的经验。**满级返回 0**，所以调用方比较之前先问 is_max()
+func growth() -> GrowthService:
+	if _growth_svc == null:
+		_growth_svc = GrowthService.new(self)
+	return _growth_svc
+
+## 战斗装配域服务（技能槽 / 消耗品次数 / 还魂丹）。懒加载
+var _loadout_svc: CombatLoadoutService = null
+
+func loadout() -> CombatLoadoutService:
+	if _loadout_svc == null:
+		_loadout_svc = CombatLoadoutService.new(self)
+	return _loadout_svc
+
+
+## 升到下一级需要的经验。**满级返回 0**。→ 成长域
 func exp_needed(level: int) -> int:
-	return progression.exp_needed(level)
+	return growth().exp_needed(level)
 
 
 func is_max_level() -> bool:
-	return progression.is_max(level)
+	return growth().is_max_level()
 
 
 var shards: int = 0
@@ -130,6 +143,12 @@ var _bonus: Dictionary = {"atk_flat": 0, "atk_pct": 0.0, "hp": 0, "def_flat": 0}
 ## 实例词条缓存：uid → {"atk","hp","def"} 已 roll 定的值。
 ## 不缓存的话，HUD 每帧刷新、每次 take_damage 都要重新 roll 一遍
 var _stat_cache: Dictionary = {}
+
+## 当前角色定义的缓存（物品域 ItemsService 用）。**留在容器上**：
+## test_m16 / test_charnet 直接写 `PlayerState._character = null` 强制重载，
+## 缓存必须在它们够得着的地方（服务通过 `_s._character` 读写同一份）
+var _character: CharacterData = null
+var _character_loaded_for := ""
 
 
 func reset_for_new_game() -> void:
@@ -211,19 +230,22 @@ func save_to() -> Dictionary:
 ## 见 docs/adr/0021-gear-v2-rework.md §2.5「删旧件、新 id、不写迁移」
 
 
-## 把 next_uid 推到「所有已存在 uid 的最大序号 + 1」之后。
-## 兜的是**存档里漏了 next_uid**（手改档、以后增字段时的兼容空白）——
-## 不兜的话新捡的装备会和档案里已有的 uid 撞号，两件东西从此共享强化等级
+# ── 物品域（逻辑 → ItemsService，ADR-0027；下面都是薄门面转发）────────
+# equipped / bag / forge / next_uid / _bonus / _stat_cache 数据字段仍住本容器
+# （进存档、被 hud/forge_panel/stage 直接读写）
+
+## 物品域服务（装备实例 / 背包 / 装备栏 / 词条聚合 / 武器门）。懒加载
+var _items_svc: ItemsService = null
+
+func items() -> ItemsService:
+	if _items_svc == null:
+		_items_svc = ItemsService.new(self)
+	return _items_svc
+
+
+## 把 next_uid 推到最大序号 + 1 之后（读档兜底）。→ 物品域
 func _ensure_uid_counter() -> void:
-	var max_seen := 0
-	var all: Array = bag.duplicate()
-	for s in ItemData.SLOT_IDS:
-		all.append(equipped_uid(s))
-	for u in all:
-		var i := str(u).find(UID_SEP)
-		if i >= 0:
-			max_seen = maxi(max_seen, int(str(u).substr(i + 1)))
-	next_uid = maxi(next_uid, max_seen + 1)
+	items().ensure_uid_counter()
 
 
 func _empty_slots() -> Array:
@@ -233,97 +255,61 @@ func _empty_slots() -> Array:
 	return out
 
 
-# ── 装备实例 id ────────────────────────────────────────────────
-
-## 新实例的 uid。序号全局递增，不按路径分 —— 只要在同一份存档里唯一就够了
+# ── 装备实例 id（→ 物品域）────────────────────────────────────
 func make_uid(path: String) -> String:
-	var uid := "%s%s%d" % [path, UID_SEP, next_uid]
-	next_uid += 1
-	return uid
+	return items().make_uid(path)
 
-
-## uid → 资源路径。**没有 # 的串原样返回** ——
-## 存档里的 uid 一定是 `路径#序号` 的形状（make_uid 生成），
-## 这里不特殊处理「纯路径」，那只是同一个字符串函数的自然结果
 func path_of(uid: String) -> String:
-	var i := uid.find(UID_SEP)
-	return uid if i < 0 else uid.substr(0, i)
+	return items().path_of(uid)
 
-
-## uid → 装备数据。坏路径返回 null（不崩）
 func item_of(uid: String) -> ItemData:
-	if uid.is_empty():
-		return null
-	return load(path_of(uid)) as ItemData
+	return items().item_of(uid)
 
 
-# ── 强化 ───────────────────────────────────────────────────────
+# ── 强化（逻辑 → ForgeService，ADR-0027；下面都是薄门面转发）──────
+# forge / shards / materials / blueprints 数据字段仍住本容器（进存档、被 stage.gd 直接读写）
 
-## 这件装备练到几级了（没练过 = 0）
+## 锻造域服务（强化 / 打造 / 分解 / 制书）。懒加载
+var _forge_svc: ForgeService = null
+
+func forge_svc() -> ForgeService:
+	if _forge_svc == null:
+		_forge_svc = ForgeService.new(self)
+	return _forge_svc
+
+
 func forge_level(uid: String) -> int:
-	return int(forge.get(uid, 0))
+	return forge_svc().forge_level(uid)
 
-
-## 这件装备能练到几级（按品质）。不是装备资源就返回 0
 func forge_max(uid: String) -> int:
-	var it := item_of(uid)
-	return 0 if it == null else _forge.max_for_tier(int(it.tier))
+	return forge_svc().forge_max(uid)
 
-
-## 从当前等级再练一级要花多少精铁
 func forge_cost(uid: String) -> int:
-	return _forge.cost_at_level(forge_level(uid))
+	return forge_svc().forge_cost(uid)
 
-
-## 这件装备的强化贡献的攻击加成（已含收益递减）
 func forge_atk(uid: String) -> float:
-	return _forge.atk_bonus_at(forge_level(uid))
+	return forge_svc().forge_atk(uid)
 
-
-## 练到 level 级时总共给多少攻击加成（**不看具体哪件**）。
-## 面板要显示「再练一级能多多少」，断言要验「每级给的比上一级少」—— 两条都需要它
 func forge_atk_at(level: int) -> float:
-	return _forge.atk_bonus_at(level)
-
+	return forge_svc().forge_atk_at(level)
 
 func forge_is_maxed(uid: String) -> bool:
-	return forge_level(uid) >= forge_max(uid)
+	return forge_svc().forge_is_maxed(uid)
 
-
-## 现在能不能强化这一件（没到顶 + 精铁够）
 func can_forge(uid: String) -> bool:
-	return not uid.is_empty() and not forge_is_maxed(uid) and shards >= forge_cost(uid)
+	return forge_svc().can_forge(uid)
 
-
-## 强化一级。花掉精铁、写进 forge 表、重算属性并发信号。
-## 返回 true = 成功了；false = 到顶了 / 精铁不够 / 不是装备
 func forge_once(uid: String) -> bool:
-	if not can_forge(uid):
-		return false
-	shards -= forge_cost(uid)
-	forge[uid] = forge_level(uid) + 1
-	_recalc_bonus()
-	equipment_changed.emit()
-	return true
+	return forge_svc().forge_once(uid)
+
+func forgeable_uids() -> Array:
+	return forge_svc().forgeable_uids()
 
 
-## 摆回实例计数器（读档用）。直接写字段也行，但这个方法会顺手跟已有的 uid 取大值 ——
-## 手改过档 / 旧档漏了 next_uid 时，这是最后一道兜底
+## 摆回实例计数器（读档用）。**uid 管理是物品域的事，留在容器上**（Phase 3 物品域会收）
 func set_uid_counter(n: int) -> void:
 	next_uid = maxi(n, 1)
 	_ensure_uid_counter()
-
-
-## 所有能强化的装备（已装备的 4 件在前，背包在后），元素是 uid。
-## 铁匠铺的列表就用它 —— 顺序稳定，光标不会跳
-func forgeable_uids() -> Array:
-	var out: Array = []
-	for s in ItemData.SLOT_IDS:
-		var uid := equipped_uid(s)
-		if not uid.is_empty():
-			out.append(uid)
-	out.append_array(bag)
-	return out
 
 
 # ── 元宝（商店经济，计划 §3.7）────────────────────────────────
@@ -355,138 +341,52 @@ func sell_item(uid: String) -> int:
 	return economy().sell_item(uid)
 
 
-# ── 材料与打造（批 6 · 回收闭环，原则 5.5）────────────────────
-
-## 打造/强化的经济数据（懒加载 —— 测试与开局都未必用到）
-var _crafting: CraftingData = null
-var _disassemble: DisassembleData = null
-
-const CRAFTING_PATH := "res://data/economy/crafting.tres"
-const DISASSEMBLE_PATH := "res://data/economy/disassemble.tres"
+# ── 材料与打造（逻辑 → ForgeService，ADR-0027；下面都是薄门面转发）────
 
 ## 材料的元 id。**精铁就是 shards**（强化主料的唯一真相，不搬家 ——
-## 材料字典里没有它，靠 MAT_REFINED_IRON 这个 id 转发到 shards）
+## 材料字典里没有它，靠 MAT_REFINED_IRON 这个 id 转发到 shards）。
+## **const 留在容器上**：外部 hud.gd 直接读 `PlayerState.MAT_REFINED_IRON`（const 不能转发）
 const MAT_REFINED_IRON := &"mat_refined_iron"
 
 
-## 四种稀有材料的持有量：id → 数量。精铁不在里面（见 MAT_REFINED_IRON）
+## 四种稀有材料的持有量：id → 数量。精铁不在里面（见 MAT_REFINED_IRON）。
+## **数据字段留容器**（进存档、被 ForgeService 与 stage.gd 读写）
 var materials: Dictionary = {}
 
-## 已到手的**逐件制书**（装备资源路径数组）。神拍板：制书不是「档位」的 ——
-## 打造寒月剑要「寒月剑制作书」，具体到每一件；一本档位书解锁 22 件
-## 等于把 66 件神装一次全放出来，打造就没有「下一件目标」了。
-## 存装备路径而不是另编制书 id：路径本身就是那件装备的唯一键，
-## 打造页 / 商店 / 掉落引用的是同一串，不会出现两套 id 对不上的事
+## 已到手的**逐件制书**（装备资源路径数组）。制书是逐件的（不是档位），
+## 存装备路径本身当唯一键，打造页 / 商店 / 掉落引用同一串。**数据字段留容器**
 var blueprints: Array = []
 
 
 func crafting() -> CraftingData:
-	if _crafting == null:
-		_crafting = load(CRAFTING_PATH) as CraftingData
-	return _crafting
-
+	return forge_svc().crafting()
 
 func disassemble_table() -> DisassembleData:
-	if _disassemble == null:
-		_disassemble = load(DISASSEMBLE_PATH) as DisassembleData
-	return _disassemble
+	return forge_svc().disassemble_table()
 
-
-## 某种材料的持有量。精铁转发 shards，其余查 materials
 func material_count(id: StringName) -> int:
-	return shards if id == MAT_REFINED_IRON else int(materials.get(String(id), 0))
+	return forge_svc().material_count(id)
 
-
-## 加材料。数量可为负吗？不 —— 扣材料一律走 pay_materials（原子检查），这里只加
 func add_material(id: StringName, n: int) -> void:
-	if n <= 0:
-		return
-	if id == MAT_REFINED_IRON:
-		shards += n
-	else:
-		var k := String(id)
-		materials[k] = int(materials.get(k, 0)) + n
+	forge_svc().add_material(id, n)
 
-
-## 原子付料：**先验够不够、再一次扣清** —— 半路断货的扣一半是最难看的 bug。
-## 返回 false 时一个子都不会动。精铁那份转给 shards
 func pay_materials(cost: Dictionary) -> bool:
-	for id in cost:
-		if material_count(StringName(String(id))) < int(cost[id]):
-			return false
-	for id in cost:
-		var k := String(id)
-		var n := int(cost[id])
-		if id == String(MAT_REFINED_IRON):
-			shards -= n
-		else:
-			materials[k] = int(materials.get(k, 0)) - n
-	return true
+	return forge_svc().pay_materials(cost)
 
-
-## 干跑版：只验够不够，一分不动。界面在「能不能造」的着色与提示上用它 ——
-## 刷新一帧跑一次真扣款就成事故了
 func pay_materials_dry_run(cost: Dictionary) -> bool:
-	for id in cost:
-		if material_count(StringName(String(id))) < int(cost[id]):
-			return false
-	return true
+	return forge_svc().pay_materials_dry_run(cost)
 
-
-## 分解一件**背包里的**装备 → 材料（按档；强化等级不返还 —— 见 disassemble.tres 注）。
-## 返回产量字典（空 = 拆不了：不在包里 / 资源丢失 / 这个档没登记产量）。
-## 与「出售」互不兑换（原则 5.1）：卖走元宝、拆走材料，玩家按缺什么选
 func disassemble(uid: String) -> Dictionary:
-	if not bag.has(uid):
-		return {}
-	var it := item_of(uid)
-	if it == null:
-		return {}
-	var yld: Dictionary = disassemble_table().yield_for(int(it.tier))
-	if yld.is_empty():
-		return {}
-	_remove_from_bag(uid)
-	for id in yld:
-		add_material(StringName(String(id)), int(yld[id]))
-	equipment_changed.emit()
-	return yld
+	return forge_svc().disassemble(uid)
 
-
-## 打造：材料 + **这一件**的制书 → 一件**全新实例**进背包。
-## 返回新 uid（空串 = 造不了；原因只有调用方需要时才查 —— 界面上逐条说）：
-## 没这本书 / 材料不够 / 路径不是装备。打造不做「缺一件也造，回头补」——
-## 那等于让玩家欠账，欠账清单是另一套系统
 func craft(path: String) -> String:
-	var it := load(path) as ItemData
-	if it == null:
-		return ""
-	if not has_blueprint(path):
-		return ""
-	if not pay_materials(crafting().cost_for(int(it.tier))):
-		return ""
-	return add_item(path)
+	return forge_svc().craft(path)
 
-
-## 买制书（逐件）。价格按**装备的档**走（CraftingData.blueprint_price，
-## 商店面板标同一份）—— 书是逐件的，钱仍是档位价：同一档的打造难度一样，
-## 没理由「寒月剑的书比破军剑的贵」。
-## 已有这本书再买 = 白花钱，直接拒绝 —— 「重复付费解锁已拥有的东西」
-## 不该是可能的事故
 func unlock_blueprint(path: String) -> bool:
-	if has_blueprint(path):
-		return false
-	var it := load(path) as ItemData
-	if it == null:
-		return false
-	var price := int(crafting().blueprint_price.get(str(int(it.tier)), 0))
-	if price <= 0 or not spend_gold(price):
-		return false
-	blueprints.append(path)
-	return true
-
+	return forge_svc().unlock_blueprint(path)
 
 func has_blueprint(path: String) -> bool:
-	return blueprints.has(path)
+	return forge_svc().has_blueprint(path)
 
 
 # ── 商店货架（刷新逻辑 → EconomyService，ADR-0027）───────────────
@@ -537,42 +437,18 @@ var revive_tokens: int = 0
 var revive_bought: Dictionary = {}
 
 
-## 用一枚还魂丹。返回 false = 没丹了（调用方别把按钮按出「没反应」）
+## 还魂丹（逻辑 → CombatLoadoutService，ADR-0027；下面都是薄门面转发）
 func use_revive_token() -> bool:
-	if revive_tokens <= 0:
-		return false
-	revive_tokens -= 1
-	return true
+	return loadout().use_revive_token()
 
-
-## 进图补给：每张地图**第一次进**送 2 枚（进图就领，与通关无关 ——
-## 「首通不附带奖励」的红线不能碰，进图补给是唯一合规的白送挂点）。
-## 返回 true = 这次真的发了（第一次进）
 func grant_map_supply(map_id: StringName) -> bool:
-	var key := "revive_supply_%s" % map_id
-	if flags.has(key):
-		return false
-	flags[key] = true
-	revive_tokens += 2
-	return true
+	return loadout().grant_map_supply(map_id)
 
-
-## 商店买还魂丹（限购：每图 5 枚）。map_id 用**玩家最近进的图** ——
-## 人在城镇买，账记到他要打的图上
 func buy_revive_token(map_id: StringName) -> bool:
-	var key := String(map_id)
-	var bought := int(revive_bought.get(key, 0))
-	if bought >= 5:
-		return false
-	if not spend_gold(REVIVE_PRICE):
-		return false
-	revive_bought[key] = bought + 1
-	revive_tokens += 1
-	return true
-
+	return loadout().buy_revive_token(map_id)
 
 func revive_bought_in(map_id: StringName) -> int:
-	return int(revive_bought.get(String(map_id), 0))
+	return loadout().revive_bought_in(map_id)
 
 
 ## 还魂丹定价（200 元宝）。放这儿是因为唯一动它的两个界面（商店标价 / 买）
@@ -610,325 +486,120 @@ const POTION_MP_PRICE := 50
 const SUPPLY_PRICE := 160
 
 
-## 还剩几次
+## 消耗品次数（逻辑 → CombatLoadoutService，ADR-0027；下面都是薄门面转发）
 func potion_charges(kind: StringName) -> int:
-	return int(potions.get(String(kind), 0))
+	return loadout().potion_charges(kind)
 
-
-## 一种消耗品的单价。**认不出的 kind 要炸**，不许静默按另一种的价算
 func potion_price(kind: StringName) -> int:
-	match kind:
-		POTION_HP:
-			return POTION_HP_PRICE
-		POTION_MP:
-			return POTION_MP_PRICE
-	push_error("PlayerState: 认不出的消耗品种类 %s" % str(kind))
-	return 0
+	return loadout().potion_price(kind)
 
-
-## 加次数（商店买，以后别的来源也走这里）
 func add_potion_charges(kind: StringName, n: int) -> void:
-	if n <= 0:
-		return
-	potions[String(kind)] = potion_charges(kind) + n
+	loadout().add_potion_charges(kind, n)
 
-
-## 用掉一次。返回 false = 没次数了 —— 调用方**必须**把这件事说出来（不许静默）
 func use_potion(kind: StringName) -> bool:
-	var left := potion_charges(kind)
-	if left <= 0:
-		return false
-	potions[String(kind)] = left - 1
-	return true
+	return loadout().use_potion(kind)
 
-
-## 买一份符（回血 / 回蓝）
 func buy_potion(kind: StringName) -> bool:
-	if not spend_gold(potion_price(kind)):
-		return false
-	add_potion_charges(kind, POTION_CHARGES)
-	return true
+	return loadout().buy_potion(kind)
 
-
-## 买补给包：**一次扣钱、血蓝各加 5 次**。
-## 不做成「扣两次钱」—— 那会出现「付了第一笔、第二笔不够」的半成交状态
 func buy_supply() -> bool:
-	if not spend_gold(SUPPLY_PRICE):
-		return false
-	add_potion_charges(POTION_HP, SUPPLY_CHARGES)
-	add_potion_charges(POTION_MP, SUPPLY_CHARGES)
-	return true
+	return loadout().buy_supply()
 
 
 # ── 主线进度标记 ───────────────────────────────────────────────
 
+## 主线进度标记。→ 成长域
 func set_flag(name: StringName) -> void:
-	if name == &"":
-		return
-	flags[String(name)] = true
-
+	growth().set_flag(name)
 
 func has_flag(name: StringName) -> bool:
-	return name != &"" and flags.has(String(name))
+	return growth().has_flag(name)
 
 
-# ── 技能栏 ─────────────────────────────────────────────────────
+# ── 技能栏（逻辑 → CombatLoadoutService，ADR-0027；下面都是薄门面转发）──
 
-## 取某个槽位的技能（空槽返回 null）
 func skill_at(i: int) -> SkillData:
-	if i < 0 or i >= skill_slots.size():
-		return null
-	var p := str(skill_slots[i])
-	return load(p) as SkillData if not p.is_empty() else null
-
+	return loadout().skill_at(i)
 
 func skill_paths() -> Array:
-	return skill_slots.duplicate()
-
+	return loadout().skill_paths()
 
 func carries(path: String) -> bool:
-	return skill_slots.has(path)
+	return loadout().carries(path)
 
-
-## 把技能装进指定槽位。同一个技能已经在别的槽里的话先摘掉 ——
-## 不然会出现「同一个技能占两格、按两个键放同一招」这种明显是 bug 的配置
 func set_skill_slot(i: int, path: String) -> void:
-	if i < 0 or i >= SKILL_SLOT_COUNT:
-		return
-	var idx := skill_slots.find(path)
-	if idx >= 0 and idx != i:
-		skill_slots[idx] = ""
-	skill_slots[i] = path
-	skills_changed.emit()
-
+	loadout().set_skill_slot(i, path)
 
 func clear_skill_slot(i: int) -> void:
-	if i < 0 or i >= SKILL_SLOT_COUNT:
-		return
-	skill_slots[i] = ""
-	skills_changed.emit()
-
+	loadout().clear_skill_slot(i)
 
 func clear_skill_slot_by_path(path: String) -> void:
-	var idx := skill_slots.find(path)
-	if idx >= 0:
-		clear_skill_slot(idx)
+	loadout().clear_skill_slot_by_path(path)
 
-
-## 自动补位：把「已解锁但没带着」的技能依次填进空槽。
-## 只在有空槽时填 —— 槽满了以后换哪个，是玩家的决定，不是系统的
 func auto_fill_slots(available: Array) -> bool:
-	var changed := false
-	for path in available:
-		var p := str(path)
-		if p.is_empty() or carries(p):
-			continue
-		var empty := skill_slots.find("")
-		if empty < 0:
-			break
-		skill_slots[empty] = p
-		changed = true
-	if changed:
-		skills_changed.emit()
-	return changed
+	return loadout().auto_fill_slots(available)
 
 
-# ── 装备栏操作 ─────────────────────────────────────────────────
-
-## 当前角色的定义（缓存住 —— 目录扫描不必每次装备都跑一遍）
-var _character: CharacterData = null
-var _character_loaded_for := ""
-
+# ── 装备栏操作（逻辑 → ItemsService，ADR-0027；下面都是薄门面转发）────
 
 func character_def() -> CharacterData:
-	if _character == null or _character_loaded_for != character_id:
-		_character = CharacterData.by_id(StringName(character_id))
-		if _character == null:
-			_character = CharacterData.default_character()
-		_character_loaded_for = character_id
-	return _character
+	return items().character_def()
 
-
-## 这件装备当前角色能不能穿。武器看类型匹配；防具/饰品不限
 func can_equip(item: ItemData) -> bool:
-	if item == null:
-		return false
-	if item.weapon_type == &"":
-		return true
-	return item.weapon_type == character_def().weapon_type
+	return items().can_equip(item)
 
-## 某槽位穿着的装备 uid（空槽返回空串）
 func equipped_uid(slot: StringName) -> String:
-	return str(equipped.get(String(slot), ""))
+	return items().equipped_uid(slot)
 
-
-## 取某个槽位穿着的装备。空槽返回 null
 func item_at(slot: StringName) -> ItemData:
-	return item_of(equipped_uid(slot))
+	return items().item_at(slot)
 
-
-## 按槽位顺序取「当前穿着的全部装备」，空槽是 null（界面按顺序画四行）
 func equipped_list() -> Array:
-	var out: Array = []
-	for s in ItemData.SLOT_IDS:
-		out.append(item_at(s))
-	return out
+	return items().equipped_list()
 
-
-## 捡到一件装备：发一个新实例 id 进背包。返回新 uid；空串 = 这不是一件装备
 func add_item(path: String) -> String:
-	if not (load(path) is ItemData):
-		push_warning("PlayerState: 不是装备资源: %s" % path)
-		return ""
-	var uid := make_uid(path)
-	bag.append(uid)
-	equipment_changed.emit()
-	return uid
+	return items().add_item(path)
 
-
-## 穿上一件背包里的装备（参数是 uid）。返回被替换下来的那件 uid（"" = 原来空槽）。
-## 换下来的自动回背包 —— 玩家不该因为换装而丢东西。
-##
-## **武器类型是唯一的门**（M4 第二角色）：武器必须与当前角色的 weapon_type 匹配
-## —— 弓手捡了铁剑可以卖钱，但不能挥。防具/饰品（weapon_type 为空）不限
 func equip(uid: String) -> String:
-	var item := item_of(uid)
-	if item == null:
-		return ""
-	if not can_equip(item):
-		return ""
-	_remove_from_bag(uid)
-	var slot := String(item.slot_id())
-	var old := equipped_uid(StringName(slot))
-	if not old.is_empty():
-		bag.append(old)          # 换下来的回背包
-	equipped[slot] = uid
-	_recalc_bonus()
-	equipment_changed.emit()
-	return old
+	return items().equip(uid)
 
-
-## 卸下某个槽位，装备回背包。返回卸下的 uid（"" = 本来就空着）
 func unequip(slot: StringName) -> String:
-	var key := String(slot)
-	var uid := str(equipped.get(key, ""))
-	if uid.is_empty():
-		return ""
-	equipped.erase(key)
-	bag.append(uid)
-	_recalc_bonus()
-	equipment_changed.emit()
-	return uid
+	return items().unequip(slot)
 
-
-## 背包里去掉某件（穿上时调）。找不到就什么都不做 ——
-## 老档里的装备可能是「直接摆进装备栏」的，不在背包里
+## 背包里去掉某件（穿上时调）。跨域服务（经济/锻造）也调它 → 物品域
 func _remove_from_bag(uid: String) -> void:
-	var idx := bag.find(uid)
-	if idx >= 0:
-		bag.remove_at(idx)
+	items()._remove_from_bag(uid)
 
-
-## 全部装备的词条总和（含各件的强化加成）。形状见 `_bonus` 的声明处
 func bonus_total() -> Dictionary:
-	return _bonus
+	return items().bonus_total()
 
-
-## 这件装备**实例**的平铺词条（已定的值）：{"atk": 点, "hp": 点, "def": 点}
-##
-## ── 为什么结果不进存档 ────────────────────────────────────────
-## 用 uid 的哈希当随机种子 —— **同一个实例每次算出来完全一样**。
-## 于是「逐件随机」（ADR-0017）既不需要新的存档结构、也不会因为读档或换场景而变；
-## 断言也能直接对账（与 audio.gd 用哈希生成噪声同一个理由：可复现才拿得住）。
-## 区间是 0/0 的装备（防具只有防御那种）取到 0，不影响别的轨道
 func stat_of(uid: String) -> Dictionary:
-	if uid.is_empty():
-		return {"atk": 0, "hp": 0, "def": 0}
-	if _stat_cache.has(uid):
-		return _stat_cache[uid]
-	var it := item_of(uid)
-	var out: Dictionary
-	if it == null:
-		out = {"atk": 0, "hp": 0, "def": 0}
-	else:
-		var rng := RandomNumberGenerator.new()
-		rng.seed = hash(uid)
-		out = it.roll(rng)
-	_stat_cache[uid] = out
-	return out
+	return items().stat_of(uid)
 
-
-## 直接摆入装备栏、背包与强化表（读档用）。摆完重算词条并发信号让玩家节点跟上
+## 直接摆入装备栏、背包与强化表（读档用）。→ 物品域
 func set_equipment(e: Dictionary, b: Array, f: Dictionary = {}) -> void:
-	equipped = e.duplicate()
-	bag = b.duplicate()
-	forge = f.duplicate()
-	_ensure_uid_counter()
-	_recalc_bonus()
-	equipment_changed.emit()
+	items().set_equipment(e, b, f)
+
+## 词条重算。跨域服务（锻造 forge_once）也调它 → 物品域
+func _recalc_bonus() -> void:
+	items()._recalc_bonus()
 
 
 ## 比例类属性的硬上限（设计原则 4.2）。**所有比例属性都必须从这儿过一道** ——
 ## 将来加暴击 / 闪避 / 穿透时，把上限加进这个 match，别在各自的计算里各写一份。
-## 未知的比例属性一律夹到 [0, 1]：宁可保守，也不要一个没设上限的百分比流出去
+## 未知的比例属性一律夹到 [0, 1]：宁可保守，也不要一个没设上限的百分比流出去。
+## **暂留容器上**：无人外部调用、域归属未定（既非纯物品也非纯战斗），Phase 6 再议
 ##
 ## ⚠️ 2026-09-18（v2）：**防御已经不是比例属性了**。它现在是平铺点数，
 ## 上限改由 `Health.armor_reduction()` 的护甲曲线自己卡（def=150 → 0.6）。
-## 所以这里删掉了 `&"def"` 分支 —— **别再往这儿送 def**，那会变成「夹 0.6 但单位是点」
-## 这种静默的错。（4.2「比例属性要有天花板」这条本身没变，只是天花板搬了家）
 func clamp_ratio(key: StringName, value: float) -> float:
 	match key:
 		_:
 			return clampf(value, 0.0, 1.0)
 
 
-func _recalc_bonus() -> void:
-	var atk_flat := 0
-	var atk_pct := 0.0
-	var hp := 0
-	var def_flat := 0
-	for s in ItemData.SLOT_IDS:
-		var uid := equipped_uid(s)
-		if uid.is_empty():
-			continue
-		var st := stat_of(uid)
-		atk_flat += int(st.get("atk", 0))
-		hp += int(st.get("hp", 0))
-		def_flat += int(st.get("def", 0))
-		atk_pct += forge_atk(uid)                 # 强化加成叠进同一个乘区（4.1）
-	var prog := progression
-	_bonus = {
-		# 平铺攻击**不进软上限**：能穿的件数是固定的（8 槽各 1 件），每件的上限由档位封死
-		# —— 压根不存在「无限堆叠」这件事（ADR-0021 §2.6）
-		"atk_flat": atk_flat,
-		# 强化% 仍然要压：单件练到顶是 +72.8%，8 件叠起来 +582%。
-		# knee/cap 沿用 1.0/1.0（量级没变，还是百分比）。
-		# ⚠️ **别把这条曲线套到平铺攻击上** —— 48 点攻击走 soften(x,1,1) 会变成 1.98
-		"atk_pct": prog.soften(atk_pct, prog.soft_knee_atk, prog.soft_cap_atk),
-		# 平铺生命同理不进软上限：8 件是固定件数，档位也封了每件的上限
-		"hp": hp,
-		# 平铺防御不进这里 —— 它走 Health 的护甲曲线，在那里卡 0.6（4.2 的上限仍只有一处）
-		"def_flat": def_flat,
-	}
-
-
 # ── 升级 ───────────────────────────────────────────────────────
 
-## 加经验，够数就升级（可连升）。返回升了几级。
-##
-## **满级之后不再累积经验**（直接丢），不是「攒着但没用」——
-## 后者会让 HUD 上的经验条在满级后继续涨，玩家以为还能升。
+## 加经验，够数就升级（可连升）。返回升了几级。→ 成长域
 func add_exp(amount: int) -> int:
-	if amount <= 0 or is_max_level():
-		return 0
-	exp += amount
-	var ups := 0
-	while not is_max_level() and exp >= exp_needed(level):
-		exp -= exp_needed(level)
-		level += 1
-		ups += 1
-		level_up.emit(level)
-	if is_max_level():
-		exp = 0
-	exp_changed.emit(exp)
-	return ups
+	return growth().add_exp(amount)
