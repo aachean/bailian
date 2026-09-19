@@ -70,14 +70,41 @@ func forge_cost(uid: String) -> int:
 	return _forge_data().cost_at_level(forge_level(uid))
 
 
-## 这件装备的强化贡献的攻击加成（已含收益递减）
-func forge_atk(uid: String) -> float:
-	return _forge_data().atk_bonus_at(forge_level(uid))
+## 这件装备当前强化等级的**倍率**（0.728 = 72.8%，已含收益递减）。ADR-0029
+func forge_mult(uid: String) -> float:
+	return _forge_data().mult_at(forge_level(uid))
 
 
-## 练到 level 级时总共给多少攻击加成（不看具体哪件）
-func forge_atk_at(level: int) -> float:
-	return _forge_data().atk_bonus_at(level)
+## 练到 level 级时的倍率（不看具体哪件）。面板/断言验「每级给的比上一级少」
+func forge_mult_at(level: int) -> float:
+	return _forge_data().mult_at(level)
+
+
+## 装备栏里**武器那一件**强化贡献的攻击%（进 damage_scale 乘区）。
+## ADR-0029：武器强化 = 唯一的攻击杠杆 —— 只算武器这一件，不再 8 槽求和。
+## 没穿武器 = 0
+func weapon_atk_pct() -> float:
+	var wuid: String = _s.equipped_uid(ItemData.SLOT_IDS[ItemData.Slot.WEAPON])
+	return 0.0 if wuid.is_empty() else forge_mult(wuid)
+
+
+## 这件装备**强化后**的实际属性 {"atk","hp","def"}。
+## ADR-0029 的分工：
+##   - 攻击（atk）**不在这里放大** —— 武器的攻击杠杆走 weapon_atk_pct()（乘区），
+##     护甲/饰品本就 atk=0。所以 atk 原样返回基础值。
+##   - hp / def **按 forge_mult 放大自己**：护甲/饰品强化 = 变肉。向下取整。
+## 只有一处算「强化后是多少」—— 词条聚合与面板显示都从这取，不会两处漂
+func forged_stat_of(uid: String) -> Dictionary:
+	var base: Dictionary = _s.stat_of(uid)      # ← 跨域：实例基础词条归物品域
+	var m := 1.0 + forge_mult(uid)
+	# **用 round 不用 int（截断）**：低词条件（tier0 头盔 hp=5）×1.15=5.75，截断成 5 →
+	# 强化了却「按了没反应」，正是本项目最恨的静默失败；round → 6，一眼看得见涨了。
+	# 截断还有个坑：数值跟着 roll 走（同型号另一件 hp=7 就涨得动），测试会时绿时红
+	return {
+		"atk": int(base.get("atk", 0)),          # 攻击不在此放大（见上）
+		"hp": int(round(base.get("hp", 0) * m)),
+		"def": int(round(base.get("def", 0) * m)),
+	}
 
 
 func forge_is_maxed(uid: String) -> bool:

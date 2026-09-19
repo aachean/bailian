@@ -13,7 +13,7 @@ extends RefCounted
 ## **本域自己拥有**：角色定义缓存 `_character` / `_character_loaded_for`（纯派生，无人外部读）。
 ##
 ## ── 跨域调用（走对方公开方法）────────────────────────────────
-##   锻造域：forge_atk（词条聚合要把强化% 叠进同一个乘区，4.1）
+##   锻造域：forged_stat_of（每件强化后 hp/def）+ weapon_atk_pct（武器攻击杠杆）—— ADR-0029
 
 const UID_SEP := "#"
 
@@ -188,28 +188,32 @@ func stat_of(uid: String) -> Dictionary:
 	return out
 
 
+## 词条聚合。ADR-0029 的强化分工：
+##   - atk_flat = Σ各件基础攻击（护甲/饰品 atk=0，实际只有武器有）——**强化不放大它**。
+##   - hp / def_flat = Σ各件**强化后**的 hp/def（`_s.forged_stat_of` 放大自己）——护甲/饰品强化 = 变肉。
+##   - atk_pct = **武器那一件**的强化倍率（`_s.weapon_atk_pct`）—— 武器强化 = 唯一攻击杠杆，进 damage_scale。
+## 于是「强化头盔涨攻击」被结构性堵死：非武器件的 forge 只进 hp/def，永远碰不到攻击。
 func _recalc_bonus() -> void:
 	var atk_flat := 0
-	var atk_pct := 0.0
 	var hp := 0
 	var def_flat := 0
 	for s in ItemData.SLOT_IDS:
 		var uid: String = equipped_uid(s)
 		if uid.is_empty():
 			continue
-		var st := stat_of(uid)
+		var st: Dictionary = _s.forged_stat_of(uid)   # ← 跨域：强化后属性归锻造域（hp/def 已放大）
 		atk_flat += int(st.get("atk", 0))
 		hp += int(st.get("hp", 0))
 		def_flat += int(st.get("def", 0))
-		atk_pct += _s.forge_atk(uid)              # ← 跨域：强化% 叠进同一个乘区（4.1）
 	var prog = _s.progression
+	# 攻击杠杆只来自武器那一件（ADR-0029），不再 8 槽求和
+	var atk_pct: float = _s.weapon_atk_pct()
 	_s._bonus = {
-		# 平铺攻击**不进软上限**：能穿件数固定（8 槽各 1），每件上限由档位封死（ADR-0021 §2.6）
+		# 平铺攻击/生命/防御都是「强化后自身属性」之和，件数固定（8 槽各 1）、档位+强化封顶，不进软上限
 		"atk_flat": atk_flat,
-		# 强化% 仍要压：单件顶 +72.8%，8 件叠 +582%。knee/cap 沿用 1.0/1.0
-		# ⚠️ 别把这条曲线套到平铺攻击上 —— 48 点走 soften(x,1,1) 会变成 1.98
+		# 武器强化%仍过软上限：单件顶 +72.8%（<knee 1.0，实际不压）。留着以防将来调高武器曲线越过 1.0
 		"atk_pct": prog.soften(atk_pct, prog.soft_knee_atk, prog.soft_cap_atk),
 		"hp": hp,
-		# 平铺防御不进这里 —— 它走 Health 的护甲曲线，卡 0.6（4.2 的上限仍只有一处）
+		# 平铺防御走 Health 的护甲曲线，卡 0.6（4.2 的上限仍只有一处）
 		"def_flat": def_flat,
 	}

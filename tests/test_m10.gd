@@ -241,13 +241,13 @@ func _t10_cost_rises_with_level() -> void:
 ## 收益递减（设计原则 5.4 / 3.4）：每一级给的加成比上一级少。
 ## 用**一阶差分**验形状 —— 只看总量的话，线性叠加也「看起来在涨」
 func _t11_gain_falls_off_with_level() -> void:
-	var d1 := PlayerState.forge_atk_at(1) - PlayerState.forge_atk_at(0)
-	var d2 := PlayerState.forge_atk_at(2) - PlayerState.forge_atk_at(1)
-	var d3 := PlayerState.forge_atk_at(3) - PlayerState.forge_atk_at(2)
+	var d1 := PlayerState.forge_mult_at(1) - PlayerState.forge_mult_at(0)
+	var d2 := PlayerState.forge_mult_at(2) - PlayerState.forge_mult_at(1)
+	var d3 := PlayerState.forge_mult_at(3) - PlayerState.forge_mult_at(2)
 	_check("11", "强化收益递减：第 n 级给的加成少于第 n-1 级",
 		d1 > d2 and d2 > d3,
 		"Δ1=%.4f　Δ2=%.4f　Δ3=%.4f　（练满 8 级合计 +%.1f%%）" % [
-			d1, d2, d3, PlayerState.forge_atk_at(8) * 100.0])
+			d1, d2, d3, PlayerState.forge_mult_at(8) * 100.0])
 
 
 ## 强化等级与实例 id 都要过存档 —— 少一个就会出现
@@ -303,7 +303,8 @@ func _t13_old_save_is_refused() -> void:
 
 ## 强化加成必须真的进了伤害乘区 —— 面板写 +38% 而打出的数字没变，
 ## 就是设计原则 4.1 要防的那种「游戏在骗玩家」。
-## v2 起强化是**百分比**那一半（`atk_pct`），装备自己的攻击走 `atk_flat` 点数
+## ADR-0029：**武器**强化 = 唯一攻击杠杆，进 `atk_pct`（ITEM_FINE 是剑，强化它 atk_pct 该涨）。
+## 顺带钉住新模型的另一半：强化**头盔**只涨 hp/def、atk_pct 岿然不动（堵死「强化头盔涨攻击」）
 func _t14_forge_atk_joins_damage_pool() -> void:
 	PlayerState.reset_for_new_game()
 	PlayerState.shards = 100
@@ -313,10 +314,23 @@ func _t14_forge_atk_joins_damage_pool() -> void:
 	PlayerState.forge_once(uid)
 	var after: float = PlayerState.bonus_total().get("atk_pct", 0.0)
 	var gained := after - before
-	var expect := PlayerState.forge_atk_at(1)
-	_check("14", "强化加成进了伤害乘区（百分比那一半算上了）",
-		is_equal_approx(gained, expect),
-		"强化%% %.3f → %.3f（+%.3f，期望 +%.3f）" % [before, after, gained, expect])
+	var expect := PlayerState.forge_mult_at(1)
+	var weapon_ok: bool = is_equal_approx(gained, expect)
+
+	# 强化头盔：hp 该涨、atk_pct 不许动
+	var helm_uid: String = PlayerState.add_item("res://data/items/eq_u5934u76d4_0_u76aeu76d4.tres")
+	PlayerState.equip(helm_uid)
+	var hp_before: int = int(PlayerState.bonus_total().get("hp", 0))
+	var pct_before: float = PlayerState.bonus_total().get("atk_pct", 0.0)
+	PlayerState.forge_once(helm_uid)
+	var hp_after: int = int(PlayerState.bonus_total().get("hp", 0))
+	var pct_after: float = PlayerState.bonus_total().get("atk_pct", 0.0)
+	var helm_ok: bool = hp_after > hp_before and is_equal_approx(pct_before, pct_after)
+
+	_check("14", "武器强化→攻击杠杆(atk_pct)；头盔强化→只涨hp、攻击不动（ADR-0029）",
+		weapon_ok and helm_ok,
+		"武器 atk%% %.3f→%.3f（期望+%.3f）　头盔 hp %d→%d、atk%% %.3f→%.3f（该不变）" % [
+			before, after, expect, hp_before, hp_after, pct_before, pct_after])
 
 
 # ── 3.4 软上限 / 4.2 硬上限 ────────────────────────────────────

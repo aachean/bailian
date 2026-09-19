@@ -699,19 +699,26 @@ func _refresh_detail_panel(bag: Array, detail_idx: int) -> void:
 	var tier_names := ["普通", "精良", "优秀", "极品", "传说", "至尊"]
 	_detail_name.text = "%s\n%s" % [tr(it.name_key), tier_names[int(it.tier)]]
 	_detail_name.modulate = it.tier_color()
-	# 属性（实例已 roll 的值）+ 强化
+	# 属性 = **强化后的实际值**（ADR-0029：护甲/饰品的 hp/def 被强化放大）。
+	# 攻击栏对武器额外标出强化给的攻击%（武器强化=攻击杠杆），护甲不显示攻击。
+	# **不再显示「强化 +X%」那一坨**（用户 2026-09-19：挤地方、且对护甲是错的）
 	var lines: Array[String] = []
-	var st := PlayerState.stat_of(uid)
-	if int(st.get("atk", 0)) > 0:
-		lines.append("%s +%d" % [tr("STAT_ATK"), int(st.get("atk", 0))])
+	var st := PlayerState.forged_stat_of(uid)
+	var is_weapon: bool = it.slot == ItemData.Slot.WEAPON
+	if int(st.get("atk", 0)) > 0 or is_weapon:
+		var atk_line := "%s +%d" % [tr("STAT_ATK"), int(st.get("atk", 0))]
+		# 武器：把强化攻击杠杆并进攻击行（+N% 而不是单列一行「强化%」）
+		var wpct := int(round(PlayerState.forge_mult(uid) * 100.0))
+		if is_weapon and wpct > 0:
+			atk_line += " (+%d%%)" % wpct
+		lines.append(atk_line)
 	if int(st.get("hp", 0)) > 0:
 		lines.append("%s +%d" % [tr("STAT_HP"), int(st.get("hp", 0))])
 	if int(st.get("def", 0)) > 0:
 		lines.append("%s +%d" % [tr("STAT_DEF"), int(st.get("def", 0))])
 	var lv := PlayerState.forge_level(uid)
 	if lv > 0:
-		lines.append("%s +%d（%s +%d%%）" % [tr("UI_FORGE_TAG"), lv,
-			tr("STAT_FORGE"), int(round(PlayerState.forge_atk(uid) * 100.0))])
+		lines.append("%s +%d" % [tr("UI_FORGE_TAG"), lv])
 	lines.append("%s %d" % [tr("HUD_GOLD"), int(it.gold_price)])
 	# **「用不了」要说全**：格子上那道斜杠只是「有问题」，
 	# 这里回答「为什么、能拿它干什么」—— 光有符号没有句子，玩家还是得自己猜
@@ -765,28 +772,29 @@ func _item_name(it: ItemData) -> String:
 			return n
 
 
-## 一件装备的词条文本：「+2　攻+12　血+38　防+5　强化+36%」。
-## **数值取【实例已 roll 的值】而不是型号区间** —— 设计原则 4.1 要求面板上的加成
-## 必须等于这一件实际打出来的贡献，拿 min/max 显示就是骗人。
-## 开头的 `+N` 是强化等级、末尾的百分比是强化给的那一份（它仍然是百分比）。
+## 一件装备的词条文本：「+2　攻+12　血+38　防+5」。
+## **数值取【强化后的实际值】**（ADR-0029：护甲/饰品 hp/def 被强化放大）——
+## 设计原则 4.1 要求面板显示 == 实际贡献。开头 `+N` 是强化等级；
+## 武器额外在攻击后标 (+N%)（武器强化=攻击杠杆）。**不再单列「强化+X%」**（用户 2026-09-19）。
 ## 什么都没给时是「—」，不显示空白
 func _stat_text(uid: String, it: ItemData) -> String:
 	if it == null:
 		return ""
 	var parts: Array[String] = []
 	var lv := PlayerState.forge_level(uid)
-	var st := PlayerState.stat_of(uid)
-	var forge_pct := PlayerState.forge_atk(uid)
+	var st := PlayerState.forged_stat_of(uid)
 	if lv > 0:
 		parts.append("+%d" % lv)
 	if int(st.get("atk", 0)) > 0:
-		parts.append("%s+%d" % [tr("STAT_ATK"), int(st.get("atk", 0))])
+		var atk_part := "%s+%d" % [tr("STAT_ATK"), int(st.get("atk", 0))]
+		var wpct := int(round(PlayerState.forge_mult(uid) * 100.0))
+		if it.slot == ItemData.Slot.WEAPON and wpct > 0:
+			atk_part += "(+%d%%)" % wpct
+		parts.append(atk_part)
 	if int(st.get("hp", 0)) > 0:
 		parts.append("%s+%d" % [tr("STAT_HP"), int(st.get("hp", 0))])
 	if int(st.get("def", 0)) > 0:
 		parts.append("%s+%d" % [tr("STAT_DEF"), int(st.get("def", 0))])
-	if forge_pct > 0.0:
-		parts.append("%s+%d%%" % [tr("STAT_FORGE"), int(round(forge_pct * 100.0))])
 	return "—" if parts.is_empty() else "　".join(parts)
 
 

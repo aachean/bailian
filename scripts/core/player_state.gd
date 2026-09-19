@@ -287,11 +287,19 @@ func forge_max(uid: String) -> int:
 func forge_cost(uid: String) -> int:
 	return forge_svc().forge_cost(uid)
 
-func forge_atk(uid: String) -> float:
-	return forge_svc().forge_atk(uid)
+func forge_mult(uid: String) -> float:
+	return forge_svc().forge_mult(uid)
 
-func forge_atk_at(level: int) -> float:
-	return forge_svc().forge_atk_at(level)
+func forge_mult_at(level: int) -> float:
+	return forge_svc().forge_mult_at(level)
+
+## 装备栏武器那件强化贡献的攻击%（唯一攻击杠杆，进 damage_scale）。→ 锻造域（ADR-0029）
+func weapon_atk_pct() -> float:
+	return forge_svc().weapon_atk_pct()
+
+## 这件装备强化后的实际属性（hp/def 已放大，atk 原样）。→ 锻造域（ADR-0029）
+func forged_stat_of(uid: String) -> Dictionary:
+	return forge_svc().forged_stat_of(uid)
 
 func forge_is_maxed(uid: String) -> bool:
 	return forge_svc().forge_is_maxed(uid)

@@ -27,8 +27,11 @@ extends Resource
 @export var base_cost: int = 3
 @export var cost_growth: float = 1.6
 
-@export_group("收益（总加成 = per × (1 - falloff^级数) / (1 - falloff)）")
-## 第 1 级的攻击加成
+@export_group("收益（总倍率 = per × (1 - falloff^级数) / (1 - falloff)）")
+## 第 1 级的倍率增量。**语义（ADR-0029，2026-09-19）**：
+## 武器强化 → 这个值当**攻击%**（进 damage_scale 乘区，武器是唯一攻击杠杆）；
+## 护甲/饰品强化 → 这个值当**放大比例**，放大该件自己 roll 的 hp/def。
+## 字段名保留 atk_ 前缀是历史遗留 —— 它其实是通用倍率，不只作用于攻击
 @export var atk_per_level: float = 0.15
 ## 每级比上一级少给多少（0.85 = 每级只有上一级的 85%）
 @export var atk_falloff: float = 0.85
@@ -46,8 +49,10 @@ func cost_at_level(level: int) -> int:
 	return int(round(float(base_cost) * pow(cost_growth, float(maxi(level, 0)))))
 
 
-## 练到 level 级时总共给多少攻击加成（已经含收益递减）
-func atk_bonus_at(level: int) -> float:
+## 练到 level 级时的**倍率**（0.728 = +72.8%，已含收益递减）。
+## 武器：当攻击%；护甲/饰品：当 hp/def 的放大比例（ADR-0029）。
+## 旧名 atk_bonus_at 已改名 —— 它从来不该只作用于攻击
+func mult_at(level: int) -> float:
 	if level <= 0:
 		return 0.0
 	if is_equal_approx(atk_falloff, 1.0):

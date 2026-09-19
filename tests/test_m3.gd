@@ -417,9 +417,10 @@ func _t9_forge_at_anvil() -> void:
 	await _pframes(4)
 	var closed: bool = not bool(panel.call("is_open")) and not get_tree().paused
 
-	# v2：强化走**百分比**那一半，装备自己的攻击是平铺点数（不受强化影响）
+	# ADR-0029：damage_scale = 1 + 等级% + **武器**强化%（武器是唯一攻击杠杆）。
+	# 这里强化的就是装备着的武器，所以 weapon_atk_pct() == 这把武器的 forge_mult
 	var expect: float = 1.0 + PlayerState.progression.atk_bonus_at(PlayerState.level) \
-		+ PlayerState.forge_atk(uid)
+		+ PlayerState.weapon_atk_pct()
 	var rolled := int(PlayerState.stat_of(uid).get("atk", 0))
 	town.queue_free()
 	await _pframes(2)

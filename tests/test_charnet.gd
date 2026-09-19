@@ -248,6 +248,30 @@ func _forge() -> void:
 			str(no_book.is_empty()), PlayerState.gold, str(dup_bp),
 			"空" if crafted.is_empty() else "有"])
 
+	# 强化分工（ADR-0029）：武器强化→攻击杠杆(atk_pct)；护甲强化→只放大自己 hp/def、攻击不动。
+	# 这条钉死那个「强化头盔涨攻击」的 bug —— 也是这批重做的验收核心
+	_fresh("swordsman")
+	PlayerState.shards = 100000
+	# 头盔：hp 涨、atk_pct 岿然不动
+	var fh := PlayerState.add_item(HELM0)
+	PlayerState.equip(fh)
+	var hp0 := int(PlayerState.bonus_total().get("hp", 0))
+	var pct0: float = PlayerState.bonus_total().get("atk_pct", 0.0)
+	PlayerState.forge_once(PlayerState.equipped_uid(&"helm"))
+	var hp1 := int(PlayerState.bonus_total().get("hp", 0))
+	var pct1: float = PlayerState.bonus_total().get("atk_pct", 0.0)
+	var helm_amp: bool = hp1 > hp0 and is_equal_approx(pct0, pct1)
+	# 武器：atk_pct 涨到 weapon_atk_pct（=这把武器的 forge_mult）
+	var fw := PlayerState.add_item(SWORD0)
+	PlayerState.equip(fw)
+	PlayerState.forge_once(PlayerState.equipped_uid(&"weapon"))
+	var pct2: float = PlayerState.bonus_total().get("atk_pct", 0.0)
+	var weap_lever: bool = pct2 > pct1 and is_equal_approx(pct2, PlayerState.weapon_atk_pct())
+	_check("F5", "强化分工：头盔强化只涨hp/攻击不动；武器强化涨攻击杠杆atk_pct（ADR-0029 修「强化头盔涨攻击」）",
+		helm_amp and weap_lever,
+		"头盔 hp %d→%d atk%% %.3f→%.3f（该不变）／武器后 atk%%=%.3f（=weapon_atk_pct %.3f）" % [
+			hp0, hp1, pct0, pct1, pct2, PlayerState.weapon_atk_pct()])
+
 
 # ── 成长域（等级 / 经验 / flags）────────────────────────────────
 
