@@ -39,6 +39,9 @@ var _page := 0
 ## 按了键什么也没发生，玩家分不清是「没反应」还是「条件不满足」
 var _msg := ""
 var _msg_color := DIM
+## 当前滚动窗口顶端的绝对索引（刷新时写）。鼠标点第 i 个显示槽 → 绝对索引 = _view_top + i。
+## 鼠标点击靠它把「屏上第几个」翻译成「列表第几件」，键盘光标不碰它
+var _view_top := 0
 
 @onready var _root: Control = $Root
 @onready var _title: Label = $Root/Panel/Title
@@ -164,6 +167,32 @@ func _list_len() -> int:
 	return PlayerState.forgeable_uids().size() if _page == 0 else _craft_paths().size()
 
 
+## 鼠标点第 slot 个显示槽（0..15）。翻译成列表绝对索引（_view_top + slot）后走分级点击。
+## 只认左键按下；子节点 IGNORE，点击穿到行上到这里
+func _on_row_gui_input(event: InputEvent, slot: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_click_index(_view_top + slot)
+		get_viewport().set_input_as_handled()
+
+
+## 分级点击（**可被测试直接调**，不依赖真实鼠标 —— 验证不靠点不到的像素）。
+## 铁匠铺两页都是「花料/花钱不可逆」→ **两步**：点一次选中高亮，点已选中的同一行才确认。
+## 越界（点到空行）忽略
+func _click_index(idx: int) -> void:
+	if idx < 0 or idx >= _list_len():
+		return
+	if idx == _cursor:
+		if _page == 0:
+			_forge_at_cursor()
+		else:
+			_craft_at_cursor()
+	else:
+		_cursor = idx
+		_msg = ""
+		refresh()
+
+
 ## 强化光标那件。三种结果都要说出来（成功 / 到顶 / 精铁不够）
 func _forge_at_cursor() -> void:
 	var uid := selected_uid()
@@ -280,11 +309,14 @@ func selected_craft_path() -> String:
 ## 行节点全部由代码建（与 HUD 面板同一套做法）：手写 tscn 的嵌套 parent 路径
 ## 容易静默丢节点，能省的静态节点就省掉
 func _build_rows() -> void:
-	for _i in CELLS:
+	for i in CELLS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
 		row.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# 鼠标：行收点击（子节点 icon/label 仍 IGNORE，点击穿到行上）。
+		# 连一次即可 —— 行是建好复用的，第 i 个显示槽的绝对索引 = _view_top + i（见 _on_row_click）
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.gui_input.connect(_on_row_gui_input.bind(i))
 
 		var icon := ItemIcon.new()
 		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
@@ -333,6 +365,7 @@ func _refresh_forge() -> void:
 	if _cursor >= list.size():
 		_cursor = maxi(list.size() - 1, 0)
 	var top := _scroll_top(list.size(), ROWS)
+	_view_top = top          # 鼠标点击靠它翻译「屏上第几个 → 列表第几件」
 	for r in ROWS:
 		var idx := top + r
 		var row := _rows[r]
@@ -386,6 +419,7 @@ func _refresh_craft() -> void:
 	# 两栏页：可见 16 格，滚动窗口的 top 落在整行边界（cols 的倍数），列才不会错位
 	var shown := ROWS * _cols()
 	var top := _grid_top(list.size(), _cols())
+	_view_top = top          # 鼠标点击靠它翻译「屏上第几个 → 列表第几件」
 	for r in shown:
 		var idx := top + r
 		var row := _rows[r]
