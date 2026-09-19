@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"blade_rush"
+display_name = "突刀"
+name_key = &"SKILL_BLADE_RUSH"
+kind = 0
+startup_frames = 7
+active_frames = 6
+recovery_frames = 13
+damage = 22
+damage_variance = 0.15
+knockback = 120.0
+hitstop_frames = 7
+heavy = false
+chainable = false
+hitbox_size = Vector2(58, 26)
+hitbox_offset = Vector2(36, -2)
+lunge_speed = 360.0
+lunge_decay_frames = 15
+invincible_from = 2
+invincible_to = 12
+cooldown_frames = 90
+mp_cost = 26
+unlock_level = 1
+shake_gain = 0.34

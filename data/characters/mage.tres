@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CharacterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/character_data.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"mage"
+name_key = &"CHAR_MAGE"
+desc_key = &"CHAR_MAGE_DESC"
+body_color = Color(0.52, 0.34, 0.82, 1)
+weapon_type = &"staff"
+sprite_dir = "res://assets/characters/mage"
+sprite_scale = 3.0
+sprite_frame_h = 29.0
+sprite_foot_y = 25.0
+starting_weapon = "res://data/items/wp_u6756_0_u5b66u5f92u6756.tres"
+combo = Array[String](["res://data/skills/staff_1.tres", "res://data/skills/staff_2.tres", "res://data/skills/staff_3.tres"])
+skills = Array[String](["res://data/skills/staff_burst.tres", "res://data/skills/staff_barrier.tres", "res://data/skills/staff_focus.tres", "res://data/skills/staff_frost.tres", "res://data/skills/staff_storm.tres"])

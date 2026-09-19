@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"staff_frost"
+display_name = "寒霜环"
+name_key = &"SKILL_STAFF_FROST"
+kind = 0
+startup_frames = 14
+active_frames = 6
+recovery_frames = 20
+damage = 20
+damage_variance = 0.15
+knockback = 110.0
+hitstop_frames = 7
+heavy = false
+chainable = false
+hitbox_size = Vector2(112, 78)
+hitbox_offset = Vector2(14, 2)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 130
+mp_cost = 34
+unlock_level = 1
+shake_gain = 0.4

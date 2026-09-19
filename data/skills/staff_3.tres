@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+[ext_resource type="PackedScene" path="res://scenes/skills/magic_bolt.tscn" id="2_bolt"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"staff_3"
+name_key = &"SKILL_STAFF_3"
+display_name = "术弹·三"
+kind = 0
+startup_frames = 13
+active_frames = 2
+recovery_frames = 19
+damage = 21
+damage_variance = 0.1
+knockback = 190.0
+hitstop_frames = 9
+heavy = true
+chainable = false
+hitbox_size = Vector2(4, 4)
+hitbox_offset = Vector2(20, -2)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 0
+shake_gain = 0.48
+projectile_scene = ExtResource("2_bolt")
+projectile_speed = 520.0
+projectile_life = 1.4

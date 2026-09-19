@@ -14,8 +14,6 @@ const ROOM := preload("res://scenes/stages/test_room.tscn")
 const MENU := preload("res://scenes/ui/main_menu.tscn")
 const SaveGuard := preload("res://tests/save_guard.gd")
 
-const ARCHER := "res://data/characters/archer.tres"
-
 var _pass := 0
 var _fail := 0
 var _bak: Dictionary = {}
@@ -35,6 +33,7 @@ func _ready() -> void:
 	await _t6_old_save_falls_back()
 	await _t7_weapon_type_gate()
 	await _t8_gate_is_visible()
+	await _t9_combo_projectiles()
 
 	SaveGuard.restore(_bak)
 	PlayerState.character_id = ""
@@ -63,47 +62,59 @@ func _pframes(n: int) -> void:
 
 # ── 断言 ───────────────────────────────────────────────────────
 
-## 注册表：两个角色都在，连招与技能池都指到真资源
+## 注册表：四个角色都在，连招与技能池都指到真资源（批 7：+刀手 / +法师）
 func _t1_registry() -> void:
 	var all := CharacterData.all()
 	var ids := {}
 	for c in all:
 		ids[str(c.id)] = c
-	var both: bool = ids.has("swordsman") and ids.has("archer")
-	var archer := ids.get("archer") as CharacterData
-	var data_ok: bool = archer != null and archer.load_combo().size() == 3 \
-		and archer.load_skills().size() >= 3 \
-		and (ids.get("swordsman") as CharacterData).load_combo().size() == 3
-	_check("1", "角色注册：剑客 + 逐风都在，连招与技能池都指到真资源",
-		both and data_ok,
-		"注册 %d 个角色　逐风连招/技能 = %d/%d" % [
+	var four: bool = ids.has("swordsman") and ids.has("archer") \
+		and ids.has("bladesman") and ids.has("mage")
+	var data_ok := true
+	for cid in ["swordsman", "archer", "bladesman", "mage"]:
+		var c := ids.get(cid) as CharacterData
+		data_ok = data_ok and c != null and c.load_combo().size() == 3 \
+			and c.load_skills().size() >= 3
+	var mage := ids.get("mage") as CharacterData
+	var staff_ok: bool = mage != null and mage.weapon_type == &"staff" \
+		and str(mage.combo[0]).ends_with("staff_1.tres")
+	_check("1", "角色注册：剑客/逐风/刀手/法师都在，连招与技能池都指到真资源",
+		four and data_ok and staff_ok,
+		"注册 %d 个角色　法师连招首段=%s 武器=%s" % [
 			all.size(),
-			archer.load_combo().size() if archer != null else -1,
-			archer.load_skills().size() if archer != null else -1])
+			str(mage.combo[0]).get_file() if mage != null else "?",
+			str(mage.weapon_type) if mage != null else "?"])
 
 
-## 玩家读表：选了逐风 → 技能池是弓的、连招第一段是 bow_1、外观色换绿
+## 玩家读表：刀手 → 刀连招 / 外观换色；法师 → 杖连招 / 外观换色（逻辑零特判）
 func _t2_player_reads_character() -> void:
-	PlayerState.character_id = "archer"
-	var room := (ROOM as PackedScene).instantiate()
-	add_child(room)
-	await _pframes(5)
-	var player := room.get_node("Player")
-	var pool: Array = player.call("skill_pool_paths")
-	var combo: Array = player.get("attack_combo")
-	var pool_is_bow: bool = pool.size() == 3 \
-		and str(pool[0]).ends_with("quick_shot.tres")
-	var combo_is_bow: bool = combo.size() == 3 \
-		and str(combo[0].resource_path).ends_with("bow_1.tres")
-	var body: ColorRect = player.get_node("Visuals/Body")
-	var colored: bool = body.color.is_equal_approx((load(ARCHER) as CharacterData).body_color)
-	room.queue_free()
-	await _pframes(2)
-	_check("2", "玩家读表：逐风 → 弓技能池 / 弓连招 / 外观换色（逻辑零特判）",
-		pool_is_bow and combo_is_bow and colored,
-		"池 %d 个首个=%s　连招首段=%s" % [
-			pool.size(), str(pool[0]).get_file(),
-			str(combo[0].resource_path).get_file() if combo.size() > 0 else "?"])
+	var expect := {
+		"bladesman": "blade_1.tres",
+		"mage": "staff_1.tres",
+	}
+	var ok := true
+	var detail := ""
+	for cid in expect:
+		PlayerState.character_id = cid
+		var room := (ROOM as PackedScene).instantiate()
+		add_child(room)
+		await _pframes(5)
+		var player := room.get_node("Player")
+		var combo: Array = player.get("attack_combo")
+		var pool: Array = player.call("skill_pool_paths")
+		var body: ColorRect = player.get_node("Visuals/Body")
+		var cd := load("res://data/characters/%s.tres" % cid) as CharacterData
+		var hit: bool = combo.size() == 3 \
+			and str(combo[0].resource_path).ends_with(expect[cid]) \
+			and pool.size() >= 5 \
+			and body.color.is_equal_approx(cd.body_color)
+		ok = ok and hit
+		detail += "%s: 连招首段=%s 池=%d 色=%s　" % [
+			cid, str(combo[0].resource_path).get_file(), pool.size(), str(hit)]
+		room.queue_free()
+		await _pframes(2)
+	_check("2", "玩家读表：刀手 → 刀连招、法师 → 杖连招、外观换色（逻辑零特判）",
+		ok, detail)
 
 
 ## 弓箭是真投射物：发射 → 飞 → 命中掉血，且带全套打击反馈（屏震在发射方身上）
@@ -169,7 +180,10 @@ func _t5_menu_character_page() -> void:
 	var page_shown: bool = menu.get_node_or_null("Slots").visible == false \
 		and bool(menu._char_page.visible)
 	var btns: Array[Button] = menu._char_btns
-	var two_visible: bool = btns.size() >= 2 and btns[0].visible and btns[1].visible
+	# 批 7 后是四职业：按钮数量跟 data/characters/ 走，一颗都不能缺
+	var four_visible: bool = btns.size() == 4
+	for b in btns:
+		four_visible = four_visible and b.visible
 	menu.call("_on_character", &"archer")
 	await _pframes(2)
 	var flow_ok: bool = not bool(menu._char_page.visible) \
@@ -178,10 +192,10 @@ func _t5_menu_character_page() -> void:
 	var pending_after := str(menu._pending_character)
 	menu.queue_free()
 	await _pframes(2)
-	_check("5", "新的开始：先选人（两颗按钮）→ 再选槽；选的人记在待选里",
-		page_shown and two_visible and flow_ok,
-		"选人页=%s 按钮≥2=%s 选完进槽位页=%s pending=%s" % [
-			str(page_shown), str(two_visible), str(flow_ok), pending_after])
+	_check("5", "新的开始：先选人（四颗按钮）→ 再选槽；选的人记在待选里",
+		page_shown and four_visible and flow_ok,
+		"选人页=%s 按钮=%d 全可见=%s 选完进槽位页=%s pending=%s" % [
+			str(page_shown), btns.size(), str(four_visible), str(flow_ok), pending_after])
 
 
 ## 老档（没 character_id）进游戏 = 剑客，一行逻辑都没为它改
@@ -207,50 +221,43 @@ func _count_projectiles(room: Node) -> int:
 	return n
 
 
-## 武器类型是唯一的装备门：弓手穿剑被拒（可卖不可挥），剑客反之；本命武器畅通。
+## 武器类型是唯一的装备门：每个职业穿得了本命武器、穿不了别的三种（留在包里可卖）。
 ## **拒绝必须能在界面上说出来**（背包提示行），不许静默。
 ##
-## v2 起武器有**四种**（剑 / 刀 / 弓 / 杖），所以这里除了「别人的本命武器拿不了」，
-## 还盯一条新的：**刀与杖现在谁都不能穿**（刀手 / 法师还没做，是批 7）。
-## 不盯的话，一把刀会变成「谁都能挥的剑」，而职业门静默失效
+## 批 7 前这里盯的是「刀与杖谁都不能穿」（职业没做）；批 7 后四个职业齐了，
+## 断言翻过来：**每种武器都有主，也只认主** —— 4×4 全查，一门失效立刻现形
 func _t7_weapon_type_gate() -> void:
-	const SWORD := "res://data/items/wp_u5251_0_u94c1u5251.tres"      # 剑
-	const BOW := "res://data/items/wp_u5f13_0_u730eu5f13.tres"        # 弓
-	const BLADE := "res://data/items/wp_u5200_0_u73afu9996u5200.tres"  # 刀（无职业）
-	const STAFF := "res://data/items/wp_u6756_0_u6843u6728u6756.tres"  # 杖（无职业）
-	PlayerState.character_id = "archer"
+	const W := {
+		"sword": "res://data/items/wp_u5251_0_u94c1u5251.tres",      # 剑 → 剑客
+		"blade": "res://data/items/wp_u5200_0_u94c1u5200.tres",      # 刀 → 刀手
+		"bow": "res://data/items/wp_u5f13_0_u730eu5f13.tres",        # 弓 → 逐风
+		"staff": "res://data/items/wp_u6756_0_u5b66u5f92u6756.tres", # 杖 → 法师
+	}
+	const CHARS := {
+		"swordsman": "sword", "bladesman": "blade", "archer": "bow", "mage": "staff",
+	}
+	var ok := true
+	var detail := ""
+	for cid in CHARS:
+		PlayerState.reset_for_new_game()
+		PlayerState.character_id = cid
+		PlayerState._character = null
+		PlayerState._character_loaded_for = ""
+		var own: bool = true
+		var others: bool = true
+		for wtype in W:
+			var uid := PlayerState.add_item(W[wtype])
+			if wtype == CHARS[cid]:
+				PlayerState.equip(uid)
+				own = own and PlayerState.equipped_uid(&"weapon") == uid
+			else:
+				others = others and not PlayerState.can_equip(PlayerState.item_of(uid)) \
+					and PlayerState.bag.has(uid)
+		ok = ok and own and others
+		detail += "%s: 本命=%s 他命全拒=%s　" % [cid, str(own), str(others)]
 	PlayerState.reset_for_new_game()
-	PlayerState.character_id = "archer"
-	var sword_uid := PlayerState.add_item(SWORD)
-	var bow_uid := PlayerState.add_item(BOW)
-	var blade_uid := PlayerState.add_item(BLADE)
-	var staff_uid := PlayerState.add_item(STAFF)
-	var sword_refused: bool = PlayerState.equip(sword_uid) == "" \
-		and PlayerState.bag.has(sword_uid) \
-		and PlayerState.equipped_uid(&"weapon") == ""
-	# 注意 equip 的返回值是「被换下来的旧装备 uid」—— 原来槽是空的，成功也返回空串，
-	# 别拿它判成败，判「武器栏现在是谁」
-	PlayerState.equip(bow_uid)
-	var bow_ok: bool = PlayerState.equipped_uid(&"weapon") == bow_uid
-	# 剑客侧：逐风弓进不了手
-	PlayerState.character_id = "swordsman"
-	PlayerState._character = null      # 清缓存（角色切换走菜单，测试里手动模拟）
-	PlayerState._character_loaded_for = ""
-	var bow_on_sword: bool = not PlayerState.can_equip(PlayerState.item_of(bow_uid))
-	var sword_on_sword: bool = PlayerState.can_equip(PlayerState.item_of(sword_uid))
-	# 刀 / 杖：两个角色都不该能穿（对应的职业还没做）
-	var blade_locked: bool = not PlayerState.can_equip(PlayerState.item_of(blade_uid))
-	PlayerState.character_id = "archer"
-	PlayerState._character = null
-	PlayerState._character_loaded_for = ""
-	var staff_locked: bool = not PlayerState.can_equip(PlayerState.item_of(staff_uid))
-	PlayerState.reset_for_new_game()
-	_check("7", "装备门：弓手穿不了剑（留在包里可卖）、本命弓畅通；剑客反之；刀/杖无职业穿不了",
-		sword_refused and bow_ok and bow_on_sword and sword_on_sword \
-			and blade_locked and staff_locked,
-		"弓手+剑拒=%s　弓手+本命弓=%s　剑客+弓拒=%s　剑客+剑=%s　刀（无职业，剑客）=拒%s　杖（无职业，弓手）=拒%s" % [
-			str(sword_refused), str(bow_ok), str(bow_on_sword), str(sword_on_sword),
-			str(blade_locked), str(staff_locked)])
+	_check("7", "装备门：四职业各穿本命武器畅通，其余三种全拒（留在包里可卖）",
+		ok, detail)
 
 
 ## **门要在界面上看得见**（[ADR-0025](../docs/adr/0025-skill-pool-module-and-unfiltered-drops.md) §2.2）。
@@ -329,3 +336,53 @@ func _t8_gate_is_visible() -> void:
 			str(ok_locked), str(bad_locked),
 			str(gear_ok_txt), str(gear_bad_txt), str(gear_bad_icon),
 			str(bp_bad_txt), str(bp_bad_icon), detail.split("\n")[0]])
+
+
+## **远程三段连招，每一段都要发弹**。
+##
+## 这条的来历：连招衔接是 `_start_attack` → `_start_attack` **直连**，
+## 不经过 `_end_action()`，而 `_projectile_fired` 只在 `_start_cast` / `_end_action`
+## 归位 —— 于是第 1 段发过弹之后，第 2/3 段判定窗口全程都在、却一发不发。
+## 弓手（bow_2/3）与法师（staff_2/3）同结构，**此前从未被任何断言盯过**
+## （#3 只验了单发起手）。干净对照实测：不修 = 1/0/0，修了 = 1/1/1。
+##
+## 做法：把「按着 J 不放」写成每帧 `_attack_queued = true`，让衔接窗口一开就接，
+## 逐段数新增的投射物；玩家推进 HURT（测试房的 Walker 会还手）就提前清场。
+func _t9_combo_projectiles() -> void:
+	PlayerState.character_id = "mage"
+	var room := (ROOM as PackedScene).instantiate()
+	add_child(room)
+	await _pframes(5)
+	var player := room.get_node("Player")
+	# Walker 会还手 —— 它一打就把玩家推进 HURT，连招被打断，量的就不是连招了
+	var walker := room.get_node_or_null("Walker")
+	if walker != null:
+		walker.queue_free()
+	await _pframes(1)
+	player.global_position = Vector2(100.0, 288.0)
+
+	var per_seg := {}          # attack_index -> 该段新增投射物数
+	var last_count := _count_projectiles(self)
+	var deepest := -1
+	player.call("_start_attack", 0)
+	var n := 0
+	while n < 240:
+		await get_tree().physics_frame
+		n += 1
+		player._attack_queued = true      # 模拟「按着 J 不放」
+		deepest = maxi(deepest, int(player.attack_index))
+		var now := _count_projectiles(self)
+		if now > last_count:
+			per_seg[player.attack_index] = int(per_seg.get(player.attack_index, 0)) + (now - last_count)
+			last_count = now
+		if player.state != 1:             # 1 = ATTACK：这一串走完了
+			break
+
+	var seg_counts := [int(per_seg.get(0, 0)), int(per_seg.get(1, 0)), int(per_seg.get(2, 0))]
+	var all_fired: bool = seg_counts[0] == 1 and seg_counts[1] == 1 and seg_counts[2] == 1
+	room.queue_free()
+	await _pframes(2)
+	_check("9", "法师三段连招：每段判定窗口都甩出法术弹，不是只有第一段有",
+		all_fired and deepest == 2,
+		"各段新增弹 = %d/%d/%d（都该是 1）　最深走到第 %d 段，共 %d 帧" % [
+			seg_counts[0], seg_counts[1], seg_counts[2], deepest + 1, n])

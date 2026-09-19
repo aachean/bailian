@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"blade_blood"
+display_name = "浴血"
+name_key = &"SKILL_BLADE_BLOOD"
+kind = 0
+startup_frames = 12
+active_frames = 8
+recovery_frames = 18
+damage = 34
+damage_variance = 0.12
+knockback = 200.0
+hitstop_frames = 10
+heavy = true
+chainable = false
+hitbox_size = Vector2(84, 58)
+hitbox_offset = Vector2(24, 0)
+lunge_speed = 60.0
+lunge_decay_frames = 12
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 200
+mp_cost = 48
+unlock_level = 1
+heal_amount = 25
+shake_gain = 0.6

@@ -12,6 +12,12 @@ func _ready() -> void:
 	for i in 10:
 		await get_tree().process_frame
 	await _shot("menu_slots")
+	# 选人页（M4）：按钮数量跟着角色走，4 职业时代的高度账只能看图对
+	get_tree().paused = false
+	menu.call("_on_start")
+	for i in 10:
+		await get_tree().process_frame
+	await _shot("menu_chars")
 	get_tree().quit()
 
 

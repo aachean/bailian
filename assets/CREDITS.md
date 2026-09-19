@@ -21,6 +21,8 @@
 | **Goblin Corps (MV Platformer Set)** | https://opengameart.org/content/goblin-corps-mv-platformer-set | MoikMellah | **CC0 1.0** | **全部小怪与 Boss**（哥布林农民 / 甲士 / 武士 / 骑士 / 领主等 10 个变体） |
 | **Villagers Sprite Sheets Pixel Art Pack** | https://opengameart.org/content/villagers-sprite-sheets-pixel-art-pack | CraftPix.net 2D Game Assets | **OGA-BY 3.0**（**强制署名**） | **NPC**：老铁匠（拄拐老人）/ 猎人（壮汉），48×48 横版 |
 | **Ranger [Animated]** | https://opengameart.org/content/ranger-animated | DezrasDragons | **CC0 1.0** | **主角（弓手 · 逐风）**：idle / run / attack / jump / 死亡 共 22 帧 |
+| **Samurai [Animated]** | https://opengameart.org/content/samurai-animated | DezrasDragons | **CC0 1.0** | **主角（刀手 · 断岳）**：idle / run / attack / jump / 死亡（与逐风同作者同族，1x 帧一致） |
+| **Mr. Necromancer Man [Animated]** | https://opengameart.org/node/39285 | Disthron | **CC0 1.0** | **主角（法师 · 玄机）**：idle / run / attack / 死亡（Classic Hero 家族切片，源文件 YeOldyNecroGuy.png） |
 | Kenney UI Pack Pixel Adventure（节选 1 张面板格 `assets/ui/panel.png`，压暗作九宫格底） | https://kenney.nl/assets/ui-pack-pixel-adventure | Kenney | **CC0 1.0** | 全部 UI 面板（铁匠铺 / 商店 / 背包 / 暂停 / 设置 / 舆图 / 死亡 / 对话） |
 | Noto Sans SC（子集化） | https://github.com/google/fonts | Google | **SIL OFL 1.1**（`assets/fonts/OFL.txt` 随附） | 界面中文字体 |
 | AI 生成 · 逐风 HUD 头像 | — | 本项目用生图工具生成（2026-09-16） | 工具生成，无第三方权利负担 | 弓手头像 |
@@ -58,7 +60,8 @@
   Mattz Art       — FREE - Knight 2D Pixel Art
   MoikMellah      — Goblin Corps (MV Platformer Set)
   CraftPix.net    — Villagers Sprite Sheets Pixel Art Pack   ← 强制署名（OGA-BY 3.0）
-  DezrasDragons   — Ranger [Animated]
+  DezrasDragons   — Ranger [Animated] ／ Samurai [Animated]
+  Disthron        — Mr. Necromancer Man
 界面：Kenney（CC0）　字体：Google Noto Sans SC（SIL OFL）
 完整来源链接见本文件。
 ```

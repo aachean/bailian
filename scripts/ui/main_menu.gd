@@ -271,14 +271,16 @@ func _build_character_page() -> void:
 	_char_page.add_child(_char_title)
 
 	var box := VBoxContainer.new()
-	box.position = Vector2(110, 96)
-	box.size = Vector2(420, 170)
-	box.add_theme_constant_override("separation", 14)
+	box.position = Vector2(110, 88)
+	box.size = Vector2(420, 200)
+	box.add_theme_constant_override("separation", 10)
 	_char_page.add_child(box)
 
 	for c in CharacterData.all():
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(420, 52)
+		# 四职业时代的高度账：88 + 4×40 + 3×10 = 298，必须停在「返回」(y=300) 之上。
+		# 两角色时代的 52px×4 会把第四颗按钮压到返回键上（VBox 不裁剪，直接叠画）
+		b.custom_minimum_size = Vector2(420, 40)
 		# 有立绘就挂头像（ADR-0015）—— 选人页一眼看到「这是谁」
 		if not c.sprite_dir.is_empty():
 			var icon_path := c.sprite_dir + "/portrait.png"

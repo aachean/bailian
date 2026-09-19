@@ -374,6 +374,7 @@ var _skin_foot_y := 62.0
 ## 复制出来的帧是冗余，改一处必忘一处。
 const ANIM_FALLBACK := {
 	&"walk": [&"run"],
+	&"jump": [&"run", &"idle"],   # 法师素材没有跳跃帧 —— 腾空时用跑步帧顶（比冻住自然）
 	&"attack2": [&"attack", &"windup"],
 	&"attack3": [&"attack", &"windup"],
 	&"hurt": [&"idle"],
@@ -1100,6 +1101,12 @@ func _start_attack(index: int) -> void:
 	_dodge_queued = false
 	_jump_buffer_timer = 0.0
 	_hitbox.deactivate()
+	# 每一段都要把「这一段发过投射物没有」归零。
+	# ⚠️ 连招衔接是 _start_attack → _start_attack **直连**，不经过 _end_action()，
+	# 所以只在 _end_action 里归位是不够的：第 1 段发过箭之后，第 2/3 段全程
+	# 判定窗口都在，却一发都不发（远程角色三段连招只有第一段有弹）。
+	# 实测（干净对照，测试房先把 Walker 清掉）：不修 = 第2/3段投射物各 0；修了 = 1/1/1。
+	_projectile_fired = false
 	velocity.x = _current.lunge_speed * float(_facing)
 	attacks_started += 1
 

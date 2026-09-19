@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+[ext_resource type="PackedScene" path="res://scenes/skills/magic_bolt.tscn" id="2_bolt"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"staff_storm"
+display_name = "万法奔流"
+name_key = &"SKILL_STAFF_STORM"
+kind = 0
+startup_frames = 16
+active_frames = 4
+recovery_frames = 22
+damage = 38
+damage_variance = 0.1
+knockback = 230.0
+hitstop_frames = 11
+heavy = true
+chainable = false
+hitbox_size = Vector2(4, 4)
+hitbox_offset = Vector2(20, -2)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 170
+mp_cost = 50
+unlock_level = 1
+shake_gain = 0.62
+projectile_scene = ExtResource("2_bolt")
+projectile_speed = 620.0
+projectile_life = 1.6

@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"blade_roar"
+display_name = "怒吼"
+name_key = &"SKILL_BLADE_ROAR"
+kind = 0
+startup_frames = 14
+active_frames = 6
+recovery_frames = 22
+damage = 26
+damage_variance = 0.15
+knockback = 160.0
+hitstop_frames = 8
+heavy = true
+chainable = false
+hitbox_size = Vector2(104, 76)
+hitbox_offset = Vector2(16, 2)
+lunge_speed = 0.0
+lunge_decay_frames = 1
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 150
+mp_cost = 40
+unlock_level = 1
+shake_gain = 0.5

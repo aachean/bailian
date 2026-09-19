@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CharacterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/character_data.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"bladesman"
+name_key = &"CHAR_BLADESMAN"
+desc_key = &"CHAR_BLADESMAN_DESC"
+body_color = Color(0.78, 0.72, 0.4, 1)
+weapon_type = &"blade"
+sprite_dir = "res://assets/characters/bladesman"
+sprite_scale = 3.0
+sprite_frame_h = 29.0
+sprite_foot_y = 25.0
+starting_weapon = "res://data/items/wp_u5200_0_u94c1u5200.tres"
+combo = Array[String](["res://data/skills/blade_1.tres", "res://data/skills/blade_2.tres", "res://data/skills/blade_3.tres"])
+skills = Array[String](["res://data/skills/blade_wind.tres", "res://data/skills/blade_guard.tres", "res://data/skills/blade_rush.tres", "res://data/skills/blade_roar.tres", "res://data/skills/blade_blood.tres"])

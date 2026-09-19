@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="SkillData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/skill_data.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+id = &"blade_3"
+name_key = &"SKILL_BLADE_3"
+display_name = "断岳"
+kind = 0
+startup_frames = 11
+active_frames = 6
+recovery_frames = 20
+damage = 27
+damage_variance = 0.1
+knockback = 340.0
+hitstop_frames = 11
+heavy = true
+chainable = false
+hitbox_size = Vector2(70, 50)
+hitbox_offset = Vector2(36, -2)
+lunge_speed = 210.0
+lunge_decay_frames = 15
+invincible_from = 0
+invincible_to = 0
+cooldown_frames = 0
+shake_gain = 0.55
